@@ -1,6 +1,6 @@
 # Runs, steps and provider execution
 
-Status: persisted run lifecycle, live/replay events and typed stage/step progress are implemented in P1-07a/b. Provider execution, preflight/policy and recovery coordination are subsequent tasks. See [lifecycle validation](../Development/p1-07a-validation.md) and [progress validation](../Development/p1-07b-validation.md). Source: [final architecture](final-architecture.txt), sections 66–67.
+Status: persisted run lifecycle, live/replay events and typed stage/step progress are implemented in P1-07a/b. An internal read-only Codex provider is implemented in P1-09b; preflight/policy, redaction and recovery coordination remain subsequent tasks. See [lifecycle validation](../Development/p1-07a-validation.md) and [progress validation](../Development/p1-07b-validation.md). Source: [final architecture](final-architecture.txt), sections 66–67.
 <!-- Source sections: 66,67 -->
 
 Every agent or workflow execution creates a Run with explicit workspace/project ownership. Runs record identity, parent run, agent/workflow references, task, status, creation/start/completion times, execution profile, environment, working directory, result/error, artifact references and trace identity.
@@ -45,4 +45,7 @@ Steps require an active parent to start. Completion requires completed/skipped c
 
 Plans allow at most 32 stages and 128 steps, with titles bounded to 160 UTF-8 bytes. JSON decoding validates the same graph/state/measurement invariants as mutations. All timestamps must be finite and chronological; operational writes use canonical SQLite Unix-time precision so live and replayed event values compare exactly. Typed titles are internal caller-supplied labels; arbitrary provider output still requires the separate redaction/event boundary.
 
-The P1-09a internal Mac byte transport now supports bounded stdin, live stdout/stderr chunks and explicit process-exit/signal results. Diagnostics already use it. It has no run authority, filesystem-scope grant or UI/mobile endpoint. Provider-specific request validation/event decoding and the later coordinator must enforce project/environment identity and policy before making agent tasks executable; see [Codex transport](codex.md).
+The P1-09a internal Mac byte transport now supports bounded stdin, live stdout/stderr chunks and explicit process-exit/signal results. Diagnostics already use it. It has no run authority, filesystem-scope grant or UI/mobile endpoint. P1-09b adds provider-specific request validation, verified read-only roots and bounded event decoding. The later coordinator must enforce environment policy, redact observations and validate results before making agent tasks executable in the app; see [Codex transport](codex.md).
+
+
+`ExecutionProvider` returns a cancellable bounded observation stream; it does not mutate persisted lifecycle state. `CodexCLIProvider` currently executes one ephemeral read-only turn per process. Scope is checked before launch and at output/termination boundaries. Its final event requires protocol and process success, but cannot itself authorize the lifecycle service to mark a run complete. The coordinator must bind the effective configuration, policy decision, redacted evidence and output-schema validation to that same run identity. See [provider validation](../Development/p1-09b-validation.md).

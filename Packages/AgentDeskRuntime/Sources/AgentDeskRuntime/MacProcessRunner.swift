@@ -19,11 +19,11 @@ struct MacProcessExit: Sendable, Equatable {
 /// Raw bytes stay untrusted. Callers must frame, validate and redact before persistence or display.
 enum MacProcessRunner {
     static func run(executable: URL, arguments: [String], directory: URL, environment: [String: String],
-                    input: Data? = nil, timeout: Duration, maximumBytes: Int,
+                    input: Data? = nil, interactiveInput: MacProcessInputPipe? = nil, timeout: Duration, maximumBytes: Int,
                     output: @Sendable (MacProcessChunk) throws -> Void) async throws -> MacProcessExit {
         try Task.checkCancellation()
         let local: (URL) -> Bool = { $0.isFileURL && $0.path.hasPrefix("/") && !$0.path.utf8.contains(0) && ($0.host == nil || $0.host == "localhost") }
-        guard local(executable), local(directory), timeout > .zero, timeout <= .seconds(3_600),
+        guard !(input != nil && interactiveInput != nil), local(executable), local(directory), timeout > .zero, timeout <= .seconds(3_600),
               (1...16_777_216).contains(maximumBytes), (input?.count ?? 0) <= 1_048_576,
               arguments.count <= 128, arguments.allSatisfy({ !$0.utf8.contains(0) && $0.utf8.count <= 65_536 }),
               arguments.reduce(0, { $0 + $1.utf8.count }) <= 131_072,
@@ -32,8 +32,13 @@ enum MacProcessRunner {
               environment.reduce(0, { $0 + $1.key.utf8.count + $1.value.utf8.count }) <= 131_072 else {
             throw CodexDiagnosticIssue.commandFailed
         }
+        let source: MacProcessInputPipe?
+        if let input {
+            let pipe = MacProcessInputPipe(); try pipe.write(input); pipe.close(); source = pipe
+        } else { source = interactiveInput }
+        defer { source?.cancel() }
         let child = try spawn(executable: executable, arguments: arguments, directory: directory,
-                              environment: environment, hasInput: input != nil)
+                              environment: environment, hasInput: source != nil)
         var reaped = false, inputFD = child.input
         defer {
             kill(-child.pid, SIGKILL)
@@ -45,6 +50,7 @@ enum MacProcessRunner {
             close(child.output); close(child.error)
         }
         let clock = ContinuousClock(), deadline = clock.now + timeout
+        var pendingInput: Data?
         var total = 0, inputOffset = 0, stdoutEOF = false, stderrEOF = false, exitStatus: Int32 = 0
         var exitedAt: ContinuousClock.Instant?
         while true {
@@ -52,9 +58,21 @@ enum MacProcessRunner {
             guard clock.now < deadline else { throw CodexDiagnosticIssue.timedOut }
             try drain(child.output, channel: .stdout, eof: &stdoutEOF, total: &total, maximum: maximumBytes, output: output)
             try drain(child.error, channel: .stderr, eof: &stderrEOF, total: &total, maximum: maximumBytes, output: output)
-            if inputFD >= 0, let input {
-                if try reaped || feed(input, offset: &inputOffset, descriptor: inputFD) {
-                    close(inputFD); inputFD = -1
+            if inputFD >= 0, let source {
+                if reaped { close(inputFD); inputFD = -1 }
+                else {
+                    if pendingInput == nil {
+                        switch source.read() {
+                        case .bytes(let bytes): pendingInput = bytes; inputOffset = 0
+                        case .waiting: break
+                        case .end: close(inputFD); inputFD = -1
+                        }
+                    }
+                    if inputFD >= 0, let bytes = pendingInput {
+                        if try feed(bytes, offset: &inputOffset, descriptor: inputFD, earlyCloseIsError: interactiveInput != nil) {
+                            pendingInput = nil
+                        }
+                    }
                 }
             }
             if !reaped {
@@ -72,7 +90,7 @@ enum MacProcessRunner {
         }
     }
 
-    private static func feed(_ input: Data, offset: inout Int, descriptor: Int32) throws -> Bool {
+    private static func feed(_ input: Data, offset: inout Int, descriptor: Int32, earlyCloseIsError: Bool) throws -> Bool {
         for _ in 0..<16 {
             if offset == input.count { return true }
             let count = input.withUnsafeBytes { bytes in
@@ -83,7 +101,10 @@ enum MacProcessRunner {
                 if errno == EAGAIN || errno == EWOULDBLOCK { return false }
                 if errno == EINTR { continue }
                 // The child can choose to stop reading. F_SETNOSIGPIPE prevents killing the host.
-                if errno == EPIPE { return true }
+                if errno == EPIPE {
+                    if earlyCloseIsError { throw CodexDiagnosticIssue.commandFailed }
+                    offset = input.count; return true
+                }
             }
             throw CodexDiagnosticIssue.commandFailed
         }

@@ -1,6 +1,6 @@
 # Security boundaries, secrets, classification and audit
 
-Status: scoped secret references and Keychain adapter code implemented (P1-05); native Mac and iPhone Keychain acceptance passes with the signed app identity. Central stream redaction, runtime policy, classification and audit remain planned. Source: [final architecture](final-architecture.txt), sections 96, 101 and 138–140.
+Status: scoped Keychain storage (P1-05), deterministic policy and durable approval/audit storage (P1-10), and the scoped redaction boundary (P1-12a) are implemented. Provider-to-evidence storage, run coordination, native approval review and remote projections remain subsequent work. Source: [final architecture](final-architecture.txt), sections 96, 101 and 138–140.
 <!-- Source sections: 96,101,138,139,140 -->
 
 The highest-priority boundary is company isolation. The model, imported documents, tool output, local processes, remote clients and extension content are not security authorities. The Mac validates scope and permission for every sensitive operation and response.
@@ -18,6 +18,22 @@ Data classifications are PUBLIC, INTERNAL, CONFIDENTIAL and SECRET. Typical requ
 Classifications affect context eligibility, display, artifact retention, export and mobile projections. Treat derived content as sensitive when it contains protected source data. An agent summary does not automatically declassify its inputs.
 
 Central redaction covers passwords, tokens, authorization headers, cookies, private keys, database URLs and configured sensitive fields. Apply it before logs, trace writes, previews, mobile streaming and analytics. Test structured fields and unstructured text, split stream chunks, escaped/encoded representations, false positives and unknown secrets. Pattern redaction is defense in depth; prevent unnecessary collection at the source.
+
+### Implemented redaction contract
+
+`ContentRedactor` binds a project, environment and run. `load` accepts deliberately supplied `SecretReference` values and an authorized resolver; it checks every reference before resolving any bytes. Workspace-wide and project-wide references may be inherited only within their owner. Foreign references, unavailable secrets, failed resolution and cancellation fail closed. Loading is not a permission grant or Keychain enumeration. No provider credential is extracted, and ordinary tests use synthetic values.
+
+Only this boundary constructs `RedactedText`. It is Encodable but cannot be decoded from arbitrary JSON to assert that content was sanitized. It carries the exact context, classification, mask count and redaction policy version. A changed record becomes CONFIDENTIAL; untouched content retains its caller-supplied classification. Whole records classified SECRET are refused. The wrapper does not authorize display, export, retrieval or transfer to another principal; consumers must check their own policy and exact scope.
+
+Text matching masks configured secret bytes in UTF-8, standard/URL-safe Base64, lower/upper hex, common JSON escapes and Unicode escapes. One layer of percent encoding is decoded solely for matching, with original source ranges retained: mixed hex case, optional encoding of unreserved characters and form `+` spaces are recognized. Overlapping occurrences merge before replacement. Password/token assignments, authorization/cookie headers, credential-bearing connection URLs, private-key blocks and recognizable token formats provide additional pattern coverage. Configured field names are literal validated names, never caller-supplied regular expressions.
+
+JSON uses a bounded lexical scanner. It masks a sensitive field's entire value, including arrays/objects; known sensitive values mask their entire scalar. Field names and string escapes are decoded for matching, while all other bytes, whitespace and number spelling/precision remain untouched. Secret-bearing object keys are rejected instead of renamed. Duplicate keys (including escaped equivalents), malformed syntax, invalid string escapes, excessive depth and excessive token counts fail without partial output. Masking a numeric/object value changes its JSON type to the redaction marker string; validate raw provider output against its output schema before redaction, then store the sanitized representation as evidence.
+
+`RedactionBuffer` holds one logical UTF-8 text/JSON message and emits nothing from `append`. `finish` is the only publication point, after the complete record is sanitized. This prevents a secret spanning chunks from leaking through a previously emitted prefix. Cancellation, invalid UTF-8 and overflow close/discard the record; subsequent appends/finishes fail. Live progress can continue using separately validated metadata events while text remains incomplete. Independent records must have real logical boundaries, not arbitrary transport chunk boundaries.
+
+Limits: 256 KiB input and 1 MiB sanitized output per record; 64 unique references and 64 KiB combined raw secret bytes; at most 1,024 generated variants totaling 4 MiB; 64 extra field names of at most 64 UTF-8 bytes; JSON depth 40, 8,192 values and 256 bytes per numeric token. Match collection is bounded. Policy/buffer descriptions and reflection hide private contents; errors contain fixed cases, not source text. Ordinary memory lifetime management does not guarantee zeroization.
+
+This is deterministic defense in depth, not discovery of every possible secret. Unknown unlabelled values, custom encodings, encrypted/compressed content and arbitrary binary artifacts require source minimization, an appropriate parser or denial before collection/publication. At this task boundary, the provider still returns untrusted observations in memory; the next evidence-storage and coordinator tasks must route them through this API before persistence or UI. See [redaction validation](../Development/p1-12a-validation.md).
 
 ## Remote and extension controls
 
@@ -37,6 +53,6 @@ The adapter uses generic-password items in the data-protection Keychain, with sy
 
 Setting updates an existing identity or adds a missing one, handling a concurrent add with one bounded update retry. Existence checks never request secret bytes. The service namespace is fixed to AgentDesk; accounts derive only from scoped identities. There are no account enumeration or bulk-delete operations. Cancellation is checked before each operation; an in-flight synchronous Security call cannot be interrupted safely.
 
-`SecretReference` is Codable and contains no value. `SecretValue` is not Codable, accepts bounded nonempty bytes, and redacts ordinary descriptions, debug descriptions and Mirror-based dumps. Authorized adapters must explicitly access bytes with `withBytes`. This wrapper does not guarantee memory zeroization or prevent deliberate misuse by code holding the value. It supplements the future centralized redaction pipeline and operation policy; it does not grant permission to an agent, plugin or phone.
+`SecretReference` is Codable and contains no value. `SecretValue` is not Codable, accepts bounded nonempty bytes, and redacts ordinary descriptions, debug descriptions and Mirror-based dumps. Authorized adapters must explicitly access bytes with `withBytes`. This wrapper does not guarantee memory zeroization or prevent deliberate misuse by code holding the value. It supplements the centralized redaction pipeline and operation policy; it does not grant permission to an agent, plugin or phone.
 
 The package builds on Mac and iPhone so future paired-device credentials can use native protection. Its presence in the iPhone binary does not expose Mac secrets or add any remote operation. No provider credentials are copied: Codex continues to own its supported CLI authentication.

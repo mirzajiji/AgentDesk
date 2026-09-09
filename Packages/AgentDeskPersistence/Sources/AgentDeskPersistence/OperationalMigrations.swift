@@ -3,7 +3,7 @@ import Foundation
 /// Forward-only, transactional migrations. A failed or future schema is never reset.
 enum OperationalMigrations {
     static let applicationID = 1_095_189_579 // "AGDK"
-    static let currentVersion = 3
+    static let currentVersion = 4
     static let versionOne = [
         """
         CREATE TABLE runs (
@@ -48,6 +48,32 @@ enum OperationalMigrations {
         """
     ]
 
+    static let versionFour = [
+        """
+        CREATE TABLE approvals (
+            workspace_id TEXT NOT NULL, project_id TEXT NOT NULL, environment_id TEXT NOT NULL,
+            approval_id TEXT NOT NULL, action_id TEXT NOT NULL, action_json TEXT NOT NULL,
+            requester_id TEXT NOT NULL, policy_fingerprint TEXT NOT NULL,
+            state TEXT NOT NULL CHECK (state IN ('pending','approved','rejected','modified','expired','consumed')),
+            sequence INTEGER NOT NULL CHECK (sequence > 0),
+            created_at REAL NOT NULL, expires_at REAL NOT NULL, updated_at REAL NOT NULL, reviewer_id TEXT, reviewer_revision TEXT,
+            PRIMARY KEY (workspace_id, project_id, environment_id, approval_id),
+            UNIQUE (workspace_id, project_id, environment_id, action_id)
+        )
+        """,
+        """
+        CREATE TABLE approval_events (
+            workspace_id TEXT NOT NULL, project_id TEXT NOT NULL, environment_id TEXT NOT NULL,
+            approval_id TEXT NOT NULL, sequence INTEGER NOT NULL CHECK (sequence > 0),
+            state TEXT NOT NULL CHECK (state IN ('pending','approved','rejected','modified','expired','consumed')),
+            recorded_at REAL NOT NULL, reviewer_id TEXT, reviewer_revision TEXT,
+            PRIMARY KEY (workspace_id, project_id, environment_id, approval_id, sequence),
+            FOREIGN KEY (workspace_id, project_id, environment_id, approval_id)
+                REFERENCES approvals(workspace_id, project_id, environment_id, approval_id)
+        )
+        """
+    ]
+
     static func apply(to database: SQLiteConnection) throws {
         try database.execute("PRAGMA foreign_keys = ON")
         try database.transaction {
@@ -71,10 +97,16 @@ enum OperationalMigrations {
                 for statement in versionThree { try database.execute(statement) }
                 try database.execute("PRAGMA user_version = 3")
             }
+            if version < 4 {
+                for statement in versionFour { try database.execute(statement) }
+                try database.execute("PRAGMA user_version = 4")
+            }
             // Verify required columns even when the database already claims the latest schema.
             _ = try database.query("SELECT workspace_id, project_id, run_id, state, created_at FROM runs LIMIT 0") { _ in 0 }
             _ = try database.query("SELECT workspace_id, project_id, run_id, sequence, state, recorded_at, event_kind, progress_json FROM run_events LIMIT 0") { _ in 0 }
             _ = try database.query("SELECT workspace_id, project_id, run_id, plan_json FROM run_progress LIMIT 0") { _ in 0 }
+            _ = try database.query("SELECT workspace_id, project_id, environment_id, approval_id, action_id, action_json, requester_id, policy_fingerprint, state, sequence, created_at, expires_at, updated_at, reviewer_id, reviewer_revision FROM approvals LIMIT 0") { _ in 0 }
+            _ = try database.query("SELECT workspace_id, project_id, environment_id, approval_id, sequence, state, recorded_at, reviewer_id, reviewer_revision FROM approval_events LIMIT 0") { _ in 0 }
             guard try database.integer("PRAGMA foreign_keys") == 1 else { throw OperationalStoreError.invalidDatabase }
         }
     }

@@ -1,6 +1,6 @@
 # Runs, steps and provider execution
 
-Status: persisted run lifecycle, live/replay events and typed stage/step progress are implemented in P1-07a/b. An internal read-only Codex provider is implemented in P1-09b; preflight/policy, redaction and recovery coordination remain subsequent tasks. See [lifecycle validation](../Development/p1-07a-validation.md) and [progress validation](../Development/p1-07b-validation.md). Source: [final architecture](final-architecture.txt), sections 66–67.
+Status: persisted run lifecycle, live/replay events and typed stage/step progress are implemented in P1-07a/b. An internal read-only Codex provider is implemented in P1-09b; P1-10 adds the internal policy/approval gate; preflight configuration, redaction and recovery coordination remain subsequent tasks. See [lifecycle validation](../Development/p1-07a-validation.md) and [progress validation](../Development/p1-07b-validation.md). Source: [final architecture](final-architecture.txt), sections 66–67.
 <!-- Source sections: 66,67 -->
 
 Every agent or workflow execution creates a Run with explicit workspace/project ownership. Runs record identity, parent run, agent/workflow references, task, status, creation/start/completion times, execution profile, environment, working directory, result/error, artifact references and trace identity.
@@ -49,3 +49,6 @@ The P1-09a internal Mac byte transport now supports bounded stdin, live stdout/s
 
 
 `ExecutionProvider` returns a cancellable bounded observation stream; it does not mutate persisted lifecycle state. `CodexCLIProvider` currently executes one ephemeral read-only turn per process. Scope is checked before launch and at output/termination boundaries. Its final event requires protocol and process success, but cannot itself authorize the lifecycle service to mark a run complete. The coordinator must bind the effective configuration, policy decision, redacted evidence and output-schema validation to that same run identity. See [provider validation](../Development/p1-09b-validation.md).
+
+
+The internal `PolicyGate` now prepares allow/review/deny decisions and wraps dispatch with current scope/authority checks and durable one-time approval consumption. It accepts an application-prepared effect, not arbitrary model commands. The coordinator must supply authenticated principals, resolved resources, an immutable effective configuration and the exact payload whose digest was reviewed. Consumed approvals cannot be reused after a failed/cancelled or uncertain attempt. Existing lifecycle rows and provider observations remain separate until P1-11 joins them. See [policy and review contract](permissions.md).

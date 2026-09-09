@@ -4,7 +4,7 @@ This is an implementation plan, not a completion claim. The full source specific
 
 Finish the current task's validation and commit before starting another independent task. A task may be split further when its diff becomes difficult to review; never combine unrelated completed tasks just to reduce commit count. Behavioral tests belong in the feature commit.
 
-Progress after P1-08b: **12 documented tasks complete, 9 Phase 1 tasks remaining** (21 detailed tasks including bootstrap). Phases 2–6 and sections 115–159 are also remaining; they have not yet been decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
+Progress after P1-09a: **13 documented tasks complete, 9 Phase 1 tasks remaining** (22 detailed tasks including bootstrap; P1-09 is split into transport and provider/event integration). Phases 2–6 and sections 115–159 are also remaining; they have not yet been decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
 
 ## Bootstrap
 
@@ -28,8 +28,9 @@ Progress after P1-08b: **12 documented tasks complete, 9 Phase 1 tasks remaining
 | P1-07a | Complete (`0ae202f`, pushed): shared run states, persisted lifecycle service and bounded replay/live state subscriptions | 12 Runtime + 58 Core + 12 persistence package tests; 97 native Mac and 92 iPhone unit tests pass. See [lifecycle validation](p1-07a-validation.md). |
 | P1-07b | Complete (`189bdff`, pushed): typed persisted stages/steps and deterministic measurable progress | 66 Core + 18 persistence + 16 Runtime package tests; 115 native Mac and 110 iPhone unit tests pass. See [progress validation](p1-07b-validation.md). |
 | P1-08a | Complete (`6be270b`, pushed): Codex discovery, supported version/status/login/logout adapters and bounded Mac command capture | Real installed CLI probe; 32 Runtime, 131 native Mac and 114 iPhone unit tests pass; see [diagnostics validation](p1-08a-validation.md) |
-| P1-08b | Complete: native Codex Settings, persisted executable/connection configuration and signed Mac XPC account host | 67 Core + 36 Runtime tests, 140 native Mac unit + 10 UI and 115 iPhone unit executions pass; actual native health check uses the existing CLI account. See [Settings validation](p1-08b-validation.md). |
-| P1-09 | Codex ExecutionProvider with arguments/stdin, streaming, cancellation, timeout and exit handling | Fake executable tests including prompt injection strings, split output, stderr, exit errors, process cleanup |
+| P1-08b | Complete (`126132d`, pushed): native Codex Settings, persisted executable/connection configuration and signed Mac XPC account host | 67 Core + 36 Runtime tests, 140 native Mac unit + 10 UI and 115 iPhone unit executions pass; actual native health check uses the existing CLI account. See [Settings validation](p1-08b-validation.md). |
+| P1-09a | Complete: real bounded Mac subprocess transport with stdin, incremental stdout/stderr, deadlines and cleanup; diagnostics use the same transport | 43 Runtime, 147 native Mac unit + 1 Settings UI and 115 iPhone unit executions pass. See [transport validation](p1-09a-validation.md). |
+| P1-09b | Codex ExecutionProvider, bounded JSON event framing and scoped request integration | Fake executable provider runs, malformed/unknown events, terminal validation, consumer cancellation/overflow and safe invocation |
 | P1-10 | Workspace-aware policy and approvals foundation | Allow/approval/deny, exact approved payload, expired/rejected approval, cross-scope and remote privilege rejection |
 | P1-11 | Run execution coordinator with scoped instructions and real provider adapter | Fake-provider end-to-end run; failure/cancel/restart persistence; supported live smoke test when available |
 | P1-12 | Redacted traces, artifacts, repository snapshots and changed-file/diff collection | Redaction before writes, scope isolation, dirty starting state, added/modified/deleted/renamed files |

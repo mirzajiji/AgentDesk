@@ -5,10 +5,14 @@ import SwiftUI
 struct ProjectAgentsView: View {
     @StateObject private var model: ProjectAgentsModel
     @State private var editor: AgentEditorRequest?
+    @State private var editingSharedInstructions = false
+    @State private var instructionPreview: InstructionPreviewRequest?
     @Environment(\.dismiss) private var dismiss
 
-    init(project: ProjectRecord, openStore: @escaping () async throws -> ProjectAgentStore) {
-        _model = StateObject(wrappedValue: ProjectAgentsModel(project: project, openStore: openStore))
+    init(project: ProjectRecord, openStore: @escaping () async throws -> ProjectAgentStore,
+         openInstructions: @escaping () async throws -> ProjectInstructionStore) {
+        _model = StateObject(wrappedValue: ProjectAgentsModel(project: project, openStore: openStore,
+                                                             openInstructions: openInstructions))
     }
 
     var body: some View {
@@ -19,6 +23,9 @@ struct ProjectAgentsView: View {
                     Text("Agents · Local project").foregroundStyle(.secondary)
                 }
                 Spacer()
+                Button("Shared Instructions") { editingSharedInstructions = true }
+                    .accessibilityIdentifier("instructions.shared")
+                    .disabled(model.instructionStore == nil)
                 Button("New Agent", systemImage: "plus") { editor = AgentEditorRequest() }
                     .accessibilityIdentifier("agent.create")
                     .disabled(model.loading || model.errorMessage != nil)
@@ -45,6 +52,12 @@ struct ProjectAgentsView: View {
                             if agent.definition.archived { Text("Archived").foregroundStyle(.secondary) }
                             else if !agent.definition.enabled { Text("Disabled").foregroundStyle(.secondary) }
                             Spacer()
+                            Button("Review Instructions") {
+                                Task {
+                                    if let value = await model.preview(agent) { instructionPreview = InstructionPreviewRequest(value: value) }
+                                }
+                            }
+                            .accessibilityIdentifier("agent.preview.\(agent.definition.name)")
                             Text("Version \(agent.definition.revision)").foregroundStyle(.secondary)
                         }
                         Text(agent.definition.summary).foregroundStyle(.secondary).lineLimit(2)
@@ -64,7 +77,7 @@ struct ProjectAgentsView: View {
                 }
                 .listStyle(.inset)
             }
-            Text("Agents are saved locally. Codex execution and effective configuration review are being added next.")
+            Text("Review the shared and agent instructions before execution. Codex execution is being added next.")
                 .font(.callout).foregroundStyle(.secondary)
         }
         .padding(24).frame(minWidth: 760, idealWidth: 820, minHeight: 520, idealHeight: 620)
@@ -72,7 +85,16 @@ struct ProjectAgentsView: View {
         .sheet(item: $editor) { request in
             AgentEditorView(existing: request.existing) { draft in try await model.save(draft, replacing: request.existing) }
         }
+        .sheet(isPresented: $editingSharedInstructions) {
+            if let store = model.instructionStore { SharedInstructionsView(store: store, scope: model.project.scope) }
+        }
+        .sheet(item: $instructionPreview) { request in InstructionPreviewView(value: request.value) }
     }
+}
+
+private struct InstructionPreviewRequest: Identifiable {
+    let id = UUID()
+    let value: ComposedInstructions
 }
 
 private struct AgentEditorRequest: Identifiable {

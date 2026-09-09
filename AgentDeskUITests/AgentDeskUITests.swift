@@ -127,6 +127,49 @@ final class AgentDeskUITests: XCTestCase {
     }
 
     @MainActor
+    func testSharedInstructionsSaveAndAppearInAgentPreview() {
+        let app = XCUIApplication()
+        app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
+        app.launch()
+        XCTAssertTrue(app.buttons["workspace.create.empty"].waitForExistence(timeout: 5))
+        app.buttons["workspace.create.empty"].click(); saveName("Personal", in: app)
+        XCTAssertTrue(app.buttons["project.create.empty"].waitForExistence(timeout: 5))
+        app.buttons["project.create.empty"].click(); saveName("Instruction Project", in: app)
+        XCTAssertTrue(app.buttons["project.agents.Instruction Project"].waitForExistence(timeout: 5))
+        app.buttons["project.agents.Instruction Project"].click()
+        XCTAssertTrue(app.buttons["agent.create"].waitForExistence(timeout: 5))
+        app.buttons["agent.create"].click()
+        XCTAssertTrue(app.buttons["agent.save"].waitForExistence(timeout: 5))
+        app.buttons["agent.save"].click()
+        XCTAssertTrue(app.buttons["agent.preview.General Assistant"].waitForExistence(timeout: 5))
+        app.buttons["instructions.shared"].click()
+        XCTAssertTrue(app.buttons["instructions.add"].waitForExistence(timeout: 5))
+        app.buttons["instructions.add"].click()
+        let title = app.textFields["instructions.title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        title.click(); title.typeKey("a", modifierFlags: .command); title.typeText("Synthetic Guidance")
+        let text = app.textViews["instructions.text"]
+        text.click(); text.typeKey("a", modifierFlags: .command); text.typeText("Record exact synthetic evidence before interpreting it.")
+        app.buttons["instructions.save"].click()
+        XCTAssertTrue(app.buttons["agent.preview.General Assistant"].waitForExistence(timeout: 5))
+        app.buttons["agent.preview.General Assistant"].click()
+        XCTAssertTrue(app.staticTexts["instruction.source.Project"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Synthetic Guidance"].exists)
+        XCTAssertTrue(app.staticTexts["Record exact synthetic evidence before interpreting it."].exists)
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "Effective instructions with exact sources"; attachment.lifetime = .keepAlways; add(attachment)
+        app.buttons["instructions.preview.done"].click()
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["project.agents.Instruction Project"].waitForExistence(timeout: 5))
+        app.buttons["project.agents.Instruction Project"].click()
+        XCTAssertTrue(app.buttons["instructions.shared"].waitForExistence(timeout: 5))
+        app.buttons["instructions.shared"].click()
+        XCTAssertTrue(app.textViews["instructions.text"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.textViews["instructions.text"].value as? String, "Record exact synthetic evidence before interpreting it.")
+    }
+
+    @MainActor
     func testWorkspaceValidationAndCancelPreserveSavedData() {
         let app = XCUIApplication()
         app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString

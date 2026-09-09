@@ -10,10 +10,13 @@ final class ProjectAgentsModel: ObservableObject {
     @Published private(set) var loading = false
     @Published private(set) var errorMessage: String?
     private let openStore: () async throws -> ProjectAgentStore
+    private let openInstructions: () async throws -> ProjectInstructionStore
     private var store: ProjectAgentStore?
+    @Published private(set) var instructionStore: ProjectInstructionStore?
 
-    init(project: ProjectRecord, openStore: @escaping () async throws -> ProjectAgentStore) {
-        self.project = project; self.openStore = openStore
+    init(project: ProjectRecord, openStore: @escaping () async throws -> ProjectAgentStore,
+         openInstructions: @escaping () async throws -> ProjectInstructionStore) {
+        self.project = project; self.openStore = openStore; self.openInstructions = openInstructions
     }
 
     func load() async {
@@ -21,6 +24,7 @@ final class ProjectAgentsModel: ObservableObject {
         defer { loading = false }
         do {
             if store == nil { store = try await openStore() }
+            if instructionStore == nil { instructionStore = try await openInstructions() }
             agents = try await store!.agents(in: project.scope, includeArchived: true)
             errorMessage = nil
         } catch is CancellationError {} catch { errorMessage = Self.message(error) }
@@ -44,9 +48,16 @@ final class ProjectAgentsModel: ObservableObject {
         } catch { errorMessage = Self.message(error) }
     }
 
+    func preview(_ agent: AgentSnapshot) async -> ComposedInstructions? {
+        guard let instructionStore else { return nil }
+        do { return try await instructionStore.preview(for: agent, in: project.scope) }
+        catch { errorMessage = Self.message(error); return nil }
+    }
+
     static func message(_ error: any Error) -> String {
         if let error = error as? AgentConfigurationError { return error.localizedDescription }
         if let error = error as? CatalogError { return error.localizedDescription }
+        if let error = error as? InstructionError { return error.localizedDescription }
         return "AgentDesk couldn’t open or save this agent. Its existing files have been preserved."
     }
 }

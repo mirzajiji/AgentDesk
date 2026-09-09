@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import platform
 import plistlib
+import re
 import shlex
 import subprocess
 
@@ -20,6 +21,13 @@ def run(arguments):
     with (OUTPUT / 'commands.log').open('a') as log:
         log.write(shlex.join(str(a) for a in arguments) + '\n')
     subprocess.run([str(a) for a in arguments], cwd=ROOT, check=True)
+
+
+def passed_test_count(report, returncode):
+    summaries = re.findall(r'Executed (\d+) tests?, with (\d+) failures?', report)
+    if returncode or not summaries or int(summaries[-1][0]) == 0 or int(summaries[-1][1]) != 0:
+        raise RuntimeError(f'Host XCTest verification failed: exit {returncode}')
+    return int(summaries[-1][0])
 
 
 def main():
@@ -92,11 +100,10 @@ def main():
     report = '\n'.join(lines) + '\n'
     (OUTPUT / 'host-unit-tests.log').write_text(report)
     print(report, end='')
-    if result.returncode or not any('Executed 5 tests' in line for line in lines):
-        raise RuntimeError(f'Host XCTest verification failed: exit {result.returncode}')
+    test_count = passed_test_count(report, result.returncode)
     (OUTPUT / 'result.json').write_text(json.dumps({
         'sourceChecks': ['mac-arm64', 'mac-intel', 'iphone-simulator', 'iphone-device'],
-        'hostUnitTests': 5,
+        'hostUnitTests': test_count,
         'hostArchitecture': host_arch,
         'xcodeBuild': 'not covered',
         'simulatorExecution': 'not covered',

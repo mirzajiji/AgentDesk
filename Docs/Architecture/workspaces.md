@@ -1,6 +1,6 @@
 # Workspaces and company isolation
 
-Status: planned design. Source: [final architecture](final-architecture.txt), sections 6, 7, 9 and 128.
+Status: typed identities and descriptor-bound filesystem reads implemented (P1-02); workspace/project creation and broader policy enforcement remain planned. Source: [final architecture](final-architecture.txt), sections 6, 7, 9 and 128.
 <!-- Source sections: 6,7,9,128 -->
 
 Each company receives an isolated workspace containing projects, agents, instructions, skills, plugins, MCP definitions, databases, environments, workflows and repository registrations. Example company names in the specification are illustrations; do not seed real company content or connect accounts automatically.
@@ -23,7 +23,7 @@ Configuration is human-readable. Operational records go in SQLite; credentials r
 
 Reject unexpected absolute paths, traversal components, invalid names, escaped encodings after normalization, sibling-prefix matches and symlink escapes. Compare path components rather than string prefixes. A user-selected external repository is an explicitly registered resource; it is not automatically trusted because a path exists.
 
-Proposed hardening: perform containment checks as close to the actual file operation as possible, avoid following mutable symlinks for sensitive writes, and fail closed when scope cannot be established. Design and test the file-operation boundary against time-of-check/time-of-use races rather than relying only on a preliminary URL normalization.
+`WorkspaceFileSystem` anchors reads to an open workspace directory. Every requested path component uses descriptor-relative, no-follow opens; only bounded regular files with one hard link are accepted. `WorkspacePath` rejects traversal, absolute paths, percent encoding, colons and control characters. Only the caller-authorized container is canonicalized (including macOS `/var` aliases). Reads check cancellation and file growth. An opened root cannot be redirected by replacing its original path with a symlink. This storage boundary does not establish project membership or grant policy approval; those checks belong to their services. Secure writes and creation follow in P1-03.
 
 ## Human context switching
 

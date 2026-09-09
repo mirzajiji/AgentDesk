@@ -8,6 +8,20 @@ from unittest.mock import patch
 
 
 class FoundationValidationTests(unittest.TestCase):
+    def test_expanded_suite_reports_actual_test_count(self):
+        script = Path(__file__).resolve().parents[1] / 'check-foundation-sources.py'
+        parse = runpy.run_path(str(script))['passed_test_count']
+        self.assertEqual(parse('Executed 6 tests, with 0 failures\nExecuted 21 tests, with 0 failures', 0), 21)
+
+    def test_missing_zero_failed_or_unsuccessful_results_are_rejected(self):
+        script = Path(__file__).resolve().parents[1] / 'check-foundation-sources.py'
+        parse = runpy.run_path(str(script))['passed_test_count']
+        for report, code in [('', 0), ('Executed 0 tests, with 0 failures', 0),
+                             ('Executed 4 tests, with 1 failure', 0),
+                             ('Executed 4 tests, with 0 failures', 1)]:
+            with self.subTest(report=report, code=code), self.assertRaises(RuntimeError):
+                parse(report, code)
+
     def test_failed_rerun_cannot_retain_previous_success(self):
         script = Path(__file__).resolve().parents[1] / 'check-foundation-sources.py'
         main = runpy.run_path(str(script))['main']

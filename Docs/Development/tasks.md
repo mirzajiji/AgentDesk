@@ -1,6 +1,6 @@
 # Implementation tasks and commit boundaries
 
-This is an implementation plan, not a completion claim. The full source specification remains authoritative. B01 documentation is committed as `4d027e9`. P1-01 native acceptance passes on Mac and the user-selected iPhone 16 Pro. It is committed and pushed as `7b369f5`. P1-02 scoped identity and filesystem reads are committed and pushed as `c496060`; see [isolation validation](p1-02-validation.md). P1-03 local workspace/project management passes native acceptance; see [catalog validation](p1-03-validation.md). Later tasks remain pending. See [foundation validation](p1-01-validation.md).
+This is an implementation plan, not a completion claim. The full source specification remains authoritative. B01 documentation is committed as `4d027e9`. P1-01 native acceptance passes on Mac and the user-selected iPhone 16 Pro. It is committed and pushed as `7b369f5`. P1-02 scoped identity and filesystem reads are committed and pushed as `c496060`; see [isolation validation](p1-02-validation.md). P1-03 local workspace/project management is committed and pushed as `f0d4d91`; see [catalog validation](p1-03-validation.md). Later tasks remain pending. See [foundation validation](p1-01-validation.md).
 
 Finish the current task's validation and commit before starting another independent task. A task may be split further when its diff becomes difficult to review; never combine unrelated completed tasks just to reduce commit count. Behavioral tests belong in the feature commit.
 
@@ -17,7 +17,7 @@ Finish the current task's validation and commit before starting another independ
 | P1-01 | Complete: Core/Design packages, native shell, shared scheme, Swift 6, macOS 15/iOS 18 targets and tests | 5 SwiftPM tests; native Mac 10 executions and iPhone 16 Pro/iOS 26 13 executions pass; see validation. Final device/OS matrix deferred by user. |
 | P1-02 | Complete: typed workspace/project/environment/run/agent IDs and workspace-scoped filesystem resolver | 21 SwiftPM and 22 native tests each on Mac and iPhone 16 Pro pass; traversal, cross-scope, symlink/hardlink, cancellation and size limits |
 | P1-03 | Complete: filesystem workspace/project creation, validation, listing, renaming, reopening and native Mac forms | 31 package tests; Mac 35 unit + 6 UI and iPhone 16 Pro 32 unit + 7 UI executions pass. Delete/archive and repository registration remain later work. |
-| P1-04 | SQLite operational store and explicit versioned migrations | Reopen, migration, rollback/transaction and cross-workspace query tests |
+| P1-04 | Complete: SQLite operational run store and explicit versioned migrations | 12 package tests; 47 native Mac and 44 iPhone 16 Pro unit executions pass; see [persistence validation](p1-04-validation.md) |
 | P1-05 | Keychain SecretStore abstraction plus injectable test store | Scoped set/get/delete/exists, missing item/error behavior; no plaintext persistence |
 | P1-06 | Agent CRUD, templates, instruction editing and configuration composition | Round trips, effective source order, missing/invalid references, cycles, cross-scope denial |
 | P1-07 | Typed run/step/event models, lifecycle transitions and event bus | Valid/invalid transitions, cancellation, ordered delivery, subscriber cleanup and deterministic progress |

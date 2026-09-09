@@ -10,6 +10,8 @@
 		AD0000000000000000000001 /* AgentDeskCore in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000011 /* AgentDeskCore */; };
 		AD0000000000000000000002 /* AgentDeskDesign in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000012 /* AgentDeskDesign */; };
 		AD0000000000000000000003 /* AgentDeskCore in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000013 /* AgentDeskCore */; };
+		AD0000000000000000000004 /* AgentDeskPersistence in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000014 /* AgentDeskPersistence */; };
+		AD0000000000000000000005 /* AgentDeskPersistence in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000015 /* AgentDeskPersistence */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -36,6 +38,12 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		AD0000000000000000000031 /* CoreTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = CoreTests;
+			path = Packages/AgentDeskCore/Tests/AgentDeskCoreTests;
+			sourceTree = "<group>";
+		};
 		C514A9183051AAE0006A58EA /* AgentDesk */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = AgentDesk;
@@ -51,10 +59,10 @@
 			path = AgentDeskUITests;
 			sourceTree = "<group>";
 		};
-		AD0000000000000000000031 /* CoreTests */ = {
+		AD0000000000000000000032 /* PersistenceTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			name = CoreTests;
-			path = Packages/AgentDeskCore/Tests/AgentDeskCoreTests;
+			name = PersistenceTests;
+			path = Packages/AgentDeskPersistence/Tests/AgentDeskPersistenceTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -66,6 +74,7 @@
 			files = (
 				AD0000000000000000000001 /* AgentDeskCore in Frameworks */,
 				AD0000000000000000000002 /* AgentDeskDesign in Frameworks */,
+				AD0000000000000000000004 /* AgentDeskPersistence in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -74,6 +83,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AD0000000000000000000003 /* AgentDeskCore in Frameworks */,
+				AD0000000000000000000005 /* AgentDeskPersistence in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -94,6 +104,7 @@
 				C514A9263051AAE2006A58EA /* AgentDeskTests */,
 				C514A9303051AAE2006A58EA /* AgentDeskUITests */,
 				AD0000000000000000000031 /* CoreTests */,
+				AD0000000000000000000032 /* PersistenceTests */,
 				C514A9173051AAE0006A58EA /* Products */,
 			);
 			sourceTree = "<group>";
@@ -130,6 +141,7 @@
 			packageProductDependencies = (
 				AD0000000000000000000011 /* AgentDeskCore */,
 				AD0000000000000000000012 /* AgentDeskDesign */,
+				AD0000000000000000000014 /* AgentDeskPersistence */,
 			);
 			productName = AgentDesk;
 			productReference = C514A9163051AAE0006A58EA /* AgentDesk.app */;
@@ -149,12 +161,14 @@
 				C514A9253051AAE2006A58EA /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				C514A9263051AAE2006A58EA /* AgentDeskTests */,
 				AD0000000000000000000031 /* CoreTests */,
+				AD0000000000000000000032 /* PersistenceTests */,
+				C514A9263051AAE2006A58EA /* AgentDeskTests */,
 			);
 			name = AgentDeskTests;
 			packageProductDependencies = (
 				AD0000000000000000000013 /* AgentDeskCore */,
+				AD0000000000000000000015 /* AgentDeskPersistence */,
 			);
 			productName = AgentDeskTests;
 			productReference = C514A9233051AAE2006A58EA /* AgentDeskTests.xctest */;
@@ -215,12 +229,13 @@
 			);
 			mainGroup = C514A90D3051AAE0006A58EA;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				AD0000000000000000000021 /* XCLocalSwiftPackageReference "Packages/AgentDeskCore" */,
+				AD0000000000000000000022 /* XCLocalSwiftPackageReference "Packages/AgentDeskDesign" */,
+				AD0000000000000000000023 /* XCLocalSwiftPackageReference "Packages/AgentDeskPersistence" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C514A9173051AAE0006A58EA /* Products */;
-			packageReferences = (
-				AD0000000000000000000021 /* AgentDeskCore */,
-				AD0000000000000000000022 /* AgentDeskDesign */,
-			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -595,23 +610,6 @@
 		};
 /* End XCBuildConfiguration section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		AD0000000000000000000021 /* AgentDeskCore */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/AgentDeskCore;
-		};
-		AD0000000000000000000022 /* AgentDeskDesign */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/AgentDeskDesign;
-		};
-/* End XCLocalSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		AD0000000000000000000011 /* AgentDeskCore */ = {isa = XCSwiftPackageProductDependency; productName = AgentDeskCore; };
-		AD0000000000000000000012 /* AgentDeskDesign */ = {isa = XCSwiftPackageProductDependency; productName = AgentDeskDesign; };
-		AD0000000000000000000013 /* AgentDeskCore */ = {isa = XCSwiftPackageProductDependency; productName = AgentDeskCore; };
-/* End XCSwiftPackageProductDependency section */
-
 /* Begin XCConfigurationList section */
 		C514A9113051AAE0006A58EA /* Build configuration list for PBXProject "AgentDesk" */ = {
 			isa = XCConfigurationList;
@@ -650,6 +648,44 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AD0000000000000000000021 /* XCLocalSwiftPackageReference "Packages/AgentDeskCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/AgentDeskCore;
+		};
+		AD0000000000000000000022 /* XCLocalSwiftPackageReference "Packages/AgentDeskDesign" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/AgentDeskDesign;
+		};
+		AD0000000000000000000023 /* XCLocalSwiftPackageReference "Packages/AgentDeskPersistence" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/AgentDeskPersistence;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AD0000000000000000000011 /* AgentDeskCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AgentDeskCore;
+		};
+		AD0000000000000000000012 /* AgentDeskDesign */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AgentDeskDesign;
+		};
+		AD0000000000000000000013 /* AgentDeskCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AgentDeskCore;
+		};
+		AD0000000000000000000014 /* AgentDeskPersistence */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AgentDeskPersistence;
+		};
+		AD0000000000000000000015 /* AgentDeskPersistence */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AgentDeskPersistence;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = C514A90E3051AAE0006A58EA /* Project object */;
 }

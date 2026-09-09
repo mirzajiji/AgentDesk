@@ -22,16 +22,24 @@ public struct CodexAgentProfile: Codable, Equatable, Sendable {
     public var requestedAccess: Access
     public var maximumSteps: Int
     public var timeoutSeconds: Int
+    public var maximumOutputBytes: Int?
+    public var allowedEnvironmentIDs: [EnvironmentID]?
+    public var outputSchema: OutputSchema?
 
     public init(modelIdentifier: String? = nil, requestedAccess: Access = .readOnly,
-                maximumSteps: Int = 30, timeoutSeconds: Int = 600) {
+                maximumSteps: Int = 30, timeoutSeconds: Int = 600, maximumOutputBytes: Int? = nil,
+                allowedEnvironmentIDs: [EnvironmentID]? = nil, outputSchema: OutputSchema? = nil) {
         self.modelIdentifier = modelIdentifier
         self.requestedAccess = requestedAccess
         self.maximumSteps = maximumSteps
         self.timeoutSeconds = timeoutSeconds
+        self.maximumOutputBytes = maximumOutputBytes
+        self.allowedEnvironmentIDs = allowedEnvironmentIDs
+        self.outputSchema = outputSchema
     }
 
     public func validate() throws {
+        try ExecutionSettings(maximumOutputBytes: maximumOutputBytes, allowedEnvironmentIDs: allowedEnvironmentIDs, outputSchema: outputSchema).validate()
         guard (1...1_000).contains(maximumSteps), (1...86_400).contains(timeoutSeconds) else {
             throw AgentConfigurationError.invalidProfile
         }

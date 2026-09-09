@@ -30,6 +30,9 @@ struct CodexSessionMachine: Sendable {
         guard phase == .complete, turnResponseReceived, let text = finalText, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw ExecutionProviderError.incompleteResult
         }
+        do { try request.outputSchema?.validateOutput(text, maximumBytes: request.maximumOutputBytes) }
+        catch is CancellationError { throw CancellationError() }
+        catch { throw ExecutionProviderError.invalidOutput }
         try publish(.completed(text: text), emit: emit)
     }
     private mutating func receive(_ message: [String: CodexJSONValue], input: MacProcessInputPipe,
@@ -95,7 +98,7 @@ struct CodexSessionMachine: Sendable {
             items[id] = (kind, completed)
             if kind == "agentMessage" {
                 if completed {
-                    guard let text = item["text"]?.string, !text.utf8.contains(0), text.utf8.count <= 262_144 - textBytes else { throw ExecutionProviderError.outputLimit }
+                    guard let text = item["text"]?.string, !text.utf8.contains(0), text.utf8.count <= request.maximumOutputBytes - textBytes else { throw ExecutionProviderError.outputLimit }
                     textBytes += text.utf8.count
                     let messagePhase = item["phase"]?.string
                     guard messagePhase == nil || ["commentary", "final_answer"].contains(messagePhase!) else { throw ExecutionProviderError.invalidProtocol }

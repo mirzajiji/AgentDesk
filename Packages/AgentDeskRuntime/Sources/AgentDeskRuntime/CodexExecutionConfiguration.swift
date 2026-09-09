@@ -56,7 +56,7 @@ enum CodexExecutionConfiguration {
         if let model = request.model { parameters["model"] = .string(model) }
         return .object(parameters)
     }
-    static func turnParameters(request: ExecutionRequest, directory: URL, profile: String, thread: String) -> CodexJSONValue {
+    static func turnParameters(request: ExecutionRequest, directory: URL, profile: String, thread: String) throws -> CodexJSONValue {
         var parameters: [String: CodexJSONValue] = [
             "threadId": .string(thread), "cwd": .string(directory.path), "permissions": .string(profile),
             "runtimeWorkspaceRoots": .array([.string(directory.path)]),
@@ -64,6 +64,7 @@ enum CodexExecutionConfiguration {
             "input": .array([.object(["type": .string("text"), "text": .string(request.task)])])
         ]
         if let model = request.model { parameters["model"] = .string(model) }
+        if let schema = request.outputSchema { parameters["outputSchema"] = try JSONDecoder().decode(CodexJSONValue.self, from: schema.jsonData()) }
         return .object(parameters)
     }
     static func request(_ id: Int64, _ method: String, _ parameters: CodexJSONValue) -> CodexJSONValue {

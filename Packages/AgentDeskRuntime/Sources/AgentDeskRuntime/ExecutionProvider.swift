@@ -15,8 +15,28 @@ struct ExecutionRequest: Sendable {
     let model: String?
     let timeout: Duration
     let maximumActivities: Int
+    let maximumOutputBytes: Int
+    let outputSchema: OutputSchema?
+
+    init(identity: ExecutionIdentity, instructions: String, task: String, model: String?, timeout: Duration,
+         maximumActivities: Int, maximumOutputBytes: Int = 262_144, outputSchema: OutputSchema? = nil) {
+        self.identity = identity; self.instructions = instructions; self.task = task; self.model = model
+        self.timeout = timeout; self.maximumActivities = maximumActivities
+        self.maximumOutputBytes = maximumOutputBytes; self.outputSchema = outputSchema
+    }
+    init(configuration: EffectiveExecutionConfiguration, runID: RunID, instructions: String, task: String) throws {
+        guard configuration.requestedAccess == .readOnly else { throw ExecutionProviderError.unsupportedAccess }
+        self.init(identity: ExecutionIdentity(scope: configuration.scope, runID: runID, agentID: configuration.agentID,
+            environmentID: configuration.environment.id), instructions: instructions, task: task, model: configuration.modelIdentifier,
+            timeout: .seconds(configuration.timeoutSeconds), maximumActivities: configuration.maximumSteps,
+            maximumOutputBytes: configuration.maximumOutputBytes, outputSchema: configuration.outputSchema)
+        try validate()
+    }
 
     func validate() throws {
+        do { try ExecutionSettings(maximumOutputBytes: maximumOutputBytes, outputSchema: outputSchema).validate() }
+        catch is CancellationError { throw CancellationError() }
+        catch { throw ExecutionProviderError.invalidRequest }
         guard !instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               instructions.utf8.count <= 98_304, task.utf8.count <= 98_304,
@@ -33,7 +53,7 @@ struct ExecutionRequest: Sendable {
     }
 }
 enum ExecutionProviderError: Error, Equatable, Sendable {
-    case invalidRequest, scopeMismatch, unavailable, unauthenticated, busy, outputLimit, consumerOverflow
+    case invalidRequest, invalidOutput, unsupportedAccess, scopeMismatch, unavailable, unauthenticated, busy, outputLimit, consumerOverflow
     case invalidProtocol, unverifiedPermissions, unexpectedApproval, providerFailed, incompleteResult, processFailed, timedOut
 }
 

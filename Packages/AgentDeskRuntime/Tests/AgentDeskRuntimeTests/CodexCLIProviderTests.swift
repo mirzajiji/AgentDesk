@@ -88,6 +88,8 @@ final class CodexCLIProviderTests: XCTestCase {
                 }
                 if ($mode ne 'missing') {
                     my $item={id=>'answer',type=>'agentMessage',text=>'synthetic result 🧪',phase=>$mode eq 'commentary' ? 'commentary' : 'final_answer'};
+                    $item->{text}='{"ok":true}' if $mode eq 'schema';
+                    $item->{text}='{"ok":"unverified"}' if $mode eq 'invalid-schema';
                     note('item/started',{threadId=>$thread,turnId=>'synthetic-turn',item=>$item});
                     note('item/completed',{threadId=>$thread,turnId=>'synthetic-turn',item=>$item});
                 }
@@ -206,6 +208,37 @@ final class CodexCLIProviderTests: XCTestCase {
         catch { XCTAssertEqual(error as? ExecutionProviderError, .timedOut) }
         XCTAssertLessThan(ContinuousClock.now - started, .seconds(1))
         XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.root.appendingPathComponent("pid.txt").path))
+    }
+
+    func testSchemaReachesCLIAndInvalidFinalOutputNeverCompletes() async throws {
+        for mode in ["schema", "invalid-schema", "success"] {
+            let fixture = try fixture(mode); defer { fixture.remove() }
+            let scope = scope, base = request(scope)
+            let schema = OutputSchema.object(["ok": .boolean])
+            let configured = ExecutionRequest(identity: base.identity, instructions: base.instructions, task: base.task,
+                model: base.model, timeout: base.timeout, maximumActivities: base.maximumActivities, outputSchema: schema)
+            let provider = try CodexCLIProvider(scope: scope, directory: fixture.root, executable: fixture.executable, diagnostics: Diagnostics(), process: fixture.process)
+            var completed = false
+            do {
+                let execution = try await provider.start(configured); defer { execution.cancel() }
+                for try await event in execution.events { if case .completed(let text) = event.payload { completed = true; XCTAssertEqual(text, #"{"ok":true}"#) } }
+                XCTAssertEqual(mode, "schema")
+            } catch { XCTAssertNotEqual(mode, "schema"); XCTAssertEqual(error as? ExecutionProviderError, .invalidOutput) }
+            XCTAssertEqual(completed, mode == "schema")
+            let lines = try String(contentsOf: fixture.root.appendingPathComponent("requests.jsonl"), encoding: .utf8).split(separator: "\n")
+            let messages = try lines.map { try CodexJSONValue.decodeMessage(Data($0.utf8)) }
+            let turn = try XCTUnwrap(messages.first { $0["method"]?.string == "turn/start" })
+            XCTAssertEqual(turn["params"]?["outputSchema"], try JSONDecoder().decode(CodexJSONValue.self, from: schema.jsonData()))
+        }
+    }
+    func testConfiguredOutputByteLimitFailsBeforeCompletion() async throws {
+        let fixture = try fixture(); defer { fixture.remove() }
+        let scope = scope, base = request(scope)
+        let configured = ExecutionRequest(identity: base.identity, instructions: base.instructions, task: base.task,
+            model: base.model, timeout: base.timeout, maximumActivities: base.maximumActivities, maximumOutputBytes: 4)
+        let provider = try CodexCLIProvider(scope: scope, directory: fixture.root, executable: fixture.executable, diagnostics: Diagnostics(), process: fixture.process)
+        do { _ = try await collect(provider.start(configured)); XCTFail("Output limit ignored") }
+        catch { XCTAssertEqual(error as? ExecutionProviderError, .outputLimit) }
     }
 
     func testScopeAuthenticationAndChangedRootAreRejectedBeforeLaunch() async throws {

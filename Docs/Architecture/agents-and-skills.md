@@ -1,6 +1,6 @@
 # Agents, templates and skills
 
-Status: project agent creation/editing, native instruction editor, versioned snapshots, templates and archive/restore implemented in P1-06a; workspace/project instruction sets and effective instruction previews are added in P1-06b1; profile composition, skills, environment constraints and output schemas follow in P1-06b2/b3. See [P1-06a native validation](../Development/p1-06a-validation.md). Source: [final architecture](final-architecture.txt), sections 18, 19 and 21.
+Status: project agent creation/editing, native instruction editor, versioned snapshots, templates and archive/restore implemented in P1-06a; workspace/project instruction sets and effective instruction previews are added in P1-06b1; P1-06b2 implements profile composition, environment constraints and output schemas; skill bundles remain P1-06b3. See [P1-06a native validation](../Development/p1-06a-validation.md). Source: [final architecture](final-architecture.txt), sections 18, 19 and 21.
 <!-- Source sections: 18,19,21 -->
 
 An agent definition combines task-specific instructions and explicitly permitted capabilities. It is configuration consumed by the runtime, not a separate security authority.
@@ -39,4 +39,4 @@ Saves require the expected current revision, so stale editors cannot silently ov
 
 The catalog's advisory lock now opens a separate file description for each operation. This matters because several project-agent actors can share a catalog root: locking a shared descriptor alone would not serialize those actors. Tests cover both concurrent stores and reentrant attempts on a shared directory handle.
 
-Agent profiles currently contain a Codex model override, read-only/workspace-write request, maximum steps and timeout. Inputs are bounded and validated; instructions must be nonempty UTF-8 text no larger than 64 KB. Advanced capabilities remain pending and are not shown as usable settings. P1-06a alone does not compose instructions, install skills, execute output schemas or start live Codex runs. See [configuration composition](configuration.md) for the subsequent shared-instruction implementation.
+Agent profiles contain a Codex model override, read-only/workspace-write request, maximum steps, timeout and optional output-byte ceiling, environment allowlist and output schema. Inputs are bounded and validated; instructions must be nonempty UTF-8 text no larger than 64 KB. The basic native editor preserves advanced fields; advanced controls remain pending. The effective configuration composer validates the new constraints and the internal provider enforces final output schemas. Skill installation and app run launch remain pending. See [configuration composition](configuration.md) for exact rules and limits.

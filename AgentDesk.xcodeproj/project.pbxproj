@@ -14,6 +14,8 @@
 		AD0000000000000000000005 /* AgentDeskPersistence in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000015 /* AgentDeskPersistence */; };
 		AD0000000000000000000006 /* AgentDeskSecurity in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000016 /* AgentDeskSecurity */; };
 		AD0000000000000000000007 /* AgentDeskSecurity in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000017 /* AgentDeskSecurity */; };
+		AD0000000000000000000008 /* AgentDeskRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000018 /* AgentDeskRuntime */; };
+		AD0000000000000000000009 /* AgentDeskRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000019 /* AgentDeskRuntime */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -73,6 +75,12 @@
 			path = Packages/AgentDeskSecurity/Tests/AgentDeskSecurityTests;
 			sourceTree = "<group>";
 		};
+		AD0000000000000000000034 /* RuntimeTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = RuntimeTests;
+			path = Packages/AgentDeskRuntime/Tests/AgentDeskRuntimeTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -84,6 +92,7 @@
 				AD0000000000000000000002 /* AgentDeskDesign in Frameworks */,
 				AD0000000000000000000004 /* AgentDeskPersistence in Frameworks */,
 				AD0000000000000000000006 /* AgentDeskSecurity in Frameworks */,
+				AD0000000000000000000008 /* AgentDeskRuntime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -94,6 +103,7 @@
 				AD0000000000000000000003 /* AgentDeskCore in Frameworks */,
 				AD0000000000000000000005 /* AgentDeskPersistence in Frameworks */,
 				AD0000000000000000000007 /* AgentDeskSecurity in Frameworks */,
+				AD0000000000000000000009 /* AgentDeskRuntime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -116,6 +126,7 @@
 				AD0000000000000000000031 /* CoreTests */,
 				AD0000000000000000000032 /* PersistenceTests */,
 				AD0000000000000000000033 /* SecurityTests */,
+				AD0000000000000000000034 /* RuntimeTests */,
 				C514A9173051AAE0006A58EA /* Products */,
 			);
 			sourceTree = "<group>";
@@ -154,6 +165,7 @@
 				AD0000000000000000000012 /* AgentDeskDesign */,
 				AD0000000000000000000014 /* AgentDeskPersistence */,
 				AD0000000000000000000016 /* AgentDeskSecurity */,
+				AD0000000000000000000018 /* AgentDeskRuntime */,
 			);
 			productName = AgentDesk;
 			productReference = C514A9163051AAE0006A58EA /* AgentDesk.app */;
@@ -176,6 +188,7 @@
 				AD0000000000000000000031 /* CoreTests */,
 				AD0000000000000000000032 /* PersistenceTests */,
 				AD0000000000000000000033 /* SecurityTests */,
+				AD0000000000000000000034 /* RuntimeTests */,
 				C514A9263051AAE2006A58EA /* AgentDeskTests */,
 			);
 			name = AgentDeskTests;
@@ -183,6 +196,7 @@
 				AD0000000000000000000013 /* AgentDeskCore */,
 				AD0000000000000000000015 /* AgentDeskPersistence */,
 				AD0000000000000000000017 /* AgentDeskSecurity */,
+				AD0000000000000000000019 /* AgentDeskRuntime */,
 			);
 			productName = AgentDeskTests;
 			productReference = C514A9233051AAE2006A58EA /* AgentDeskTests.xctest */;
@@ -248,6 +262,7 @@
 				AD0000000000000000000022 /* XCLocalSwiftPackageReference "Packages/AgentDeskDesign" */,
 				AD0000000000000000000023 /* XCLocalSwiftPackageReference "Packages/AgentDeskPersistence" */,
 				AD0000000000000000000024 /* XCLocalSwiftPackageReference "Packages/AgentDeskSecurity" */,
+				AD0000000000000000000025 /* XCLocalSwiftPackageReference "Packages/AgentDeskRuntime" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C514A9173051AAE0006A58EA /* Products */;
@@ -683,6 +698,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/AgentDeskSecurity;
 		};
+		AD0000000000000000000025 /* XCLocalSwiftPackageReference "Packages/AgentDeskRuntime" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/AgentDeskRuntime;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -713,6 +732,14 @@
 		AD0000000000000000000017 /* AgentDeskSecurity */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AgentDeskSecurity;
+		};
+		AD0000000000000000000018 /* AgentDeskRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AgentDeskRuntime;
+		};
+		AD0000000000000000000019 /* AgentDeskRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AgentDeskRuntime;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

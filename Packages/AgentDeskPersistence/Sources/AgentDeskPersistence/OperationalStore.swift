@@ -2,9 +2,7 @@ import AgentDeskCore
 import Foundation
 import SQLite3
 
-public enum PersistedRunState: String, Codable, CaseIterable, Sendable {
-    case queued, running, waitingForApproval, paused, completed, failed, cancelled
-}
+public typealias PersistedRunState = RunState
 
 public struct StoredRun: Equatable, Sendable, Identifiable {
     public let id: RunID
@@ -20,6 +18,10 @@ public struct StoredRunEvent: Equatable, Sendable {
     public let sequence: Int64
     public let state: PersistedRunState
     public let recordedAt: Date
+
+    public init(runID: RunID, scope: ProjectScope, sequence: Int64, state: PersistedRunState, recordedAt: Date) {
+        self.runID = runID; self.scope = scope; self.sequence = sequence; self.state = state; self.recordedAt = recordedAt
+    }
 }
 
 /// Workspace-bound operational persistence. The caller must authorize project membership first.

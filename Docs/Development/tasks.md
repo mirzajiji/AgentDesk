@@ -4,7 +4,7 @@ This is an implementation plan, not a completion claim. The full source specific
 
 Finish the current task's validation and commit before starting another independent task. A task may be split further when its diff becomes difficult to review; never combine unrelated completed tasks just to reduce commit count. Behavioral tests belong in the feature commit.
 
-Progress after P1-12a: **18 documented tasks complete, 6 Phase 1 tasks remaining** (24 detailed tasks including bootstrap; P1-09 is split into transport/provider integration and P1-12 into redaction, evidence storage and Git capture). Phases 2–6 and sections 115–159 are also remaining; they have not yet been decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
+Progress after P1-12b: **19 documented tasks complete, 5 Phase 1 tasks remaining** (24 detailed tasks including bootstrap; P1-09 is split into transport/provider integration and P1-12 into redaction, evidence storage and Git capture). Phases 2–6 and sections 115–159 are also remaining; they have not yet been decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
 
 ## Bootstrap
 
@@ -34,7 +34,7 @@ Progress after P1-12a: **18 documented tasks complete, 6 Phase 1 tasks remaining
 | P1-10 | Complete: deterministic policy, exact prepared-action binding, durable approval/audit ledger and internal dispatch gate | 70 Core + 12 Security + 25 Persistence + 64 Runtime tests; 183 native Mac unit + 1 Settings UI and 141 iPhone unit tests pass. See [policy validation](p1-10-validation.md). Native review UI and coordinator integration remain required. |
 | P1-11 | Run execution coordinator with scoped instructions and real provider adapter | Fake-provider end-to-end run; failure/cancel/restart persistence; supported live smoke test when available |
 | P1-12a | Complete: scoped redaction, classified output types and bounded logical stream completion | 24 Security, 227 native Mac unit + 1 Settings UI and 182 iPhone 16 Pro tests pass. See [redaction validation](p1-12a-validation.md). Storage/coordinator integration follows. |
-| P1-12b | Scoped trace/artifact storage with safe publication and recovery | Redaction before persistence/display, run/environment binding, metadata/file consistency, failure/restart and secret exclusion |
+| P1-12b | Complete: immutable run/environment evidence binding, sanitized traces, artifact publication and recovery | 38 Persistence, 240 native Mac unit + 1 Settings UI and 195 iPhone tests pass. See [evidence validation](p1-12b-validation.md). Provider/coordinator integration follows. |
 | P1-12c | Repository snapshots and changed-file/diff capture | Dirty starting state, added/modified/deleted/renamed/binary files, unusual paths, deterministic Git commands and sanitized evidence |
 | P1-13 | Native navigation, workspace/project/agent editors, context inspector and live run/result UI | Mac UI critical path, keyboard/accessibility, validation/errors; shared/mobile regression suite |
 | P1-14 | Command palette, basic menu bar, Settings and first-run checks | Command routing, stale selection handling, no duplicate execution, menu status updates and UI tests |

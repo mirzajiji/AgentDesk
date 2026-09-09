@@ -3,7 +3,7 @@ import Foundation
 /// Forward-only, transactional migrations. A failed or future schema is never reset.
 enum OperationalMigrations {
     static let applicationID = 1_095_189_579 // "AGDK"
-    static let currentVersion = 4
+    static let currentVersion = 5
     static let versionOne = [
         """
         CREATE TABLE runs (
@@ -74,6 +74,29 @@ enum OperationalMigrations {
         """
     ]
 
+    static let versionFive = [
+        """
+        CREATE TABLE evidence_runs (
+            workspace_id TEXT NOT NULL, project_id TEXT NOT NULL, run_id TEXT NOT NULL,
+            environment_id TEXT NOT NULL, binding_json TEXT NOT NULL,
+            PRIMARY KEY (workspace_id, project_id, run_id),
+            UNIQUE (workspace_id, project_id, run_id, environment_id),
+            FOREIGN KEY (workspace_id, project_id, run_id) REFERENCES runs(workspace_id, project_id, run_id)
+        )
+        """,
+        """
+        CREATE TABLE evidence_items (
+            workspace_id TEXT NOT NULL, project_id TEXT NOT NULL, run_id TEXT NOT NULL, environment_id TEXT NOT NULL,
+            evidence_id TEXT NOT NULL, sequence INTEGER NOT NULL CHECK (sequence > 0),
+            metadata_json TEXT NOT NULL, body TEXT,
+            PRIMARY KEY (workspace_id, project_id, run_id, environment_id, evidence_id),
+            UNIQUE (workspace_id, project_id, run_id, environment_id, sequence),
+            FOREIGN KEY (workspace_id, project_id, run_id, environment_id)
+                REFERENCES evidence_runs(workspace_id, project_id, run_id, environment_id)
+        )
+        """
+    ]
+
     static func apply(to database: SQLiteConnection) throws {
         try database.execute("PRAGMA foreign_keys = ON")
         try database.transaction {
@@ -101,12 +124,18 @@ enum OperationalMigrations {
                 for statement in versionFour { try database.execute(statement) }
                 try database.execute("PRAGMA user_version = 4")
             }
+            if version < 5 {
+                for statement in versionFive { try database.execute(statement) }
+                try database.execute("PRAGMA user_version = 5")
+            }
             // Verify required columns even when the database already claims the latest schema.
             _ = try database.query("SELECT workspace_id, project_id, run_id, state, created_at FROM runs LIMIT 0") { _ in 0 }
             _ = try database.query("SELECT workspace_id, project_id, run_id, sequence, state, recorded_at, event_kind, progress_json FROM run_events LIMIT 0") { _ in 0 }
             _ = try database.query("SELECT workspace_id, project_id, run_id, plan_json FROM run_progress LIMIT 0") { _ in 0 }
             _ = try database.query("SELECT workspace_id, project_id, environment_id, approval_id, action_id, action_json, requester_id, policy_fingerprint, state, sequence, created_at, expires_at, updated_at, reviewer_id, reviewer_revision FROM approvals LIMIT 0") { _ in 0 }
             _ = try database.query("SELECT workspace_id, project_id, environment_id, approval_id, sequence, state, recorded_at, reviewer_id, reviewer_revision FROM approval_events LIMIT 0") { _ in 0 }
+            _ = try database.query("SELECT workspace_id, project_id, run_id, environment_id, binding_json FROM evidence_runs LIMIT 0") { _ in 0 }
+            _ = try database.query("SELECT workspace_id, project_id, run_id, environment_id, evidence_id, sequence, metadata_json, body FROM evidence_items LIMIT 0") { _ in 0 }
             guard try database.integer("PRAGMA foreign_keys") == 1 else { throw OperationalStoreError.invalidDatabase }
         }
     }

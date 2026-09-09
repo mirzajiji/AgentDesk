@@ -1,6 +1,6 @@
 # Security boundaries, secrets, classification and audit
 
-Status: scoped Keychain storage (P1-05), deterministic policy and durable approval/audit storage (P1-10), and the scoped redaction boundary (P1-12a) are implemented. Provider-to-evidence storage, run coordination, native approval review and remote projections remain subsequent work. Source: [final architecture](final-architecture.txt), sections 96, 101 and 138–140.
+Status: scoped Keychain storage (P1-05), deterministic policy and durable approval/audit storage (P1-10), scoped redaction (P1-12a), and sanitized trace/artifact storage (P1-12b) are implemented. Provider coordination, native approval review and remote projections remain subsequent work. Source: [final architecture](final-architecture.txt), sections 96, 101 and 138–140.
 <!-- Source sections: 96,101,138,139,140 -->
 
 The highest-priority boundary is company isolation. The model, imported documents, tool output, local processes, remote clients and extension content are not security authorities. The Mac validates scope and permission for every sensitive operation and response.
@@ -33,7 +33,7 @@ JSON uses a bounded lexical scanner. It masks a sensitive field's entire value, 
 
 Limits: 256 KiB input and 1 MiB sanitized output per record; 64 unique references and 64 KiB combined raw secret bytes; at most 1,024 generated variants totaling 4 MiB; 64 extra field names of at most 64 UTF-8 bytes; JSON depth 40, 8,192 values and 256 bytes per numeric token. Match collection is bounded. Policy/buffer descriptions and reflection hide private contents; errors contain fixed cases, not source text. Ordinary memory lifetime management does not guarantee zeroization.
 
-This is deterministic defense in depth, not discovery of every possible secret. Unknown unlabelled values, custom encodings, encrypted/compressed content and arbitrary binary artifacts require source minimization, an appropriate parser or denial before collection/publication. At this task boundary, the provider still returns untrusted observations in memory; the next evidence-storage and coordinator tasks must route them through this API before persistence or UI. See [redaction validation](../Development/p1-12a-validation.md).
+This is deterministic defense in depth, not discovery of every possible secret. Unknown unlabelled values, custom encodings, encrypted/compressed content and arbitrary binary artifacts require source minimization, an appropriate parser or denial before collection/publication. The [evidence store](persistence.md) now requires this wrapper for writes. The provider still returns untrusted observations in memory; the coordinator must route them through this API before storage or UI. See [redaction validation](../Development/p1-12a-validation.md).
 
 ## Remote and extension controls
 

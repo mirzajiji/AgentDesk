@@ -5,9 +5,9 @@ let package = Package(
     name: "AgentDeskPersistence",
     platforms: [.macOS(.v15), .iOS(.v18)],
     products: [.library(name: "AgentDeskPersistence", targets: ["AgentDeskPersistence"])],
-    dependencies: [.package(path: "../AgentDeskCore")],
+    dependencies: [.package(path: "../AgentDeskCore"), .package(path: "../AgentDeskSecurity")],
     targets: [
-        .target(name: "AgentDeskPersistence", dependencies: ["AgentDeskCore"], linkerSettings: [.linkedLibrary("sqlite3")]),
-        .testTarget(name: "AgentDeskPersistenceTests", dependencies: ["AgentDeskPersistence", "AgentDeskCore"])
+        .target(name: "AgentDeskPersistence", dependencies: ["AgentDeskCore", "AgentDeskSecurity"], linkerSettings: [.linkedLibrary("sqlite3")]),
+        .testTarget(name: "AgentDeskPersistenceTests", dependencies: ["AgentDeskPersistence", "AgentDeskCore", "AgentDeskSecurity"])
     ]
 )

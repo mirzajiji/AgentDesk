@@ -6,13 +6,15 @@ struct ProjectAgentsView: View {
     @StateObject private var model: ProjectAgentsModel
     @State private var editor: AgentEditorRequest?
     @State private var editingSharedInstructions = false
+    @State private var editingSkills = false
     @State private var instructionPreview: InstructionPreviewRequest?
     @Environment(\.dismiss) private var dismiss
 
     init(project: ProjectRecord, openStore: @escaping () async throws -> ProjectAgentStore,
-         openInstructions: @escaping () async throws -> ProjectInstructionStore) {
+         openInstructions: @escaping () async throws -> ProjectInstructionStore,
+         openSkills: @escaping () async throws -> ProjectSkillStore) {
         _model = StateObject(wrappedValue: ProjectAgentsModel(project: project, openStore: openStore,
-                                                             openInstructions: openInstructions))
+                                                             openInstructions: openInstructions, openSkills: openSkills))
     }
 
     var body: some View {
@@ -23,6 +25,8 @@ struct ProjectAgentsView: View {
                     Text("Agents · Local project").foregroundStyle(.secondary)
                 }
                 Spacer()
+                Button("Skills") { editingSkills = true }
+                    .accessibilityIdentifier("skills.open").disabled(model.skillStore == nil)
                 Button("Shared Instructions") { editingSharedInstructions = true }
                     .accessibilityIdentifier("instructions.shared")
                     .disabled(model.instructionStore == nil)
@@ -80,13 +84,16 @@ struct ProjectAgentsView: View {
             Text("Review the shared and agent instructions before execution. Codex execution is being added next.")
                 .font(.callout).foregroundStyle(.secondary)
         }
-        .padding(24).frame(minWidth: 760, idealWidth: 820, minHeight: 520, idealHeight: 620)
+        .padding(24).frame(minWidth: 820, idealWidth: 880, minHeight: 520, idealHeight: 620)
         .task { await model.load() }
         .sheet(item: $editor) { request in
-            AgentEditorView(existing: request.existing) { draft in try await model.save(draft, replacing: request.existing) }
+            AgentEditorView(existing: request.existing, skills: model.skills) { draft in try await model.save(draft, replacing: request.existing) }
         }
         .sheet(isPresented: $editingSharedInstructions) {
             if let store = model.instructionStore { SharedInstructionsView(store: store, scope: model.project.scope) }
+        }
+        .sheet(isPresented: $editingSkills, onDismiss: { Task { await model.load() } }) {
+            if let store = model.skillStore { ProjectSkillsView(scope: model.project.scope, store: store) }
         }
         .sheet(item: $instructionPreview) { request in InstructionPreviewView(value: request.value) }
     }
@@ -104,6 +111,7 @@ private struct AgentEditorRequest: Identifiable {
 
 private struct AgentEditorView: View {
     let existing: AgentSnapshot?
+    let skills: [SkillSnapshot]
     let save: (AgentDraft) async throws -> Void
     @State private var draft = AgentTemplate.general.draft
     @State private var template = AgentTemplate.general
@@ -146,6 +154,8 @@ private struct AgentEditorView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 .padding().tabItem { Text("Execution") }
+                AgentSkillSelectionView(skills: skills, references: $draft.skillReferences)
+                    .padding().tabItem { Text("Skills") }
             }
             if let error { Text(error).foregroundStyle(.red).accessibilityIdentifier("agent.validation") }
             HStack {
@@ -169,4 +179,38 @@ private struct AgentEditorView: View {
         .onAppear { draft = existing?.draft ?? template.draft; modelIdentifier = draft.profile.modelIdentifier ?? "" }
     }
 }
+private struct AgentSkillSelectionView: View {
+    let skills: [SkillSnapshot]
+    @Binding var references: [SkillReference]
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Selected skills keep their exact version until you explicitly update the reference.").font(.caption).foregroundStyle(.secondary)
+                if skills.isEmpty { Text("No skills available. Create one from the project’s Skills panel.") }
+                ForEach(skills) { skill in
+                    let selected = references.first { $0.id == skill.id && $0.scope == skill.definition.scope }
+                    HStack {
+                        Toggle(skill.definition.name, isOn: Binding(get: { selected != nil }, set: { enabled in
+                            references.removeAll { $0.id == skill.id && $0.scope == skill.definition.scope }
+                            if enabled, let reference = try? skill.definition.reference { references.append(reference) }
+                        }))
+                        .disabled(selected == nil && (skill.definition.archived || !skill.definition.enabled))
+                        .accessibilityIdentifier("agent.skill.\(skill.definition.name)")
+                        Text("Version \(selected?.revision ?? skill.definition.revision)").foregroundStyle(.secondary)
+                        if skill.definition.archived || !skill.definition.enabled { Text("Unavailable").foregroundStyle(.orange) }
+                        else if let selected, selected.revision != skill.definition.revision {
+                            Button("Use version \(skill.definition.revision)") {
+                                if let index = references.firstIndex(of: selected), let latest = try? skill.definition.reference { references[index] = latest }
+                            }
+                        }
+                    }
+                }
+                ForEach(references.filter { reference in !skills.contains { $0.id == reference.id && $0.definition.scope == reference.scope } }, id: \.self) { reference in
+                    HStack { Text("Missing skill · version \(reference.revision)").foregroundStyle(.orange); Button("Remove reference") { references.removeAll { $0 == reference } } }
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
 #endif

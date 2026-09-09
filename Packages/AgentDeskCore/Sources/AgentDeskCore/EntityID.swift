@@ -34,12 +34,14 @@ public enum ProjectEntity: Sendable {}
 public enum EnvironmentEntity: Sendable {}
 public enum RunEntity: Sendable {}
 public enum AgentEntity: Sendable {}
+public enum SkillEntity: Sendable {}
 
 public typealias WorkspaceID = EntityID<WorkspaceEntity>
 public typealias ProjectID = EntityID<ProjectEntity>
 public typealias EnvironmentID = EntityID<EnvironmentEntity>
 public typealias RunID = EntityID<RunEntity>
 public typealias AgentID = EntityID<AgentEntity>
+public typealias SkillID = EntityID<SkillEntity>
 
 public struct ProjectScope: Hashable, Codable, Sendable {
     public let workspaceID: WorkspaceID

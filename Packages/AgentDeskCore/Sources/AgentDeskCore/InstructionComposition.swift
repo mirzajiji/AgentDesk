@@ -17,6 +17,7 @@ public struct ComposedInstructions: Equatable, Sendable {
     public let agentID: AgentID
     public let agentRevision: Int
     public let sources: [ComposedInstructionSource]
+    public let skillPermissionRequests: [SkillPermissionRequest]
     public var text: String {
         sources.map { "## \($0.layer): \($0.title) (version \($0.revision))\n\n\($0.text)" }.joined(separator: "\n\n")
     }
@@ -24,7 +25,7 @@ public struct ComposedInstructions: Equatable, Sendable {
 
 public enum InstructionComposer {
     public static func compose(scope: ProjectScope, agent: AgentSnapshot,
-                               workspace: InstructionBundleSnapshot?, project: InstructionBundleSnapshot?) throws -> ComposedInstructions {
+                               workspace: InstructionBundleSnapshot?, project: InstructionBundleSnapshot?, skills: [SkillSnapshot] = []) throws -> ComposedInstructions {
         try Task.checkCancellation()
         guard agent.definition.scope == scope else { throw ScopedFileError.scopeMismatch }
         _ = try agent.draft.validated()
@@ -49,7 +50,17 @@ public enum InstructionComposer {
         sources.append(source(layer: "Agent", title: agent.definition.name, revision: agent.definition.revision,
                               file: "Projects/\(scope.projectID)/Agents/\(agent.id)/Versions/\(agent.definition.revision)/instructions.md",
                               text: agent.instructions))
-        return ComposedInstructions(scope: scope, agentID: agent.id, agentRevision: agent.definition.revision, sources: sources)
+        try SkillReference.validate(agent.draft.skillReferences, in: scope)
+        guard try skills.map({ try $0.definition.reference }) == agent.draft.skillReferences else { throw SkillError.invalidBundle }
+        for skill in skills {
+            try skill.definition.scope.validate(in: scope)
+            guard skill.definition.enabled, !skill.definition.archived else { throw SkillError.unavailable }
+            let base = skill.definition.scope.projectID == nil ? "" : "Projects/\(scope.projectID)/"
+            sources.append(source(layer: "Skill", title: skill.definition.name, revision: skill.definition.revision,
+                file: "\(base)Skills/\(skill.id)/Versions/\(skill.definition.revision)/instructions.md", text: skill.instructions))
+        }
+        return try ComposedInstructions(scope: scope, agentID: agent.id, agentRevision: agent.definition.revision, sources: sources,
+            skillPermissionRequests: skills.map { try SkillPermissionRequest(skillName: $0.definition.name, reference: $0.definition.reference, operations: $0.definition.requiredPermissions) })
     }
 
     private static func source(layer: String, title: String, revision: Int, file: String, text: String) -> ComposedInstructionSource {

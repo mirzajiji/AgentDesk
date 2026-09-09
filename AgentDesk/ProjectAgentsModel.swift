@@ -11,12 +11,16 @@ final class ProjectAgentsModel: ObservableObject {
     @Published private(set) var errorMessage: String?
     private let openStore: () async throws -> ProjectAgentStore
     private let openInstructions: () async throws -> ProjectInstructionStore
+    private let openSkills: () async throws -> ProjectSkillStore
+    @Published private(set) var skillStore: ProjectSkillStore?
+    @Published private(set) var skills: [SkillSnapshot] = []
     private var store: ProjectAgentStore?
     @Published private(set) var instructionStore: ProjectInstructionStore?
 
     init(project: ProjectRecord, openStore: @escaping () async throws -> ProjectAgentStore,
-         openInstructions: @escaping () async throws -> ProjectInstructionStore) {
-        self.project = project; self.openStore = openStore; self.openInstructions = openInstructions
+         openInstructions: @escaping () async throws -> ProjectInstructionStore,
+         openSkills: @escaping () async throws -> ProjectSkillStore) {
+        self.project = project; self.openStore = openStore; self.openInstructions = openInstructions; self.openSkills = openSkills
     }
 
     func load() async {
@@ -25,6 +29,10 @@ final class ProjectAgentsModel: ObservableObject {
         do {
             if store == nil { store = try await openStore() }
             if instructionStore == nil { instructionStore = try await openInstructions() }
+            if skillStore == nil { skillStore = try await openSkills() }
+            let shared = try await skillStore!.skills(at: SkillScope(workspaceID: project.workspaceID), in: project.scope, includeArchived: true)
+            let local = try await skillStore!.skills(at: SkillScope(workspaceID: project.workspaceID, projectID: project.id), in: project.scope, includeArchived: true)
+            skills = shared + local
             agents = try await store!.agents(in: project.scope, includeArchived: true)
             errorMessage = nil
         } catch is CancellationError {} catch { errorMessage = Self.message(error) }
@@ -55,6 +63,7 @@ final class ProjectAgentsModel: ObservableObject {
     }
 
     static func message(_ error: any Error) -> String {
+        if let error = error as? SkillError { return error.localizedDescription }
         if let error = error as? AgentConfigurationError { return error.localizedDescription }
         if let error = error as? CatalogError { return error.localizedDescription }
         if let error = error as? InstructionError { return error.localizedDescription }

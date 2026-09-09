@@ -57,11 +57,12 @@ public struct AgentDraft: Equatable, Sendable {
     public var instructions: String
     public var enabled: Bool
     public var profile: CodexAgentProfile
+    public var skillReferences: [SkillReference]
 
     public init(name: String, summary: String = "", instructions: String, enabled: Bool = true,
-                profile: CodexAgentProfile = CodexAgentProfile()) {
+                profile: CodexAgentProfile = CodexAgentProfile(), skillReferences: [SkillReference] = []) {
         self.name = name; self.summary = summary; self.instructions = instructions
-        self.enabled = enabled; self.profile = profile
+        self.enabled = enabled; self.profile = profile; self.skillReferences = skillReferences
     }
 
     public func validated() throws -> AgentDraft {
@@ -75,6 +76,7 @@ public struct AgentDraft: Equatable, Sendable {
         guard !instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               instructions.utf8.count <= 65_536, !instructions.utf8.contains(0) else { throw AgentConfigurationError.invalidInstructions }
         try profile.validate()
+        try SkillReference.validate(skillReferences)
         return copy
     }
 }
@@ -89,6 +91,7 @@ public struct AgentDefinition: Codable, Equatable, Sendable, Identifiable {
     public let enabled: Bool
     public let archived: Bool
     public let profile: CodexAgentProfile
+    public let skillReferences: [SkillReference]?
     public let createdAt: Date
     public let updatedAt: Date
     public let instructionsFile: String
@@ -100,7 +103,7 @@ public struct AgentSnapshot: Equatable, Sendable, Identifiable {
     public var id: AgentID { definition.id }
     public var draft: AgentDraft {
         AgentDraft(name: definition.name, summary: definition.summary, instructions: instructions,
-                   enabled: definition.enabled, profile: definition.profile)
+                   enabled: definition.enabled, profile: definition.profile, skillReferences: definition.skillReferences ?? [])
     }
 }
 

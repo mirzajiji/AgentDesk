@@ -4,7 +4,7 @@ This is an implementation plan, not a completion claim. The full source specific
 
 Finish the current task's validation and commit before starting another independent task. A task may be split further when its diff becomes difficult to review; never combine unrelated completed tasks just to reduce commit count. Behavioral tests belong in the feature commit.
 
-Progress after P1-06b2: **16 documented tasks complete, 6 Phase 1 tasks remaining** (22 detailed tasks including bootstrap; P1-09 is split into transport and provider/event integration). Phases 2–6 and sections 115–159 are also remaining; they have not yet been decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
+Progress after P1-06b3: **17 documented tasks complete, 5 Phase 1 tasks remaining** (22 detailed tasks including bootstrap; P1-09 is split into transport and provider/event integration). Phases 2–6 and sections 115–159 are also remaining; they have not yet been decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
 
 ## Bootstrap
 
@@ -24,7 +24,7 @@ Progress after P1-06b2: **16 documented tasks complete, 6 Phase 1 tasks remainin
 | P1-06a | Complete (`6664313`, pushed): project agent creation/editing, templates, immutable instruction versions, archive/restore and native Mac editor | 43 package tests; 68 native Mac unit + 8 UI and 65 iPhone 16 Pro unit executions pass. See [agent editing validation](p1-06a-validation.md). |
 | P1-06b1 | Complete (`d98f5b1`, pushed): versioned workspace/project instruction sets, include composition and native exact-source preview | 56 package tests; 83 native Mac unit + 9 UI and 78 iPhone 16 Pro unit executions pass. See [instruction validation](p1-06b1-validation.md). |
 | P1-06b2 | Complete: immutable execution/environment/policy settings, effective configuration with provenance and enforced output schemas | 88 Core + 68 Runtime tests; 205 native Mac unit + 1 Settings UI and 161 iPhone tests pass; real Codex structured-output smoke passes. See [configuration validation](p1-06b2-validation.md). |
-| P1-06b3 | Scoped versioned skills and agent skill references | Bundle/path validation, permission requests without grants, source preview, version pinning and cross-scope denial |
+| P1-06b3 | Complete: workspace/project skill bundles, native editor/attachments, archive/restore, pinned agent references and exact source/permission preview | 97 Core + 68 Runtime tests; 215 Mac unit tests, 11 distinct Mac UI executions across runs and 170 iPhone tests pass. See [skill validation](p1-06b3-validation.md) for initial selector failures and accepted retries. |
 | P1-07a | Complete (`0ae202f`, pushed): shared run states, persisted lifecycle service and bounded replay/live state subscriptions | 12 Runtime + 58 Core + 12 persistence package tests; 97 native Mac and 92 iPhone unit tests pass. See [lifecycle validation](p1-07a-validation.md). |
 | P1-07b | Complete (`189bdff`, pushed): typed persisted stages/steps and deterministic measurable progress | 66 Core + 18 persistence + 16 Runtime package tests; 115 native Mac and 110 iPhone unit tests pass. See [progress validation](p1-07b-validation.md). |
 | P1-08a | Complete (`6be270b`, pushed): Codex discovery, supported version/status/login/logout adapters and bounded Mac command capture | Real installed CLI probe; 32 Runtime, 131 native Mac and 114 iPhone unit tests pass; see [diagnostics validation](p1-08a-validation.md) |
@@ -38,7 +38,7 @@ Progress after P1-06b2: **16 documented tasks complete, 6 Phase 1 tasks remainin
 | P1-14 | Command palette, basic menu bar, Settings and first-run checks | Command routing, stale selection handling, no duplicate execution, menu status updates and UI tests |
 | P1-15 | Complete Phase 1 acceptance and architecture documentation for implemented systems | Fresh app: workspace → project → agent → instructions → Codex → live steps → results/files; all affected suites |
 
-After P1-06a/b1, implementation follows the runtime critical path through P1-07a/b and Codex discovery/provider setup. P1-06b2 configuration constraints are complete; P1-06b3 skills remain required work. Capabilities must be validated and policy-gated before being made executable. All six phases and the additions below remain in scope.
+After P1-06a/b1, implementation follows the runtime critical path through P1-07a/b and Codex discovery/provider setup. P1-06b2 configuration constraints and P1-06b3 scoped skills are complete. Capabilities must be validated and policy-gated before being made executable. All six phases and the additions below remain in scope.
 
 The iOS target introduced in P1-01 is a truthful companion shell with an unpaired/connection-unavailable state. Do not fabricate active runs or working pairing before Phase 5 exists. Keep testing it whenever shared types or design code change.
 

@@ -26,6 +26,7 @@ public actor ProjectAgentStore {
         try validate(requested)
         return try root.withLock {
             let draft = try draft.validated()
+            try validateSkills(draft.skillReferences)
             try checkDuplicate(draft.name, excluding: nil)
             let agents = try agentDirectory(create: true)
             let id = AgentID(), stagingName = ".new-\(UUID().uuidString)"
@@ -73,7 +74,7 @@ public actor ProjectAgentStore {
 
     private func save(_ existing: AgentSnapshot, expectedRevision: Int, draft: AgentDraft, archived: Bool) throws -> AgentSnapshot {
         guard existing.definition.revision == expectedRevision else { throw AgentConfigurationError.staleRevision }
-        if !archived { try checkDuplicate(draft.name, excluding: existing.id) }
+        if !archived { try checkDuplicate(draft.name, excluding: existing.id); try validateSkills(draft.skillReferences) }
         let directory = try agentDirectory().child(existing.id.rawValue), versions = try directory.child("Versions")
         let revisions = try versions.names().filter { !$0.hasPrefix(".") }.map { name -> Int in
             guard let number = Int(name), (1...1_000_000).contains(number), String(number) == name else {
@@ -123,11 +124,14 @@ public actor ProjectAgentStore {
             throw AgentConfigurationError.invalidInstructions
         }
         let snapshot = AgentSnapshot(definition: definition, instructions: instructions)
+        try SkillReference.validate(snapshot.draft.skillReferences, in: scope)
         guard try snapshot.draft.validated() == snapshot.draft else { throw AgentConfigurationError.invalidConfiguration }
         return snapshot
     }
 
     private func publishVersion(_ definition: AgentDefinition, instructions: String, in versions: ConfigurationDirectory) throws {
+        let manifest = try encode(definition)
+        guard manifest.count <= 65_536 else { throw AgentConfigurationError.invalidConfiguration }
         let temporary = ".new-\(UUID().uuidString)"
         let staging = try versions.createChild(temporary)
         var published = false
@@ -137,7 +141,7 @@ public actor ProjectAgentStore {
                 versions.remove(temporary, directory: true)
             }
         }
-        try staging.write(encode(definition), to: "agent.json")
+        try staging.write(manifest, to: "agent.json")
         try staging.write(Data(instructions.utf8), to: "instructions.md")
         try versions.publishChild(temporary, as: String(definition.revision))
         published = true
@@ -146,8 +150,14 @@ public actor ProjectAgentStore {
     private func definition(id: AgentID, revision: Int, draft: AgentDraft, archived: Bool,
                             createdAt: Date, updatedAt: Date) -> AgentDefinition {
         AgentDefinition(schemaVersion: 1, id: id, scope: scope, revision: revision, name: draft.name,
-                        summary: draft.summary, enabled: draft.enabled, archived: archived, profile: draft.profile,
+                        summary: draft.summary, enabled: draft.enabled, archived: archived, profile: draft.profile, skillReferences: draft.skillReferences.isEmpty ? nil : draft.skillReferences,
                         createdAt: createdAt, updatedAt: updatedAt, instructionsFile: "instructions.md")
+    }
+
+    private func validateSkills(_ references: [SkillReference]) throws {
+        let library = try SkillLibrary(scope: scope, workspace: root.child(scope.workspaceID.rawValue), project: project)
+        try library.validate(scope)
+        _ = try library.resolve(references)
     }
 
     private func agentDirectory(create: Bool = false) throws -> ConfigurationDirectory {

@@ -66,7 +66,8 @@ struct WorkspaceBrowserView: View {
         }
         .sheet(item: $selectedProject) { project in
             ProjectAgentsView(project: project, openStore: { try await model.agentStore(for: project) },
-                              openInstructions: { try await model.instructionStore(for: project) })
+                              openInstructions: { try await model.instructionStore(for: project) },
+                              openSkills: { try await model.skillStore(for: project) })
         }
         .sheet(item: $editor) { item in
             CatalogNameEditor(editor: item) { name in

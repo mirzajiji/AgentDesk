@@ -99,7 +99,7 @@ struct InstructionPreviewView: View {
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("instructions.preview.done")
             }
-            Text("Global → Workspace → Project → Agent · Agent version \(value.agentRevision)")
+            Text("Global → Workspace → Project → Agent → Selected skills · Agent version \(value.agentRevision)")
                 .foregroundStyle(.secondary)
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -115,6 +115,13 @@ struct InstructionPreviewView: View {
                             }
                         }
                         Divider()
+                    }
+                    ForEach(value.skillPermissionRequests, id: \.reference) { request in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(request.skillName) · Permission requests").font(.headline)
+                            if request.operations.isEmpty { Text("No additional permissions requested.") }
+                            ForEach(request.operations, id: \.self) { operation in Text(operation.skillPermissionTitle) }
+                        }
                     }
                 }.textSelection(.enabled)
             }

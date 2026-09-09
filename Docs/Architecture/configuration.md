@@ -1,6 +1,6 @@
 # Configuration composition and versioning
 
-Status: P1-06b1 implements shared instructions; P1-06b2 adds immutable execution settings, project environments, stored policy documents, effective configuration and provider output contracts. See [configuration validation](../Development/p1-06b2-validation.md). Skill bundles and native advanced configuration controls remain later tasks. Source: [final architecture](final-architecture.txt), sections 8, 10 and 131–133.
+Status: P1-06b1 implements shared instructions; P1-06b2 adds immutable execution settings, project environments, stored policy documents, effective configuration and provider output contracts. See [configuration validation](../Development/p1-06b2-validation.md). P1-06b3 adds native skill editing and explicit pinned instruction sources; native advanced execution controls remain later work. Source: [final architecture](final-architecture.txt), sections 8, 10 and 131–133.
 <!-- Source sections: 8,10,131,132,133 -->
 
 Configuration stays in readable JSON, Markdown and appropriate YAML. The UI edits these files through validated services. SQLite can index or cache configuration but is not its only authoritative copy.
@@ -35,7 +35,7 @@ The store writes complete revisions before publishing the current pointer, check
 
 Limits are 64 documents/roots per set, 64 includes per document, 32 include edges in a chain, 64 KiB of UTF-8 text per file and 256 KiB of text per set. Missing files, malformed manifests, scope mismatches, unsupported versions, symlinks, duplicate IDs/roots, cycles and stale saves fail without silently replacing current files. Cancellation and write failures leave previous committed data intact; an unpublished complete revision may remain for recovery.
 
-The instruction preview does not start Codex or grant authority. Workflow/run instruction layers, user-editable global settings and skill bundles remain pending. Execution configuration has its own composer below. Native shared-instruction editing and preview are Mac-only.
+The instruction preview does not start Codex or grant authority. Workflow/run instruction layers and user-editable global settings remain pending; P1-06b3 appends selected, pinned skill sources. Execution configuration has its own composer below. Native shared-instruction editing and preview are Mac-only.
 
 
 ## Implemented execution configuration

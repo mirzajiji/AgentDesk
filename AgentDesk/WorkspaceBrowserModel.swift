@@ -117,6 +117,11 @@ final class WorkspaceBrowserModel: ObservableObject {
         return try await catalog.instructionStore(in: project.scope)
     }
 
+    func skillStore(for project: ProjectRecord) async throws -> ProjectSkillStore {
+        guard let catalog else { throw CatalogError.invalidConfiguration }
+        return try await catalog.skillStore(in: project.scope)
+    }
+
     static func message(for error: any Error) -> String {
         if let error = error as? CatalogError { return error.localizedDescription }
         return "AgentDesk couldn’t open or save this workspace. Check that its local files are available and try again."

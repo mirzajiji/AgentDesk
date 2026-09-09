@@ -160,6 +160,53 @@ final class AgentDeskUITests: XCTestCase {
     }
 
     @MainActor
+    func testSkillCreationPinningPreviewAndReopen() {
+        let app = XCUIApplication()
+        app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
+        app.launch()
+        XCTAssertTrue(app.buttons["workspace.create.empty"].waitForExistence(timeout: 5))
+        app.buttons["workspace.create.empty"].click(); saveName("Synthetic workspace", in: app)
+        XCTAssertTrue(app.buttons["project.create.empty"].waitForExistence(timeout: 5))
+        app.buttons["project.create.empty"].click(); saveName("Skill Project", in: app)
+        XCTAssertTrue(app.buttons["project.agents.Skill Project"].waitForExistence(timeout: 5))
+        app.buttons["project.agents.Skill Project"].click()
+        XCTAssertTrue(app.buttons["skills.open"].waitForExistence(timeout: 5)); app.buttons["skills.open"].click()
+        XCTAssertTrue(app.buttons["skill.create"].waitForExistence(timeout: 5)); app.buttons["skill.create"].click()
+        XCTAssertTrue(app.textFields["skill.name"].waitForExistence(timeout: 5))
+        app.textFields["skill.name"].click(); app.textFields["skill.name"].typeText("Evidence method")
+        app.textViews["skill.instructions"].click(); app.textViews["skill.instructions"].typeText("Keep synthetic observations separate from assumptions.")
+        app.tabs["Attachments"].click()
+        app.buttons["skill.attachment.add"].click()
+        XCTAssertTrue(app.textViews["skill.attachment.text"].waitForExistence(timeout: 5))
+        app.textViews["skill.attachment.text"].click(); app.textViews["skill.attachment.text"].typeText("Synthetic example kept with this version.")
+        app.buttons["skill.attachment.keep"].click()
+        XCTAssertTrue(app.staticTexts["examples/example.md"].waitForExistence(timeout: 5))
+        app.buttons["skill.save"].click()
+        XCTAssertTrue(app.buttons["skill.edit.Evidence method"].waitForExistence(timeout: 5))
+        app.buttons["skills.done"].click()
+        XCTAssertTrue(app.buttons["agent.create"].waitForExistence(timeout: 5)); app.buttons["agent.create"].click()
+        XCTAssertTrue(app.buttons["agent.save"].waitForExistence(timeout: 5))
+        app.tabs["Skills"].click()
+        let selection = app.checkBoxes["agent.skill.Evidence method"]
+        XCTAssertTrue(selection.waitForExistence(timeout: 5)); selection.click()
+        app.buttons["agent.save"].click()
+        XCTAssertTrue(app.buttons["agent.preview.General Assistant"].waitForExistence(timeout: 5))
+        app.buttons["agent.preview.General Assistant"].click()
+        XCTAssertTrue(app.staticTexts["instruction.source.Skill"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Keep synthetic observations separate from assumptions."].exists)
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "Pinned skill instructions in native preview"; attachment.lifetime = .keepAlways; add(attachment)
+        app.buttons["instructions.preview.done"].click()
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["project.agents.Skill Project"].waitForExistence(timeout: 5))
+        app.buttons["project.agents.Skill Project"].click()
+        XCTAssertTrue(app.buttons["agent.edit.General Assistant"].waitForExistence(timeout: 5))
+        app.buttons["agent.edit.General Assistant"].click(); app.tabs["Skills"].click()
+        XCTAssertTrue(selection.waitForExistence(timeout: 5)); XCTAssertEqual((selection.value as? NSNumber)?.intValue, 1)
+    }
+
+    @MainActor
     func testSharedInstructionsSaveAndAppearInAgentPreview() {
         let app = XCUIApplication()
         app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString

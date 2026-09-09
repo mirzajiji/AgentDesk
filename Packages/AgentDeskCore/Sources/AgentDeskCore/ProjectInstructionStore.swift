@@ -59,7 +59,8 @@ public actor ProjectInstructionStore {
     public func preview(for agent: AgentSnapshot, in requested: ProjectScope) throws -> ComposedInstructions {
         try root.withLock {
             try validate(requested)
-            return try InstructionComposer.compose(scope: scope, agent: agent, workspace: read(.workspace), project: read(.project))
+            let skills = try SkillLibrary(scope: scope, workspace: workspace, project: project).resolve(agent.draft.skillReferences)
+            return try InstructionComposer.compose(scope: scope, agent: agent, workspace: read(.workspace), project: read(.project), skills: skills)
         }
     }
 

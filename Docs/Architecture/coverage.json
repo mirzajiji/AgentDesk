@@ -1,0 +1,1121 @@
+{
+  "source": "final-architecture.txt",
+  "sourceSHA256": "b7475d91fc2464c790183d82e74024025c17d8cee1120021910549a0f17cfd51",
+  "sectionCount": 159,
+  "documentCount": 34,
+  "sections": [
+    {
+      "section": 1,
+      "title": "Product Vision",
+      "sourceLine": 3,
+      "document": "overview.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 2,
+      "title": "Non-Negotiable Architecture Decisions",
+      "sourceLine": 39,
+      "document": "overview.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 3,
+      "title": "Core Architecture",
+      "sourceLine": 73,
+      "document": "overview.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 4,
+      "title": "Apple Platform Structure",
+      "sourceLine": 149,
+      "document": "apple-platforms.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 5,
+      "title": "Mac Is the Execution Authority",
+      "sourceLine": 194,
+      "document": "overview.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 6,
+      "title": "Workspaces and Projects",
+      "sourceLine": 226,
+      "document": "workspaces.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 7,
+      "title": "Strict Company Isolation",
+      "sourceLine": 259,
+      "document": "workspaces.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 8,
+      "title": "Filesystem as Source of Truth",
+      "sourceLine": 291,
+      "document": "configuration.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 9,
+      "title": "Suggested Workspace Structure",
+      "sourceLine": 309,
+      "document": "workspaces.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 10,
+      "title": "Configuration Inheritance",
+      "sourceLine": 356,
+      "document": "configuration.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 11,
+      "title": "Project Memory",
+      "sourceLine": 394,
+      "document": "project-memory.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 12,
+      "title": "Temporary Context vs Permanent Memory",
+      "sourceLine": 424,
+      "document": "project-memory.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 13,
+      "title": "Requirements Versioning",
+      "sourceLine": 454,
+      "document": "requirements.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 14,
+      "title": "Requirement Editing UX",
+      "sourceLine": 496,
+      "document": "requirements.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 15,
+      "title": "Tests Use Latest Requirement",
+      "sourceLine": 513,
+      "document": "requirements.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 16,
+      "title": "Requirement/Test Traceability",
+      "sourceLine": 530,
+      "document": "requirements.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 17,
+      "title": "Knowledge Retrieval",
+      "sourceLine": 562,
+      "document": "project-memory.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 18,
+      "title": "Agent System",
+      "sourceLine": 587,
+      "document": "agents-and-skills.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 19,
+      "title": "Suggested QA Agents",
+      "sourceLine": 617,
+      "document": "agents-and-skills.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 20,
+      "title": "Deterministic Code vs Agent",
+      "sourceLine": 638,
+      "document": "overview.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 21,
+      "title": "Skills",
+      "sourceLine": 666,
+      "document": "agents-and-skills.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 22,
+      "title": "Workflows",
+      "sourceLine": 697,
+      "document": "workflows.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 23,
+      "title": "Codex CLI Only",
+      "sourceLine": 742,
+      "document": "codex.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 24,
+      "title": "Codex CLI Provider",
+      "sourceLine": 762,
+      "document": "codex.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 25,
+      "title": "Codex Account Management",
+      "sourceLine": 790,
+      "document": "codex.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 26,
+      "title": "Codex Account Switching",
+      "sourceLine": 833,
+      "document": "codex.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 27,
+      "title": "Execution Profiles / Model Routing",
+      "sourceLine": 847,
+      "document": "codex.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 28,
+      "title": "Escalation",
+      "sourceLine": 884,
+      "document": "codex.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 29,
+      "title": "Codex Usage Dashboard",
+      "sourceLine": 911,
+      "document": "usage.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 30,
+      "title": "Token Usage",
+      "sourceLine": 959,
+      "document": "usage.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 31,
+      "title": "Plugins",
+      "sourceLine": 984,
+      "document": "plugins.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 32,
+      "title": "Plugin Isolation",
+      "sourceLine": 1007,
+      "document": "plugins.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 33,
+      "title": "Plugin Lifecycle",
+      "sourceLine": 1028,
+      "document": "plugins.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 34,
+      "title": "Plugin Permissions",
+      "sourceLine": 1056,
+      "document": "plugins.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 35,
+      "title": "Jira Plugin Setup",
+      "sourceLine": 1079,
+      "document": "plugins.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 36,
+      "title": "Plugins vs MCP",
+      "sourceLine": 1118,
+      "document": "plugins.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 37,
+      "title": "MCP Is a Core Architectural Pillar",
+      "sourceLine": 1142,
+      "document": "mcp.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 38,
+      "title": "MCP UI",
+      "sourceLine": 1161,
+      "document": "mcp.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 39,
+      "title": "MCP Permissions",
+      "sourceLine": 1205,
+      "document": "mcp.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 40,
+      "title": "AgentDesk as MCP Server",
+      "sourceLine": 1221,
+      "document": "mcp.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 41,
+      "title": "Databases Per Project",
+      "sourceLine": 1248,
+      "document": "databases.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 42,
+      "title": "Database Setup",
+      "sourceLine": 1264,
+      "document": "databases.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 43,
+      "title": "Database Secrets",
+      "sourceLine": 1302,
+      "document": "databases.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 44,
+      "title": "Database Lifecycle",
+      "sourceLine": 1321,
+      "document": "databases.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 45,
+      "title": "Database Permissions",
+      "sourceLine": 1347,
+      "document": "databases.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 46,
+      "title": "SQL Classification",
+      "sourceLine": 1372,
+      "document": "databases.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 47,
+      "title": "Database Tools",
+      "sourceLine": 1391,
+      "document": "databases.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 48,
+      "title": "Database Schema Browser",
+      "sourceLine": 1430,
+      "document": "databases.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 49,
+      "title": "Database Query Console",
+      "sourceLine": 1445,
+      "document": "databases.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 50,
+      "title": "Database Evidence",
+      "sourceLine": 1461,
+      "document": "databases.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 51,
+      "title": "Bug Registry",
+      "sourceLine": 1481,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 52,
+      "title": "Manual Bug Registration",
+      "sourceLine": 1502,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 53,
+      "title": "Mandatory Duplicate Detection",
+      "sourceLine": 1528,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 54,
+      "title": "Duplicate Ticket Behavior",
+      "sourceLine": 1574,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 55,
+      "title": "Possible Duplicates",
+      "sourceLine": 1588,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 56,
+      "title": "Blocked Downstream Scenarios",
+      "sourceLine": 1606,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 57,
+      "title": "Bug Relationships",
+      "sourceLine": 1627,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 58,
+      "title": "CityPay Jira Bug Skill",
+      "sourceLine": 1645,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 59,
+      "title": "CityPay Ticket Structure",
+      "sourceLine": 1668,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 60,
+      "title": "CityPay Ticket Rules",
+      "sourceLine": 1688,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 61,
+      "title": "CityPay Failure Grouping",
+      "sourceLine": 1761,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 62,
+      "title": "CityPay API Validation Rules",
+      "sourceLine": 1777,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 63,
+      "title": "CityPay Status Bugs",
+      "sourceLine": 1791,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 64,
+      "title": "CityPay Concurrency Bugs",
+      "sourceLine": 1803,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 65,
+      "title": "CityPay UI Bugs",
+      "sourceLine": 1820,
+      "document": "bug-registry.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 66,
+      "title": "Run Engine",
+      "sourceLine": 1837,
+      "document": "execution.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 67,
+      "title": "Structured Run Steps",
+      "sourceLine": 1874,
+      "document": "execution.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 68,
+      "title": "Event Bus",
+      "sourceLine": 1893,
+      "document": "run-events.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 69,
+      "title": "Tracing",
+      "sourceLine": 1921,
+      "document": "run-events.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 70,
+      "title": "Artifacts",
+      "sourceLine": 1946,
+      "document": "run-events.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 71,
+      "title": "Git/File Change Tracking",
+      "sourceLine": 1969,
+      "document": "repositories.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 72,
+      "title": "Policy Engine",
+      "sourceLine": 1990,
+      "document": "permissions.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 73,
+      "title": "Approval Engine",
+      "sourceLine": 2015,
+      "document": "permissions.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 74,
+      "title": "Agent Testing / Evals",
+      "sourceLine": 2048,
+      "document": "testing-and-coverage.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 75,
+      "title": "Native macOS UI",
+      "sourceLine": 2075,
+      "document": "apple-platforms.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 76,
+      "title": "Main Mac Navigation",
+      "sourceLine": 2096,
+      "document": "native-interface.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 77,
+      "title": "Overview",
+      "sourceLine": 2126,
+      "document": "native-interface.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 78,
+      "title": "Agent Editor",
+      "sourceLine": 2144,
+      "document": "native-interface.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 79,
+      "title": "Context Inspector",
+      "sourceLine": 2166,
+      "document": "native-interface.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 80,
+      "title": "Command Palette",
+      "sourceLine": 2191,
+      "document": "native-interface.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 81,
+      "title": "Menu Bar",
+      "sourceLine": 2216,
+      "document": "native-interface.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 82,
+      "title": "Native Notifications",
+      "sourceLine": 2233,
+      "document": "native-interface.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 83,
+      "title": "Local Wi-Fi Remote Operation",
+      "sourceLine": 2248,
+      "document": "local-network.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 84,
+      "title": "LAN Architecture",
+      "sourceLine": 2266,
+      "document": "remote-access.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 85,
+      "title": "Bonjour / Local Discovery",
+      "sourceLine": 2283,
+      "document": "local-network.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 86,
+      "title": "LAN Connection Modes",
+      "sourceLine": 2304,
+      "document": "local-network.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 87,
+      "title": "Device Pairing",
+      "sourceLine": 2336,
+      "document": "device-pairing.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 88,
+      "title": "Trusted Devices",
+      "sourceLine": 2365,
+      "document": "device-pairing.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 89,
+      "title": "iPhone Capabilities",
+      "sourceLine": 2383,
+      "document": "remote-access.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 90,
+      "title": "iPhone Restrictions",
+      "sourceLine": 2411,
+      "document": "remote-access.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 91,
+      "title": "iPhone Run UI",
+      "sourceLine": 2429,
+      "document": "remote-access.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 92,
+      "title": "Mobile Diff Review",
+      "sourceLine": 2451,
+      "document": "remote-access.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 93,
+      "title": "Mobile Approval",
+      "sourceLine": 2465,
+      "document": "remote-access.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 94,
+      "title": "LAN Reconnection",
+      "sourceLine": 2485,
+      "document": "local-network.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 95,
+      "title": "Apple Local Network Permissions",
+      "sourceLine": 2511,
+      "document": "local-network.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 96,
+      "title": "Remote Security",
+      "sourceLine": 2523,
+      "document": "security.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 97,
+      "title": "Live Socket-Based Mac ↔ iPhone Streaming",
+      "sourceLine": 2539,
+      "document": "local-network.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 98,
+      "title": "Local Server",
+      "sourceLine": 2651,
+      "document": "remote-access.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 99,
+      "title": "No Mandatory Cloud",
+      "sourceLine": 2671,
+      "document": "overview.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 100,
+      "title": "Persistence",
+      "sourceLine": 2688,
+      "document": "persistence.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 101,
+      "title": "Secrets",
+      "sourceLine": 2717,
+      "document": "security.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 102,
+      "title": "Logging",
+      "sourceLine": 2743,
+      "document": "run-events.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 103,
+      "title": "Search",
+      "sourceLine": 2761,
+      "document": "project-memory.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 104,
+      "title": "First-Run Experience",
+      "sourceLine": 2782,
+      "document": "native-interface.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 105,
+      "title": "Connections Overview",
+      "sourceLine": 2822,
+      "document": "plugins.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 106,
+      "title": "Health Monitoring",
+      "sourceLine": 2844,
+      "document": "plugins.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 107,
+      "title": "Project Relationship Graph",
+      "sourceLine": 2865,
+      "document": "project-memory.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 108,
+      "title": "Example Full QA Execution",
+      "sourceLine": 2898,
+      "document": "overview.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 109,
+      "title": "AgentDesk Product Principles",
+      "sourceLine": 2959,
+      "document": "overview.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 110,
+      "title": "Development Phases",
+      "sourceLine": 2996,
+      "document": "overview.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 111,
+      "title": "Testing Requirements",
+      "sourceLine": 3127,
+      "document": "testing-and-coverage.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 112,
+      "title": "Required Architecture Documentation",
+      "sourceLine": 3211,
+      "document": "documentation.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 113,
+      "title": "AGENTS.md",
+      "sourceLine": 3240,
+      "document": "documentation.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 114,
+      "title": "Final Acceptance Scenario",
+      "sourceLine": 3273,
+      "document": "overview.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 115,
+      "title": "Manual Scenario Runner / Postman Collections",
+      "sourceLine": 3324,
+      "document": "scenarios.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 116,
+      "title": "Per-Project Dashboard, Statistics & Tool/Model Analytics",
+      "sourceLine": 3576,
+      "document": "analytics.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 117,
+      "title": "Environment Snapshot & Reproducibility",
+      "sourceLine": 3847,
+      "document": "reproducibility.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 118,
+      "title": "Evidence Provenance",
+      "sourceLine": 3901,
+      "document": "run-events.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 119,
+      "title": "Confidence / Evidence Quality",
+      "sourceLine": 3955,
+      "document": "run-events.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 120,
+      "title": "Task Templates / Quick Actions",
+      "sourceLine": 3983,
+      "document": "workflows.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 121,
+      "title": "Run Replay / Clone Run",
+      "sourceLine": 4029,
+      "document": "reproducibility.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 122,
+      "title": "Compare Runs",
+      "sourceLine": 4055,
+      "document": "reproducibility.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 123,
+      "title": "Test Coverage Map",
+      "sourceLine": 4087,
+      "document": "testing-and-coverage.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 124,
+      "title": "Missing Coverage Detection",
+      "sourceLine": 4119,
+      "document": "testing-and-coverage.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 125,
+      "title": "Test Data Management",
+      "sourceLine": 4136,
+      "document": "testing-and-coverage.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 126,
+      "title": "Preflight Checks",
+      "sourceLine": 4169,
+      "document": "workflows.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 127,
+      "title": "Tool Fallbacks",
+      "sourceLine": 4189,
+      "document": "workflows.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 128,
+      "title": "Workspace Lock / Visual Safety Indicator",
+      "sourceLine": 4213,
+      "document": "workspaces.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 129,
+      "title": "Production Safety Mode",
+      "sourceLine": 4237,
+      "document": "permissions.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 130,
+      "title": "Dry Run Mode",
+      "sourceLine": 4256,
+      "document": "permissions.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 131,
+      "title": "Workflow Versioning",
+      "sourceLine": 4278,
+      "document": "configuration.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 132,
+      "title": "Agent Configuration Versioning",
+      "sourceLine": 4294,
+      "document": "configuration.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 133,
+      "title": "Change Review Before Agent Configuration Save",
+      "sourceLine": 4313,
+      "document": "configuration.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 134,
+      "title": "Run Budgets",
+      "sourceLine": 4326,
+      "document": "workflows.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 135,
+      "title": "Concurrency Control",
+      "sourceLine": 4352,
+      "document": "workflows.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 136,
+      "title": "Resource Locks",
+      "sourceLine": 4368,
+      "document": "workflows.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 137,
+      "title": "Artifact Retention Policies",
+      "sourceLine": 4383,
+      "document": "operations.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 138,
+      "title": "Sensitive Data Classification",
+      "sourceLine": 4401,
+      "document": "security.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 139,
+      "title": "Redaction Engine",
+      "sourceLine": 4423,
+      "document": "security.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 140,
+      "title": "Audit Log",
+      "sourceLine": 4443,
+      "document": "security.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 141,
+      "title": "Plugin/MCP Permission Presets",
+      "sourceLine": 4469,
+      "document": "permissions.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 142,
+      "title": "Connection Diagnostics",
+      "sourceLine": 4491,
+      "document": "plugins.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 143,
+      "title": "Project Onboarding Wizard",
+      "sourceLine": 4518,
+      "document": "projects.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 144,
+      "title": "Import Existing Project Context",
+      "sourceLine": 4539,
+      "document": "importing.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 145,
+      "title": "OpenAPI Support",
+      "sourceLine": 4556,
+      "document": "importing.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 146,
+      "title": "Contract Drift Detection",
+      "sourceLine": 4577,
+      "document": "importing.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 147,
+      "title": "Git Integration as First-Class Project Setup",
+      "sourceLine": 4596,
+      "document": "projects.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 148,
+      "title": "Repository Safety",
+      "sourceLine": 4615,
+      "document": "repositories.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 149,
+      "title": "Notes / Manual Findings",
+      "sourceLine": 4630,
+      "document": "project-memory.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 150,
+      "title": "Inbox / Unclassified Information",
+      "sourceLine": 4644,
+      "document": "project-memory.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 151,
+      "title": "Universal Project Timeline",
+      "sourceLine": 4665,
+      "document": "project-memory.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 152,
+      "title": "Deep Linking",
+      "sourceLine": 4684,
+      "document": "native-interface.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 153,
+      "title": "Backup & Restore",
+      "sourceLine": 4693,
+      "document": "operations.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 154,
+      "title": "Git-Based Configuration Backup",
+      "sourceLine": 4711,
+      "document": "repositories.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 155,
+      "title": "Extension Readiness",
+      "sourceLine": 4723,
+      "document": "extensions.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 156,
+      "title": "Command-Line Interface for AgentDesk",
+      "sourceLine": 4743,
+      "document": "extensions.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 157,
+      "title": "CI Invocation",
+      "sourceLine": 4763,
+      "document": "extensions.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 158,
+      "title": "Final Architecture Principle: AgentDesk Is the System of Context",
+      "sourceLine": 4778,
+      "document": "overview.md",
+      "status": "documented-design; implementation pending"
+    },
+    {
+      "section": 159,
+      "title": "Calendar Sync & Upcoming Event Widget",
+      "sourceLine": 4819,
+      "document": "calendar.md",
+      "status": "documented-design; implementation pending"
+    }
+  ]
+}

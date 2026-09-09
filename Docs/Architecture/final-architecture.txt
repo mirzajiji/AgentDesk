@@ -1,0 +1,5069 @@
+AgentDesk — Final Architecture
+
+1. Product Vision
+
+AgentDesk is a local-first native Apple agent-management platform for QA, AQA, coding, debugging, documentation, project knowledge, testing, bug investigation, engineering workflows, and general technical work.
+
+It is not a chatbot wrapper.
+
+It should feel closer to a combination of:
+
+* Xcode
+* Linear
+* Raycast
+* GitHub Actions
+* an agent observability platform
+* a QA management system
+* a workflow/orchestration system
+
+The primary application runs on macOS and is the execution authority.
+
+An iOS companion application allows secure monitoring, review, approvals, and limited control from an iPhone.
+
+The eventual experience should allow the user to issue tasks such as:
+
+Handle QA for B2C-1234
+
+or:
+
+Investigate this Playwright failure
+
+or:
+
+Implement automation for these acceptance criteria
+
+AgentDesk then coordinates the required agents, tools, project memory, repositories, plugins, MCP connections, databases, tests, evidence, and approvals.
+
+⸻
+
+2. Non-Negotiable Architecture Decisions
+
+AgentDesk must use:
+
+* Swift
+* SwiftUI
+* native macOS application
+* native iOS companion application
+* Swift Package Manager
+* modern Swift concurrency
+* local filesystem
+* local database
+* macOS Keychain
+* Codex CLI
+* MCP
+
+AgentDesk must NOT depend on:
+
+* React
+* Electron
+* Tauri
+* OpenAI API
+* OPENAI_API_KEY
+* OpenAI Agents SDK
+* mandatory cloud infrastructure
+* unofficial ChatGPT APIs
+* extracted ChatGPT cookies/session tokens
+
+Codex CLI is currently the only AI provider.
+
+Codex authentication uses the officially supported Codex/ChatGPT login flow.
+
+⸻
+
+3. Core Architecture
+
+                         AgentDesk
+                         macOS App
+                         SwiftUI
+                            │
+                            ▼
+                 ┌────────────────────┐
+                 │ Application Layer  │
+                 └─────────┬──────────┘
+                           │
+          ┌────────────────┼─────────────────┐
+          │                │                 │
+          ▼                ▼                 ▼
+    Agent Runtime     Project Memory     Connections
+          │                                  │
+          │                         ┌────────┼────────┐
+          ▼                         │        │        │
+   Execution Router              Plugins    MCP    Databases
+          │
+          ├───────────────┐
+          │               │
+          ▼               ▼
+      Codex CLI      Deterministic Tools
+          │
+          │
+      ChatGPT
+   authenticated CLI
+
+AgentDesk owns:
+
+* workspaces
+* projects
+* agents
+* agent teams
+* instructions
+* skills
+* project memory
+* requirements
+* validation rules
+* bugs
+* tests
+* workflows
+* routing
+* tools
+* plugins
+* MCP
+* databases
+* environments
+* permissions
+* approvals
+* execution state
+* artifacts
+* traces
+* usage history
+* security
+* mobile access
+* device pairing
+
+Codex owns:
+
+* reasoning
+* requirement interpretation
+* code analysis
+* repository modifications
+* test design
+* complex failure analysis
+* debugging
+* documentation generation
+* semantic duplicate analysis
+* architecture reasoning
+
+Codex does not own security or permissions.
+
+⸻
+
+4. Apple Platform Structure
+
+Use native Apple targets.
+
+AgentDesk/
+│
+├── Apps/
+│   ├── AgentDeskMac/
+│   └── AgentDeskMobile/
+│
+├── Packages/
+│   ├── AgentDeskCore/
+│   ├── AgentDeskRuntime/
+│   ├── AgentDeskProtocol/
+│   ├── AgentDeskClient/
+│   ├── AgentDeskPersistence/
+│   ├── AgentDeskSecurity/
+│   ├── AgentDeskMCP/
+│   ├── AgentDeskPlugins/
+│   ├── AgentDeskDatabases/
+│   └── AgentDeskDesign/
+│
+├── Workspaces/
+├── Shared/
+├── Config/
+├── Data/
+├── Tests/
+├── Docs/
+├── AGENTS.md
+├── README.md
+└── Package.swift
+
+Use:
+
+* async/await
+* actors
+* AsyncSequence
+* AsyncStream
+* structured concurrency
+* Sendable
+
+Avoid giant ObservableObject classes and putting business logic directly inside SwiftUI Views.
+
+⸻
+
+5. Mac Is the Execution Authority
+
+All actual engineering operations execute from the Mac.
+
+AgentDesk Mac
+│
+├── Codex CLI
+├── Git repositories
+├── MCP servers
+├── plugins
+├── databases
+├── shell
+├── Playwright
+├── Kubernetes
+├── filesystem
+├── Jira
+├── GitLab
+├── Grafana
+└── other engineering systems
+
+The iPhone does not connect directly to company infrastructure.
+
+iPhone
+  ↓
+AgentDesk Mac
+  ↓
+Company systems
+
+Credentials remain on the Mac.
+
+⸻
+
+6. Workspaces and Projects
+
+The user works across separate companies.
+
+Each company gets a completely isolated workspace.
+
+Example:
+
+Workspaces/
+├── citypay/
+├── pokerstars/
+└── cascador/
+
+A workspace may contain multiple projects:
+
+CityPay
+├── PAYNET
+├── Backoffice
+├── Promotions
+└── Verification
+
+Every operation carries:
+
+WorkspaceID
+ProjectID
+EnvironmentID
+RunID
+AgentID
+
+where appropriate.
+
+⸻
+
+7. Strict Company Isolation
+
+Isolation must be enforced in code.
+
+Company A must never receive Company B:
+
+* code
+* tickets
+* requirements
+* prompts
+* project memory
+* database results
+* credentials
+* secrets
+* logs
+* MCP results
+* plugin results
+* artifacts
+* traces
+* runs
+* test evidence
+
+Do not rely on an instruction such as:
+
+Do not use CityPay information inside PokerStars.
+
+CityPay information should simply not be accessible.
+
+Every subsystem must be workspace-aware.
+
+⸻
+
+8. Filesystem as Source of Truth
+
+Important configuration remains human-readable.
+
+Use:
+
+* JSON
+* YAML where appropriate
+* Markdown
+
+The UI is a graphical editor for these files.
+
+Operational data lives in SQLite.
+
+Do not place every configuration value only inside SQLite.
+
+⸻
+
+9. Suggested Workspace Structure
+
+Workspaces/citypay/
+│
+├── workspace.json
+│
+├── Projects/
+│   └── paynet/
+│       ├── project.json
+│       │
+│       ├── requirements/
+│       ├── validation-rules/
+│       ├── business-rules/
+│       ├── tests/
+│       ├── bugs/
+│       ├── evidence/
+│       ├── decisions/
+│       ├── documentation/
+│       └── database-knowledge/
+│
+├── Agents/
+│   ├── qa-manager/
+│   ├── requirement-analyzer/
+│   ├── test-designer/
+│   ├── automation-engineer/
+│   ├── api-tester/
+│   ├── database-analyst/
+│   ├── failure-analyzer/
+│   ├── bug-writer/
+│   └── documentation-agent/
+│
+├── Skills/
+│
+├── Plugins/
+│
+├── MCP/
+│
+├── Databases/
+│
+├── Environments/
+│
+├── Workflows/
+│
+└── Repositories/
+
+⸻
+
+10. Configuration Inheritance
+
+Configuration should compose approximately as:
+
+GLOBAL
+  ↓
+WORKSPACE
+  ↓
+PROJECT
+  ↓
+AGENT
+  ↓
+WORKFLOW
+  ↓
+RUN
+
+Instructions can compose from multiple files.
+
+Example:
+
+Shared/Instructions/qa-principles.md
+Shared/Instructions/security.md
+Workspaces/citypay/Instructions/testing.md
+Workspaces/citypay/Agents/api-tester/instructions.md
+
+AgentDesk should provide:
+
+* effective configuration preview
+* effective instructions preview
+* file source
+* configuration validation
+* diff
+* version history
+* circular-reference detection
+* invalid-path detection
+
+⸻
+
+11. Project Memory
+
+Project Memory is a core AgentDesk concept.
+
+It is not chat memory.
+
+It contains persistent structured knowledge such as:
+
+* project descriptions
+* requirements
+* acceptance criteria
+* validation rules
+* business rules
+* API behavior
+* state transitions
+* environment rules
+* test expectations
+* architectural information
+* QA decisions
+* discovered behavior
+* terminology
+* known bugs
+* test relationships
+
+Structured memory should be stored in readable JSON.
+
+Do not create one huge JSON document.
+
+⸻
+
+12. Temporary Context vs Permanent Memory
+
+AgentDesk must distinguish:
+
+Run Context
+
+Information relevant to one execution.
+
+Evidence
+
+Observed technical information from a run.
+
+Project Memory
+
+Reusable confirmed project information.
+
+Requirement
+
+Versioned authoritative expected behavior.
+
+Bug Registry
+
+Known defects and external ticket associations.
+
+Agents may suggest memory changes.
+
+They must not silently rewrite authoritative project requirements.
+
+⸻
+
+13. Requirements Versioning
+
+Requirements are immutable after creation.
+
+If a requirement changes:
+
+requirement.v1.json
+requirement.v2.json
+requirement.v3.json
+current.json
+
+Never overwrite v2 to create v3.
+
+Example:
+
+{
+  "requirementId": "manual-review-to-closed",
+  "currentVersion": 3,
+  "currentFile": "requirement.v3.json"
+}
+
+Each version contains metadata such as:
+
+{
+  "id": "manual-review-to-closed",
+  "version": 3,
+  "status": "active",
+  "supersedes": 2,
+  "description": "...",
+  "preconditions": [],
+  "rules": [],
+  "acceptanceCriteria": [],
+  "validationRules": [],
+  "expectedBehavior": {},
+  "environmentScope": [],
+  "references": [],
+  "changeReason": "...",
+  "createdAt": "..."
+}
+
+⸻
+
+14. Requirement Editing UX
+
+When editing v3:
+
+Current version
+v3
+Proposed version
+v4
+Change summary
+...
+[Review Diff]
+[Cancel] [Create v4]
+
+v3 remains intact.
+
+⸻
+
+15. Tests Use Latest Requirement
+
+By default all:
+
+* new tests
+* automated tests
+* regression analysis
+* expected result generation
+* bug analysis
+* requirement validation
+
+must resolve the latest ACTIVE version.
+
+Historical versions are only used when explicitly requested.
+
+⸻
+
+16. Requirement/Test Traceability
+
+Every test can reference the exact requirement version.
+
+{
+  "testId": "close-manual-review-channel",
+  "requirements": [
+    {
+      "id": "manual-review-to-closed",
+      "version": 4
+    }
+  ]
+}
+
+If the requirement becomes v5:
+
+Test created against v4
+Current requirement v5
+Potentially stale
+
+AgentDesk should support impact analysis:
+
+Requirement v5 created
+Potentially affected:
+Automated tests  7
+Manual tests     4
+Known bugs       2
+Documentation    1
+Workflow         1
+
+⸻
+
+17. Knowledge Retrieval
+
+Do not inject the entire project into every Codex request.
+
+Use selective retrieval.
+
+Agents can declare:
+
+include:
+architecture/**
+qa/**
+api/paynet/**
+exclude:
+finance/**
+
+Initially use:
+
+* metadata
+* structured relationships
+* SQLite FTS5/full-text indexing
+
+Keep a future abstraction for local semantic search.
+
+⸻
+
+18. Agent System
+
+Agents should have definitions including:
+
+id
+name
+description
+workspace
+project scope
+enabled
+execution profile
+instructions
+skills
+knowledge
+tools
+plugins
+MCP servers
+databases
+permissions
+environments
+output schema
+max steps
+timeout
+working directory
+approval policy
+delegation policy
+tags
+
+⸻
+
+19. Suggested QA Agents
+
+Built-in templates:
+
+QA Manager
+Requirement Analyzer
+Test Designer
+Automation Engineer
+API Tester
+Database Analyst
+Failure Analyzer
+Bug Writer
+Documentation Agent
+Release Agent
+
+Avoid needless agent proliferation.
+
+Use normal code when reasoning is unnecessary.
+
+⸻
+
+20. Deterministic Code vs Agent
+
+Use deterministic code for:
+
+* status comparisons
+* JSON validation
+* exact schema validation
+* parsing known structures
+* test execution
+* checking file existence
+* exit codes
+* SQL classification
+* known calculations
+* Git diff collection
+
+Use Codex for:
+
+* requirements reasoning
+* test design
+* semantic comparison
+* code understanding
+* repository modifications
+* debugging
+* documentation
+* root-cause analysis
+
+⸻
+
+21. Skills
+
+Skills are reusable capability/instruction bundles.
+
+Example:
+
+Skills/api-bug-investigation/
+├── skill.json
+├── instructions.md
+├── examples/
+└── scripts/
+
+Skill properties:
+
+id
+name
+description
+whenToUse
+inputs
+outputs
+instructions
+tools
+permissions
+scripts
+examples
+tags
+
+Manage skills completely through the UI.
+
+⸻
+
+22. Workflows
+
+Support deterministic workflows mixed with agent steps.
+
+Example:
+
+Ticket
+ ↓
+Requirement Analyzer
+ ↓
+Code Analyzer
+ ↓
+Test Designer
+ ↓
+Automation Engineer
+ ↓
+Run Tests
+ ↓
+      PASS → Review
+       │
+      FAIL
+       ↓
+Failure Analyzer
+       ↓
+test problem / product bug
+
+Workflow steps can support:
+
+* agent
+* command
+* tool
+* plugin
+* MCP
+* approval
+* condition
+* branch
+* retry
+* timeout
+* artifact generation
+* later parallel execution
+
+Definitions remain readable files.
+
+⸻
+
+23. Codex CLI Only
+
+Codex CLI is the current AI execution backend.
+
+No OpenAI API.
+
+No Agents SDK.
+
+Create:
+
+protocol ExecutionProvider
+
+and:
+
+CodexCLIProvider
+
+This allows future providers without changing agent definitions.
+
+⸻
+
+24. Codex CLI Provider
+
+It must support:
+
+* locate Codex executable
+* detect version
+* determine readiness
+* determine authentication state where supported
+* execute Codex
+* execute non-interactively where supported
+* set working directory
+* safely supply prompts
+* stream stdout/stderr
+* cancellation
+* timeouts
+* exit status
+* changed-file collection
+* Git diff collection
+* event emission
+* secret redaction
+* execution metadata
+
+Never interpolate untrusted content into shell command strings.
+
+Use Process with argument arrays.
+
+⸻
+
+25. Codex Account Management
+
+Create:
+
+Settings
+→ AI
+→ Codex
+
+Display:
+
+Codex CLI
+Installed
+Version
+...
+Authentication
+Authenticated
+Account
+when safely available
+Plan
+when officially available
+[Health Check]
+[Login]
+[Logout]
+[Reconnect]
+[Disconnect]
+
+States:
+
+Not Installed
+Installed / Logged Out
+Authenticating
+Authenticated
+Authentication Expired
+Usage Limited
+CLI Error
+Unavailable
+
+Login and logout must use supported Codex CLI mechanisms.
+
+AgentDesk must never manage ChatGPT session cookies itself.
+
+⸻
+
+26. Codex Account Switching
+
+Support:
+
+Logout
+ ↓
+Login with another ChatGPT/Codex account
+ ↓
+Refresh account status
+
+Workspace/project data is not deleted when logging out.
+
+⸻
+
+27. Execution Profiles / Model Routing
+
+Support logical profiles:
+
+FAST
+BALANCED
+REASONING
+CODING
+MAX
+
+Agents can use:
+
+AUTO
+FASTEST
+BALANCED
+BEST_QUALITY
+FIXED
+
+Do not spread current model names throughout source code.
+
+Map logical profiles to installed/current Codex configuration.
+
+Example:
+
+Formatting             → FAST
+Summarization          → FAST
+Straightforward tests  → BALANCED
+Requirements analysis  → BALANCED
+Bug investigation      → REASONING
+Architecture           → REASONING
+Repository edit        → CODING
+Very difficult work    → MAX
+
+Deterministic task classification comes first.
+
+⸻
+
+28. Escalation
+
+Support escalation when validation indicates a weaker profile was insufficient.
+
+FAST
+ ↓
+validation failure
+ ↓
+BALANCED
+ ↓
+still unresolved
+ ↓
+REASONING
+
+Do not rely exclusively on self-reported model confidence.
+
+Validators include:
+
+* output schema
+* expected fields
+* test outcome
+* tool exit code
+* required evidence
+* missing information
+
+⸻
+
+29. Codex Usage Dashboard
+
+Provide:
+
+Settings
+→ AI
+→ Usage
+
+Two categories are important.
+
+Provider-Reported Usage
+
+When supported by Codex:
+
+* plan
+* 5-hour usage
+* weekly usage
+* remaining allowance
+* reset times
+* token metadata
+* model/profile usage
+
+Never fabricate unavailable information.
+
+Show:
+
+5-hour usage
+Unavailable from installed Codex CLI
+
+when necessary.
+
+Local AgentDesk Usage
+
+Always track:
+
+* runs today
+* 5-hour local run activity
+* runs this week
+* run duration
+* runs per workspace
+* runs per agent
+* runs per execution profile
+* failures
+* cancellations
+* average runtime
+
+⸻
+
+30. Token Usage
+
+If Codex provides real machine-readable token metadata, capture:
+
+inputTokens
+cachedInputTokens
+outputTokens
+totalTokens
+
+Example:
+
+Input     28,431
+Cached    19,220
+Output     4,892
+Total     33,323
+
+If Codex does not expose it:
+
+Token usage
+Unavailable
+
+Do not present estimates as real usage.
+
+⸻
+
+31. Plugins
+
+Plugins are first-class user-facing integrations.
+
+Examples:
+
+Jira
+GitLab
+GitHub
+Confluence
+Slack
+Grafana
+PostgreSQL
+Kubernetes
+Playwright
+Browser
+Filesystem
+custom internal integrations
+
+Each plugin is independently configurable per workspace/project.
+
+⸻
+
+32. Plugin Isolation
+
+Example:
+
+CityPay
+Jira       ON
+GitLab     ON
+Grafana    ON
+PokerStars
+Jira       ON
+Git        ON
+Grafana    ON
+Cascador
+Jira       ON
+GitLab     ON
+Kubernetes ON
+
+Authenticating CityPay Jira does not authenticate PokerStars Jira.
+
+⸻
+
+33. Plugin Lifecycle
+
+States:
+
+Disabled
+Enabled / Not Configured
+Connecting
+Connected
+Authentication Expired
+Error
+Disconnected
+
+Actions:
+
+Enable
+Disable
+Connect
+Login
+Reauthenticate
+Disconnect
+Logout
+Reset Configuration
+Test Connection
+
+Disconnect should actually remove/stop local connection state.
+
+⸻
+
+34. Plugin Permissions
+
+Every capability supports:
+
+ALLOW
+APPROVAL
+DENY
+
+Example Jira:
+
+Issues Read       ALLOW
+Issues Create     APPROVAL
+Issues Update     APPROVAL
+Issues Delete     DENY
+Comments Read     ALLOW
+Comments Write    APPROVAL
+Attachments Read  ALLOW
+Attachments Add   APPROVAL
+
+Policy enforcement occurs outside the model.
+
+⸻
+
+35. Jira Plugin Setup
+
+Workspace:
+
+Connections
+→ Plugins
+→ Jira
+
+Full lifecycle:
+
+Enable
+↓
+Instance setup
+↓
+Login/authentication
+↓
+Validate account
+↓
+Discover capabilities
+↓
+Configure permissions
+↓
+Save connection
+↓
+Test
+↓
+Connected
+
+UI displays:
+
+* instance
+* account
+* workspace
+* status
+* permissions
+* health
+
+⸻
+
+36. Plugins vs MCP
+
+Plugins and MCP are related but different.
+
+A Plugin is the AgentDesk integration abstraction.
+
+A plugin may internally use:
+
+MCP
+REST
+CLI
+native Swift
+local process
+
+Example:
+
+Jira Plugin
+   ↓
+Jira MCP implementation
+
+Agents should usually depend on normalized plugin capabilities rather than integration internals.
+
+⸻
+
+37. MCP Is a Core Architectural Pillar
+
+AgentDesk must fully support MCP.
+
+AgentDesk must:
+
+1. consume MCP servers
+2. discover MCP tools
+3. discover MCP resources
+4. discover MCP prompts
+5. manage local MCP processes
+6. support MCP permissions
+7. scope MCP per workspace/project
+8. display MCP health
+9. display MCP logs
+10. eventually expose itself as an MCP server
+
+⸻
+
+38. MCP UI
+
+Workspace
+→ Connections
+→ MCP
+
+Example:
+
+Jira MCP          Connected
+GitLab MCP        Connected
+PostgreSQL MCP    Connected
+Playwright MCP    Local
+Custom MCP        Stopped
+
+Each MCP connection displays:
+
+* name
+* workspace
+* project
+* transport
+* command/endpoint
+* process ID where relevant
+* status
+* available tools
+* resources
+* prompts
+* authentication
+* permissions
+* logs
+* last health check
+
+Actions:
+
+Start
+Stop
+Restart
+Reconnect
+Edit
+Disable
+Delete
+Test
+
+⸻
+
+39. MCP Permissions
+
+MCP is never automatically trusted.
+
+Example:
+
+get_issue       ALLOW
+search_issues   ALLOW
+create_issue    APPROVAL
+update_issue    APPROVAL
+delete_issue    DENY
+
+All MCP calls pass through the same Policy Engine.
+
+⸻
+
+40. AgentDesk as MCP Server
+
+AgentDesk itself should expose MCP later.
+
+Potential capabilities:
+
+list_workspaces
+list_projects
+list_agents
+list_skills
+run_agent
+run_workflow
+get_run
+get_run_steps
+get_run_status
+get_artifacts
+get_file_changes
+search_project_memory
+search_bug_registry
+get_requirement
+get_current_requirement
+request_approval
+
+This allows Codex and other MCP-compatible tools to treat AgentDesk as a local engineering context/orchestration system.
+
+⸻
+
+41. Databases Per Project
+
+Every project can define its own database connections.
+
+Example:
+
+CityPay / PAYNET
+UZ DEV Verification DB
+UZ TEST Verification DB
+UZ TEST Account DB
+UZ TEST Audit DB
+
+Database connections never automatically cross workspace boundaries.
+
+⸻
+
+42. Database Setup
+
+UI:
+
+Project
+→ Connections
+→ Databases
+→ Add Database
+
+Fields:
+
+Name
+Database type
+Host
+Port
+Database name
+Schema
+Username
+Password
+SSL mode
+Environment
+Description
+Additional parameters
+
+PostgreSQL is first priority.
+
+Architect for future:
+
+* MySQL
+* MariaDB
+* SQL Server
+* Oracle
+* MongoDB
+* SQLite
+* others
+
+⸻
+
+43. Database Secrets
+
+Non-secret connection info can be stored locally.
+
+Passwords and sensitive credentials go to macOS Keychain.
+
+Example:
+
+{
+  "id": "uz-test-verification",
+  "host": "db.example.internal",
+  "port": 5432,
+  "database": "verification",
+  "username": "qa.user",
+  "passwordRef": "keychain://citypay/paynet/uz-test-verification/password"
+}
+
+⸻
+
+44. Database Lifecycle
+
+States:
+
+Not Configured
+Configured
+Connecting
+Connected
+Authentication Failed
+Network Unavailable
+Connection Failed
+Disconnected
+
+Actions:
+
+Configure
+Test Connection
+Connect
+Disconnect
+Edit
+Duplicate
+Delete
+Update Password
+
+⸻
+
+45. Database Permissions
+
+Use:
+
+ALLOW
+APPROVAL
+DENY
+
+Example test DB:
+
+SELECT       ALLOW
+INSERT       APPROVAL
+UPDATE       APPROVAL
+DELETE       DENY
+DDL          DENY
+
+Example production:
+
+SELECT       APPROVAL
+WRITE        DENY
+DDL          DENY
+DESTRUCTIVE  DENY
+
+⸻
+
+46. SQL Classification
+
+AgentDesk should classify SQL deterministically.
+
+SELECT    READ
+INSERT    WRITE
+UPDATE    WRITE
+DELETE    DESTRUCTIVE_WRITE
+CREATE    DDL
+ALTER     DDL
+DROP      DESTRUCTIVE
+TRUNCATE  DESTRUCTIVE
+
+A multi-statement operation receives the highest risk level found.
+
+Codex cannot bypass classification.
+
+⸻
+
+47. Database Tools
+
+Normalized capabilities:
+
+listSchemas
+listTables
+describeTable
+executeReadQuery
+executeWriteQuery
+explainQuery
+
+Each call carries:
+
+workspace
+project
+databaseConnection
+environment
+run
+agent
+query
+
+Flow:
+
+Request
+ ↓
+Workspace isolation
+ ↓
+DB selection
+ ↓
+SQL classification
+ ↓
+Policy Engine
+ ↓
+Approval if needed
+ ↓
+Execution
+
+⸻
+
+48. Database Schema Browser
+
+Desktop UI should allow:
+
+* schemas
+* tables
+* columns
+* indexes
+* constraints
+* foreign keys
+
+Schema metadata can be cached locally and refreshed.
+
+⸻
+
+49. Database Query Console
+
+A controlled SQL console may be provided.
+
+It must obey exactly the same Policy Engine as agents.
+
+Display:
+
+* rows
+* duration
+* affected rows
+* errors
+* approval status
+
+⸻
+
+50. Database Evidence
+
+Database results may become run/bug evidence.
+
+Example:
+
+{
+  "type": "database-evidence",
+  "connection": "uz-test-verification",
+  "environment": "UZ_TEST",
+  "capturedAt": "...",
+  "resultSummary": {
+    "rows": 1
+  }
+}
+
+Full result retention must be configurable because data may be sensitive.
+
+⸻
+
+51. Bug Registry
+
+Every project has a persistent local Bug Registry.
+
+It includes:
+
+* AgentDesk-generated defects
+* manually found bugs
+* manually registered Jira bugs
+* automatically registered bugs
+* Playwright failures
+* API defects
+* DB defects
+* regression relationships
+* evidence
+* duplicate relationships
+
+Each bug gets an internal AgentDesk identity even if it also has a Jira ID.
+
+⸻
+
+52. Manual Bug Registration
+
+If the user creates the Jira bug manually:
+
+Bug
+→ Mark as Registered
+
+Allow:
+
+Ticket ID
+Ticket URL
+
+either one or both.
+
+Example:
+
+Registered
+Jira: B2C-1234
+[Open Ticket]
+[Change Link]
+[Unlink]
+
+Once registered, it becomes available to duplicate detection.
+
+⸻
+
+53. Mandatory Duplicate Detection
+
+Before creating any bug ticket:
+
+Gather evidence
+ ↓
+Determine failing behavior
+ ↓
+Determine root behavior
+ ↓
+Check downstream reachability
+ ↓
+Load current requirements
+ ↓
+Search Bug Registry
+ ↓
+Compare possible matches
+ ↓
+NEW / DUPLICATE / POSSIBLE_DUPLICATE / RELATED
+
+Do not compare only title text.
+
+Compare:
+
+* root behavior
+* endpoint
+* module
+* component
+* validation field
+* statuses
+* status transitions
+* expected behavior
+* actual behavior
+* HTTP status
+* application errors
+* persisted DB state
+* requirement
+* affected scenarios
+* environment/region
+
+Use deterministic fingerprints first.
+
+Use Codex semantic analysis only when needed.
+
+⸻
+
+54. Duplicate Ticket Behavior
+
+If it is clearly the same issue:
+
+DUPLICATE / EXISTING TICKET
+B2C-1234
+<Existing title>
+
+Do not create a new ticket.
+
+Prepare a Jira comment containing the additional reproduction/evidence.
+
+⸻
+
+55. Possible Duplicates
+
+If overlap is uncertain:
+
+POSSIBLY DUPLICATE / OVERLAPS EXISTING TICKET
+
+Explain:
+
+* what overlaps
+* what is different
+* why the decision is uncertain
+
+User can override.
+
+Store override decisions locally.
+
+⸻
+
+56. Blocked Downstream Scenarios
+
+If:
+
+A → B → C → D
+
+and existing bug prevents:
+
+A → B
+
+AgentDesk must not claim C or D is broken.
+
+Output:
+
+BLOCKED BY EXISTING DEFECT
+B2C-1234
+Downstream <behavior> could not be verified because
+the scenario was blocked at <step>.
+
+⸻
+
+57. Bug Relationships
+
+Support:
+
+duplicates
+duplicatedBy
+blockedBy
+blocks
+relatedTo
+regressionOf
+affectsRequirement
+introducedByRequirement
+coveredBy
+
+These relationships connect bugs, tests, and requirements.
+
+⸻
+
+58. CityPay Jira Bug Skill
+
+Create a dedicated skill:
+
+citypay-jira-bug
+
+It must use this title format:
+
+[Component - Environment] Area - Module | Problem
+
+Prefixes:
+
+[Backend - UZ]
+[Frontend - UZ]
+[Backend - GEO]
+[Frontend - GEO]
+[Backend - TR]
+[Frontend - TR]
+
+Never guess component/environment when unavailable.
+
+⸻
+
+59. CityPay Ticket Structure
+
+Use, when applicable:
+
+Title
+Environment
+Preconditions
+Description
+Reproduce Steps
+Actual Result
+Expected Result
+Endpoint
+Payload
+Response
+Additional Information
+
+Do not generate an Impact section.
+
+⸻
+
+60. CityPay Ticket Rules
+
+Title
+
+Short and specific.
+
+Environment
+
+Always include when known.
+
+Preconditions
+
+Only when setup/state matters.
+
+Description
+
+Explain:
+
+* functionality under test
+* wrong behavior
+* why it violates expected behavior
+
+Do not repeat reproduction steps.
+
+Reproduce Steps
+
+Most important section.
+
+Must be:
+
+* chronological
+* reproducible
+* concise
+* evidence-based
+
+Preserve supplied:
+
+* endpoint
+* IDs
+* statuses
+* currency
+* filters
+* payload values
+
+Never invent missing actions.
+
+Actual Result
+
+Preserve:
+
+* HTTP status
+* application code
+* statuses
+* IDs
+* values
+* DB state
+
+Expected Result
+
+Use current active requirements.
+
+Do not invent HTTP status codes.
+
+API Evidence
+
+Include exact endpoint/payload/response only when supplied.
+
+Additional Information
+
+Preserve exact IDs and evidence.
+
+⸻
+
+61. CityPay Failure Grouping
+
+Group failures with the same root behavior.
+
+Example:
+
+13-digit PINFL accepted
+15-digit PINFL accepted
+alphanumeric PINFL accepted
+
+may become one missing-PINFL-validation defect.
+
+Do not combine unrelated failures.
+
+⸻
+
+62. CityPay API Validation Rules
+
+Differentiate:
+
+* hard-stop validation
+* Manual Review outcome
+* optional fields
+* malformed input
+* business conflicts
+
+If invalid data was accepted, state whether persistence occurred.
+
+⸻
+
+63. CityPay Status Bugs
+
+Include applicable:
+
+Channel verification status
+Channel account status
+Master status
+
+If propagation is relevant, inspect sibling Channels too when evidence permits.
+
+⸻
+
+64. CityPay Concurrency Bugs
+
+Capture when available:
+
+* Request A
+* Request B
+* shared fields
+* differing fields
+* both responses
+* both HTTP statuses
+* DB count before
+* DB count after
+* which request actually persisted
+* whether one caller received identifiers belonging to another request
+
+⸻
+
+65. CityPay UI Bugs
+
+Frontend defects should remain simpler.
+
+Typically:
+
+Environment
+Description
+Reproduce Steps
+Actual Result
+Expected Result
+Additional Evidence
+
+Reference screenshot/video artifacts when available.
+
+⸻
+
+66. Run Engine
+
+Every agent/workflow execution creates a Run.
+
+Run fields:
+
+id
+workspaceID
+projectID
+parentRunID
+agentID
+workflowID
+task
+status
+createdAt
+startedAt
+completedAt
+executionProfile
+environment
+workingDirectory
+result
+error
+artifacts
+traceID
+
+Statuses:
+
+queued
+running
+waitingForApproval
+paused
+completed
+failed
+cancelled
+
+⸻
+
+67. Structured Run Steps
+
+Runs contain explicit steps.
+
+Example:
+
+✓ Load requirements
+✓ Search documentation
+✓ Inspect repository
+✓ Analyze existing tests
+● Implement automation
+○ Execute tests
+○ Failure analysis
+○ Report
+
+This structure is necessary for desktop observability and mobile tracking.
+
+⸻
+
+68. Event Bus
+
+Create a typed internal event system.
+
+Events include:
+
+RunStarted
+StepStarted
+StepProgress
+StepCompleted
+CodexOutput
+ToolStarted
+ToolCompleted
+PluginCalled
+MCPToolCalled
+DatabaseQueryStarted
+DatabaseQueryCompleted
+FilesChanged
+ArtifactCreated
+ApprovalRequested
+RunCompleted
+RunFailed
+RunCancelled
+
+Use AsyncStream or another clean Swift-concurrency mechanism.
+
+⸻
+
+69. Tracing
+
+Do not expose hidden model chain-of-thought.
+
+Persist operational information:
+
+* task
+* agent
+* step
+* public decision summary
+* routing decision
+* tool invocation
+* sanitized arguments
+* tool output
+* stdout
+* stderr
+* process status
+* validation
+* files changed
+* artifacts
+* errors
+* timing
+
+⸻
+
+70. Artifacts
+
+Artifacts include:
+
+* test plans
+* bug tickets
+* reports
+* Markdown
+* JSON
+* screenshots
+* Playwright evidence
+* logs
+* patches
+* generated tests
+* SQL evidence
+* API evidence
+
+Store metadata in local persistence.
+
+Store actual files in workspace/project-scoped artifact directories.
+
+⸻
+
+71. Git/File Change Tracking
+
+When Codex modifies a repository, capture:
+
+git status
+git diff
+changed files
+
+Statuses:
+
+added
+modified
+deleted
+renamed
+
+Provide proper desktop diff viewer.
+
+Mobile gets read-only diff review.
+
+⸻
+
+72. Policy Engine
+
+All meaningful actions pass through the Policy Engine.
+
+Decisions:
+
+ALLOW
+APPROVAL
+DENY
+
+Inputs:
+
+workspace
+project
+agent
+tool/plugin
+action
+environment
+resource
+client device
+
+Security enforcement must not depend on model instructions.
+
+⸻
+
+73. Approval Engine
+
+Approval types include:
+
+* Jira creation
+* Jira modification
+* Jira comment
+* Git commit
+* Git push
+* merge request
+* merge
+* database write
+* destructive SQL
+* Kubernetes command
+* external messages
+* sensitive filesystem operation
+
+Statuses:
+
+pending
+approved
+rejected
+modified
+expired
+
+Support:
+
+Approve
+Reject
+Modify and approve
+
+⸻
+
+74. Agent Testing / Evals
+
+Agents must be testable like software.
+
+Assertions may include:
+
+* expected concepts
+* forbidden concepts
+* required classification
+* output schema
+* expected tool
+* prohibited tool
+* expected artifact
+* duplicate result
+* deterministic validator
+
+Example:
+
+Agent → Tests
+47 total
+46 passed
+1 failed
+
+Run individual or complete suites.
+
+⸻
+
+75. Native macOS UI
+
+The app should feel like a native developer tool.
+
+Use:
+
+* NavigationSplitView
+* inspectors
+* native toolbars
+* native sheets
+* context menus
+* Commands
+* keyboard shortcuts
+* native Settings
+* MenuBarExtra
+* Quick Look where appropriate
+
+Do not simply recreate a web dashboard in SwiftUI.
+
+⸻
+
+76. Main Mac Navigation
+
+Overview
+Workspaces
+  CityPay
+  PokerStars
+  Cascador
+Projects
+Agents
+Runs
+Workflows
+Skills
+Connections
+  Plugins
+  MCP
+  Databases
+  Repositories
+Project Memory
+  Requirements
+  Validation
+  Bugs
+  Tests
+  Documentation
+Approvals
+Artifacts
+Traces
+Settings
+
+⸻
+
+77. Overview
+
+Show:
+
+Active runs
+Pending approvals
+Failed runs
+Recent activity
+Workspace status
+Codex status
+Plugin health
+MCP health
+Database health
+Connected remote devices
+Usage summary
+
+⸻
+
+78. Agent Editor
+
+Tabs:
+
+General
+Instructions
+Execution
+Tools
+Skills
+Knowledge
+Plugins
+MCP
+Databases
+Permissions
+Outputs
+Tests
+Versions
+
+Provide Markdown/instruction editing and effective-prompt preview.
+
+⸻
+
+79. Context Inspector
+
+Before running:
+
+What will this agent know?
+
+Show:
+
+* workspace
+* project
+* instructions
+* skills
+* requirement versions
+* project memory
+* dynamic knowledge
+* selected environment
+* plugins
+* MCP
+* database access
+* repository access
+* previous-run context
+* cross-workspace data: NONE
+
+⸻
+
+80. Command Palette
+
+Implement ⌘K.
+
+Commands:
+
+Run Agent
+Run Workflow
+Analyze Ticket
+Switch Workspace
+Switch Project
+Search Requirements
+Search Bugs
+Open Run
+Search Knowledge
+Create Agent
+Create Skill
+Add Plugin
+Add MCP
+Add Database
+Open Approvals
+Settings
+
+⸻
+
+81. Menu Bar
+
+Use MenuBarExtra.
+
+Example:
+
+AgentDesk
+Running    2
+Approvals  1
+Failed     0
+Open AgentDesk
+Active Runs
+Approvals
+Pause Runs
+
+⸻
+
+82. Native Notifications
+
+Notify for:
+
+* approval required
+* run completed
+* run failed
+* important agent result
+* connection loss
+* remote device connected
+
+Deep-link into the relevant view.
+
+⸻
+
+83. Local Wi-Fi Remote Operation
+
+This is a required V1 feature.
+
+AgentDesk Remote must work when:
+
+MacBook
+   │
+   │ same Wi-Fi / LAN
+   │
+iPhone
+
+No internet, cloud backend, Tailscale, or VPN is required for Mac↔iPhone communication on the same local network.
+
+External services may separately require internet.
+
+⸻
+
+84. LAN Architecture
+
+AgentDesk Mac Runtime
+        │
+        │ local authenticated server
+        │
+      Wi-Fi
+        │
+        ▼
+AgentDesk iPhone
+
+The Mac runs the authority/server.
+
+The iPhone is a client.
+
+⸻
+
+85. Bonjour / Local Discovery
+
+Use Apple-native networking where appropriate:
+
+* Bonjour/mDNS
+* Network.framework
+* NWListener
+* NWBrowser
+
+The Mac advertises an AgentDesk service.
+
+Conceptually:
+
+_agentdesk._tcp.local
+
+The iPhone discovers hosts automatically.
+
+Users should not normally enter IP addresses or ports.
+
+⸻
+
+86. LAN Connection Modes
+
+Support explicit modes:
+
+Local Only
+
+127.0.0.1
+
+Local Network
+
+Trusted LAN interface.
+
+Private VPN
+
+Future/optional Tailscale/WireGuard.
+
+Relay
+
+Potential future option.
+
+Connection priority:
+
+localhost
+↓
+LAN
+↓
+private VPN
+↓
+future relay
+
+⸻
+
+87. Device Pairing
+
+Same Wi-Fi does not equal authorization.
+
+Flow:
+
+Mac
+Settings
+→ Remote Access
+→ Pair Device
+
+Mac displays:
+
+* QR code
+* one-time pairing code
+* host fingerprint/identity
+
+iPhone scans.
+
+Pairing code is:
+
+* short-lived
+* single-use
+* not a permanent credential
+
+After pairing, create cryptographic device credentials.
+
+⸻
+
+88. Trusted Devices
+
+Mac UI:
+
+Trusted Devices
+Mirza's iPhone
+Last seen: now
+Runs read       ALLOW
+Artifacts       ALLOW
+Approvals       ALLOW
+Start workflows ALLOW
+Admin           DENY
+[Rename]
+[Permissions]
+[Revoke]
+
+⸻
+
+89. iPhone Capabilities
+
+The iPhone can:
+
+* list workspaces/projects
+* see active runs
+* see recent runs
+* see current step
+* see completed/pending steps
+* see run timeline
+* inspect tool activity
+* inspect public agent summaries
+* inspect artifacts
+* view screenshots
+* review generated Markdown
+* inspect logs
+* view changed files
+* review Git diff
+* view approval requests
+* approve/reject
+* cancel a run
+* pause/resume where supported
+* start predefined agents
+* start predefined workflows
+* receive notifications
+
+⸻
+
+90. iPhone Restrictions
+
+By default mobile cannot:
+
+* view secrets
+* edit raw security policies
+* run arbitrary shell commands
+* modify MCP credentials
+* view passwords
+* access databases directly
+* edit arbitrary configuration files
+* bypass approvals
+* alter workspace isolation
+
+These restrictions must be enforced server-side.
+
+⸻
+
+91. iPhone Run UI
+
+Example:
+
+CITYPAY
+B2C-1234
+Running • 08:42
+✓ Requirements
+✓ Documentation
+✓ Repository analysis
+✓ Test design
+● Automation implementation
+○ Test execution
+○ Failure analysis
+○ Report
+FILES CHANGED
+M tests/customer_test.py
+A tests/concurrency_test.py
+[Review Changes]
+
+⸻
+
+92. Mobile Diff Review
+
+Provide:
+
+* file list
+* unified diff
+* line additions
+* line removals
+* collapsible hunks
+
+Initially read-only.
+
+⸻
+
+93. Mobile Approval
+
+Example:
+
+APPROVAL REQUIRED
+CityPay
+B2C-1234
+Git Push
+Branch:
+qa/b2c-1234
+3 files changed
++142
+-18
+[Review Diff]
+[Reject] [Approve]
+
+Use Face ID/device authentication for high-risk approvals where appropriate.
+
+⸻
+
+94. LAN Reconnection
+
+Handle:
+
+* iPhone locks
+* Wi-Fi changes
+* DHCP/IP change
+* application foreground/background
+* Mac sleep/wake
+* connection loss
+
+States:
+
+Discovering
+Connecting
+Authenticating
+Connected
+Reconnecting
+Mac Sleeping
+Unavailable
+Permission Required
+
+Bonjour should allow rediscovery after IP changes.
+
+⸻
+
+95. Apple Local Network Permissions
+
+Correctly configure local-network privacy declarations.
+
+If permission is denied, show:
+
+Local Network Access Required
+
+Do not incorrectly report the Mac as offline.
+
+⸻
+
+96. Remote Security
+
+Use:
+
+* authenticated paired devices
+* cryptographic credentials
+* TLS where appropriate
+* device revocation
+* workspace authorization
+* audit logs
+* rate limits where useful
+* sanitized API responses
+
+Bonjour advertisements must expose minimal non-sensitive metadata.
+
+⸻
+97. Live Socket-Based Mac ↔ iPhone Streaming
+Mac and iPhone must maintain a persistent live socket connection while the remote client is active.
+Preferred architecture:
+Codex / Tools / Workflows
+        ↓
+Run Event Bus
+        ↓
+AgentDesk Mac Runtime
+        ↓
+Persistent WebSocket
+        ↓
+Local Wi-Fi / LAN
+        ↓
+AgentDesk iPhone
+The connection must support real-time bidirectional communication.
+Mac → iPhone events include:
+	•	run started
+	•	run status changed
+	•	major task progress changed
+	•	step started
+	•	step progress updated
+	•	step completed
+	•	step failed
+	•	agent changed
+	•	tool started
+	•	tool completed
+	•	Codex output summary
+	•	files changed
+	•	artifact created
+	•	approval requested
+	•	database validation completed
+	•	MCP action completed
+	•	plugin action completed
+	•	run completed
+	•	run failed
+	•	run cancelled
+iPhone → Mac actions include:
+	•	approve
+	•	reject
+	•	cancel run
+	•	pause/resume where supported
+	•	start predefined workflow
+	•	start predefined agent
+	•	request run refresh
+	•	request artifact/diff details
+The socket must be authenticated using the paired-device identity.
+Do not rely on periodic polling for active run progress.
+Polling may be used only as a recovery/fallback mechanism.
+Major Task Progress
+In addition to low-level steps, every Run must expose a larger high-level progress model.
+Example:
+PAYNET Registration Investigation
+
+Overall Progress
+██████████████░░░░░░ 68%
+
+1. Understand Requirements        ✓
+2. Inspect Existing Tests         ✓
+3. Execute Scenario               ✓
+4. Investigate Failure            ●
+5. Duplicate Detection            ○
+6. Prepare Result                 ○
+Each major stage should have:
+	•	ID
+	•	title
+	•	status
+	•	progress where measurable
+	•	current agent
+	•	start time
+	•	completion time
+	•	child steps
+	•	public summary
+Statuses:
+pending
+running
+waitingForApproval
+completed
+failed
+skipped
+cancelled
+The Mac and iPhone must render the same authoritative progress state.
+The iPhone should therefore be able to show at a glance:
+CITYPAY / PAYNET
+
+Investigate registration failure
+
+68% complete
+
+Current stage:
+Investigate Failure
+
+Current action:
+Comparing persisted identity state with Requirement v4
+
+Elapsed:
+06:31
+Progress should be derived from structured workflow/run state, not invented percentage values by the model.
+For workflows with known stages, calculate deterministic progress from completed stages.
+For open-ended agent runs where exact percentage is unavailable, show stage-based progress without fabricating a numerical percentage.
+Socket Reconnection
+If the socket drops:
+	1	iPhone enters Reconnecting.
+	2	Rediscover the paired Mac when necessary.
+	3	Authenticate again.
+	4	Request events after the last acknowledged sequence number.
+	5	Reconstruct current Run state.
+	6	Resume live streaming.
+Every event should have a monotonically increasing run/event sequence identifier where appropriate to prevent missed or duplicated UI state after reconnect.
+The user should not have to manually refresh a running task.
+
+⸻
+
+98. Local Server
+
+Use a native Swift server architecture rather than FastAPI.
+
+Expose an authenticated internal protocol for:
+
+* workspaces
+* projects
+* runs
+* steps
+* artifacts
+* diffs
+* approvals
+* health
+* device pairing
+
+Use shared Swift Codable protocol types between Mac and iOS.
+
+⸻
+
+99. No Mandatory Cloud
+
+The full system should work locally.
+
+Mac ↔ iPhone status       works on LAN
+Run timeline              works
+Artifacts                 works
+Diff                      works
+Approval                  works
+Cancel                    works
+Project memory            works
+Bug registry              works
+
+External systems such as Jira/GitLab/Codex may require internet independently.
+
+⸻
+
+100. Persistence
+
+Use explicit local persistence.
+
+Preferred:
+
+* SQLite
+* GRDB or similarly controlled Swift SQLite layer
+
+SQLite stores:
+
+runs
+runSteps
+traceEvents
+artifactMetadata
+approvals
+remoteDevices
+auditEvents
+plugin health
+MCP health
+database connection metadata
+usage metrics
+agent eval results
+runtime state
+
+Files remain authoritative for project/agent configuration.
+
+⸻
+
+101. Secrets
+
+Use macOS Keychain.
+
+Implement:
+
+SecretStore
+
+with:
+
+set
+get
+delete
+exists
+
+Never expose secret values to:
+
+* JSON
+* YAML
+* logs
+* traces
+* artifacts
+* mobile responses
+
+⸻
+
+102. Logging
+
+Structured logging fields:
+
+timestamp
+level
+workspaceID
+projectID
+runID
+agentID
+component
+event
+message
+
+Redact sensitive data.
+
+⸻
+
+103. Search
+
+Desktop global search supports:
+
+* projects
+* agents
+* workflows
+* runs
+* artifacts
+* requirements
+* bugs
+* tests
+* documentation
+* knowledge
+
+Default searches remain inside the active workspace/project.
+
+Cross-workspace/global mode must be explicit.
+
+⸻
+
+104. First-Run Experience
+
+Mac launch:
+
+Welcome to AgentDesk
+
+System check:
+
+Codex CLI
+Git
+local runtime
+MCP readiness
+
+Then:
+
+Create Workspace
+
+Then:
+
+Create Project
+
+Then:
+
+Create First Agent
+
+Templates:
+
+General Assistant
+QA Manager
+Test Designer
+Automation Engineer
+Bug Investigator
+
+Then optionally:
+
+Enable Remote Access
+Pair iPhone
+
+⸻
+
+105. Connections Overview
+
+One unified view:
+
+Connections
+AI
+Codex                 Authenticated
+Plugins
+Jira / CityPay        Connected
+GitLab / CityPay      Connected
+Jira / PokerStars     Connected
+MCP
+CityPay Jira MCP      Connected
+Playwright MCP        Running
+Databases
+UZ Test               Connected
+UZ Dev                Connected
+Remote
+iPhone                 LAN Connected
+
+⸻
+
+106. Health Monitoring
+
+Every major connection has health status.
+
+Examples:
+
+Connected
+Authentication Expired
+Unavailable
+Stopped
+Configuration Error
+Network Error
+
+Provide:
+
+[Test Connection]
+
+where relevant.
+
+⸻
+
+107. Project Relationship Graph
+
+AgentDesk should eventually understand:
+
+Project
+  │
+  ├── Requirement v1
+  ├── Requirement v2
+  └── Requirement v3 ← current
+          │
+          ├── Test A
+          ├── Test B
+          ├── Automation C
+          │
+          └── Bug B2C-1234
+                 │
+                 ├── blocks Test D
+                 ├── duplicate evidence #2
+                 └── related requirement
+
+This enables questions like:
+
+What is the current requirement?
+What changed from v3 to v4?
+Which tests are stale?
+Which tests are affected by this requirement change?
+Is this bug already registered?
+Which ticket covers this failure?
+Is this test blocked by an existing bug?
+Which bugs violate this requirement?
+
+⸻
+
+108. Example Full QA Execution
+
+User:
+Handle QA for B2C-1234
+        ↓
+QA Manager
+        ↓
+Load latest requirement versions
+        ↓
+Read Jira / project description
+        ↓
+Retrieve documentation
+        ↓
+Inspect repository
+        ↓
+Inspect existing tests
+        ↓
+Test Designer
+        ↓
+Generate:
+positive
+negative
+boundary
+permissions
+API
+DB
+concurrency
+regression
+        ↓
+Automation Engineer / Codex
+        ↓
+Modify tests
+        ↓
+Run pytest / Playwright
+        ↓
+Failure?
+      /     \
+    NO       YES
+    │         │
+ review    Failure Analyzer
+              │
+         collect evidence
+              │
+          DB / API / logs
+              │
+         load requirements
+              │
+       search Bug Registry
+              │
+     ┌────────┼─────────┐
+     │        │         │
+    NEW   DUPLICATE   RELATED
+     │        │
+ Bug Writer   Existing Jira comment
+     │
+ approval
+     │
+ Jira creation
+
+⸻
+
+109. AgentDesk Product Principles
+
+These principles should appear in AGENTS.md and architecture documentation.
+
+1. Native Apple experience.
+2. Mac is the execution authority.
+3. iPhone is a secure limited remote client.
+4. Local first.
+5. Local Wi-Fi must work without cloud.
+6. Codex CLI is the only current AI provider.
+7. No OpenAI API dependency.
+8. No Agents SDK dependency.
+9. MCP is a first-class integration protocol.
+10. Plugins are first-class project integrations.
+11. Databases are first-class project connections.
+12. Files are authoritative for configuration.
+13. JSON is preferred for structured project memory.
+14. Requirements are immutable/versioned.
+15. Tests use current requirement versions.
+16. Tests record requirement-version relationships.
+17. Bug registry is persistent.
+18. Duplicate detection occurs before bug creation.
+19. Deterministic code before AI.
+20. Human approval before risky side effects.
+21. Security is enforced outside prompts.
+22. Strict company isolation.
+23. Secrets remain on the Mac.
+24. Mobile receives minimum necessary privileges.
+25. Agents are observable.
+26. Agents are testable.
+27. Everything important is debuggable.
+28. Avoid unnecessary agents.
+29. Provider-specific model names should not leak into domain logic.
+30. Do not fake unavailable Codex usage information.
+
+⸻
+
+110. Development Phases
+
+Phase 1 — Native Mac Foundation
+
+Implement fully:
+
+* SwiftUI macOS app
+* navigation
+* workspace creation
+* project creation
+* filesystem architecture
+* local SQLite
+* Keychain abstraction
+* agent CRUD
+* instructions editing
+* configuration composition
+* Codex detection
+* Codex login/status management
+* Codex CLI provider
+* Run model
+* RunStep model
+* live Codex output
+* traces
+* artifacts
+* changed-file tracking
+* approvals foundation
+* command palette
+* basic menu bar
+* tests
+
+Critical slice:
+
+Create workspace
+↓
+Create project
+↓
+Create agent
+↓
+Edit instructions
+↓
+Execute via Codex
+↓
+See live steps
+↓
+Inspect result/files
+
+Phase 2 — Project Memory
+
+Implement:
+
+* structured memory
+* requirement storage
+* requirement versioning
+* current requirement resolver
+* validation rules
+* requirement diff
+* test/requirement linking
+* stale test detection
+* bug registry
+* manual Jira linking
+* duplicate detection
+* CityPay bug skill
+
+Phase 3 — Connections
+
+Implement:
+
+* plugin framework
+* Jira plugin
+* plugin permissions
+* login/logout/reconnect
+* MCP manager
+* MCP capability discovery
+* database manager
+* PostgreSQL driver
+* DB permissions
+* schema browser
+* connection health
+
+Phase 4 — Workflow Intelligence
+
+Implement:
+
+* workflow engine
+* branching
+* retry
+* agent teams
+* delegation
+* QA Manager flows
+* Failure Analyzer
+* Bug Writer
+* database evidence
+* duplicate matching
+* project impact analysis
+
+Phase 5 — iPhone / Local Wi-Fi
+
+Implement:
+
+* Mac control server
+* Bonjour
+* device pairing
+* cryptographic device auth
+* SwiftUI iOS app
+* active runs
+* live step tracking
+* artifacts
+* diff viewer
+* approvals
+* cancellation
+* remote security
+* LAN reconnect
+* real physical-device testing
+
+Phase 6 — Advanced Platform
+
+Implement:
+
+* AgentDesk MCP server
+* richer agent evals
+* workflow visual editor
+* advanced usage analytics
+* native notifications
+* advanced menu bar
+* configuration history
+* scheduling/triggers
+* optional private VPN support
+* optional relay architecture
+
+⸻
+
+111. Testing Requirements
+
+At minimum test:
+
+Workspace Security
+
+* cross-workspace file read denied
+* cross-workspace project memory denied
+* cross-workspace MCP denied
+* cross-workspace plugin denied
+* cross-workspace DB denied
+* path traversal denied
+
+Project Memory
+
+* requirement creation
+* version increment
+* previous version immutable
+* latest resolver
+* stale test detection
+* impact linkage
+
+Bugs
+
+* bug registration
+* Jira linking
+* duplicate exact match
+* possible duplicate
+* unrelated defect
+* blocked downstream scenario
+* duplicate evidence attachment
+
+Codex
+
+* executable detection
+* safe argument building
+* execution
+* cancellation
+* timeout
+* fake provider
+* logged-out behavior
+
+Plugins
+
+* per-workspace setup
+* login lifecycle
+* disable
+* permissions
+* approval
+* isolation
+
+MCP
+
+* discovery
+* tool permissions
+* server isolation
+* restart
+* failed health
+
+Databases
+
+* connection config
+* Keychain password
+* test connection
+* query classification
+* approval-required write
+* denied destructive query
+* cross-workspace denial
+
+Mobile
+
+* pairing
+* revoked device
+* unpaired denial
+* LAN discovery
+* reconnect
+* run streaming
+* diff viewing
+* approval
+* secret access denial
+* shell access denial
+
+⸻
+
+112. Required Architecture Documentation
+
+Create:
+
+Docs/Architecture/
+├── overview.md
+├── apple-platforms.md
+├── workspaces.md
+├── projects.md
+├── project-memory.md
+├── requirements.md
+├── bug-registry.md
+├── execution.md
+├── codex.md
+├── plugins.md
+├── mcp.md
+├── databases.md
+├── workflows.md
+├── security.md
+├── permissions.md
+├── persistence.md
+├── run-events.md
+├── remote-access.md
+├── local-network.md
+├── device-pairing.md
+└── usage.md
+
+⸻
+
+113. AGENTS.md
+
+The root AGENTS.md must explain:
+
+* overall architecture
+* Swift conventions
+* concurrency conventions
+* source-of-truth rules
+* workspace isolation
+* project isolation
+* requirement versioning
+* Bug Registry behavior
+* duplicate detection
+* Codex CLI-only requirement
+* no OpenAI API
+* no Agents SDK
+* plugin architecture
+* MCP architecture
+* database architecture
+* approval architecture
+* mobile restrictions
+* LAN architecture
+* security requirements
+* tests required for changes
+* how to add an agent
+* how to add a skill
+* how to add a plugin
+* how to add MCP
+* how to add a DB driver
+* how to add workflow nodes
+
+⸻
+
+114. Final Acceptance Scenario
+
+The architecture should ultimately pass this complete real-world scenario:
+
+1. Launch AgentDesk on Mac.
+2. Codex status:
+   authenticated.
+3. Open CityPay workspace.
+4. Open PAYNET project.
+5. Jira plugin:
+   connected.
+6. PostgreSQL:
+   UZ TEST connected.
+7. Requirement:
+   registration v4 active.
+8. Start:
+   "Investigate failing PAYNET registration tests."
+9. AgentDesk loads v4 requirements.
+10. QA Manager inspects project context.
+11. Codex inspects repository.
+12. Existing tests are analyzed.
+13. Tests execute.
+14. Failure Analyzer examines API result.
+15. Database Analyst safely reads DB.
+16. Bug Agent identifies root behavior.
+17. Bug Registry is searched.
+18. Existing B2C-1234 is found.
+19. AgentDesk determines:
+    DUPLICATE / EXISTING TICKET.
+20. No new Jira issue is generated.
+21. Additional evidence/comment is prepared.
+22. User leaves Mac.
+23. iPhone on same Wi-Fi automatically discovers paired Mac.
+24. iPhone shows:
+    run still active.
+25. User reviews:
+    completed steps,
+    DB validation,
+    changed files,
+    generated evidence.
+26. Agent asks approval to comment on B2C-1234.
+27. iPhone receives approval request.
+28. User reviews content.
+29. User approves with device authentication.
+30. Mac executes the approved Jira action.
+31. Run completes.
+32. Evidence and relationships are stored locally.
+33. AgentDesk usage screen records the run.
+34. Requirements, test links, bug history and run trace remain available for future agents.
+
+
+115. Manual Scenario Runner / Postman Collections
+AgentDesk must support manual and agent-driven execution of predefined API scenarios.
+This is separate from full autonomous QA workflows.
+The user should be able to quickly execute an existing scenario without asking an agent to reconstruct all steps every time.
+Postman Support
+Each project can import and manage:
+	•	Postman collections
+	•	Postman environments
+	•	collection variables
+	•	environment variables
+	•	request folders
+	•	requests
+	•	authentication configuration
+	•	pre-request scripts where safely supported
+	•	test scripts where safely supported
+Example:
+CityPay
+└── PAYNET
+    └── API Collections
+        ├── PAYNET Registration
+        ├── Account Closure
+        ├── Refunds
+        └── Promotions
+Environment examples:
+UZ DEV
+UZ TEST
+GEO DEV
+TR TEST
+AgentDesk should parse imported Postman collection/environment JSON locally and present them in a native UI.
+Do not require the Postman desktop application to run the imported collection after import.
+Where practical, use a compatible local runner such as Newman or implement a controlled execution abstraction around supported collection behavior.
+The architecture should hide the runner implementation behind:
+ScenarioRunner
+CollectionRunner
+so other formats can be added later.
+Collection UI
+Project:
+Project
+→ Testing
+→ API Collections
+Display:
+PAYNET Registration
+42 requests
+
+Environment:
+UZ TEST
+
+Last run:
+Today 15:42
+
+Status:
+Passed
+Opening a collection shows folders and requests.
+Example:
+PAYNET Registration
+
+Registration
+├── New Customer
+├── Existing Customer
+├── Invalid PINFL
+├── Missing Phone
+└── Concurrent Registration
+The user should be able to:
+	•	select collection
+	•	select folder
+	•	select one request
+	•	select multiple requests
+	•	choose environment
+	•	inspect request
+	•	inspect variables
+	•	run manually
+	•	stop execution
+	•	view live progress
+	•	inspect response
+	•	inspect assertions
+	•	inspect failures
+	•	save evidence
+	•	attach result to a Run
+	•	attach result to a Bug
+	•	compare results with requirements
+Manual Fast Run
+Example UI:
+PAYNET Registration
+
+Environment
+UZ TEST
+
+Selected
+Concurrent Registration
+
+[Run]
+Execution should start directly through deterministic tooling.
+Do NOT invoke Codex merely to run a known Postman request.
+Flow:
+User clicks Run
+      ↓
+Load collection
+      ↓
+Resolve selected environment
+      ↓
+Resolve local secrets
+      ↓
+Execute request/scenario
+      ↓
+Evaluate Postman assertions
+      ↓
+Store result
+      ↓
+Display response/evidence
+This path should be fast.
+Prompt-Driven Scenario Execution
+Agents must also be able to use these saved scenarios.
+Examples:
+Run the PAYNET concurrent registration scenario on UZ TEST.
+or:
+Test the account closure scenario.
+The agent should first search registered Project Testing assets.
+If a matching predefined scenario already exists:
+User Prompt
+    ↓
+Scenario Resolver
+    ↓
+Existing Collection/Scenario Found
+    ↓
+Run directly
+Do not ask Codex to recreate the HTTP requests from scratch.
+Only use Codex for interpretation if the requested scenario is ambiguous or requires analysis.
+Example:
+"Test PAYNET invalid PINFL registration"
+        ↓
+Scenario search
+        ↓
+PAYNET Registration /
+Invalid PINFL folder
+        ↓
+Execute directly
+Saved AgentDesk Scenarios
+In addition to Postman, support an AgentDesk-native scenario definition format later.
+Example:
+{
+  "id": "paynet-concurrent-registration",
+  "name": "Concurrent PAYNET Registration",
+  "environment": "UZ_TEST",
+  "steps": [
+    {
+      "type": "postmanRequest",
+      "requestId": "..."
+    },
+    {
+      "type": "databaseValidation",
+      "connectionId": "uz-test-verification",
+      "validator": "..."
+    }
+  ]
+}
+This enables combining:
+	•	API calls
+	•	DB validation
+	•	Playwright
+	•	shell commands
+	•	MCP tools
+	•	plugins
+	•	assertions
+into reusable deterministic QA scenarios.
+Scenario Results
+Persist:
+ScenarioRun
+with:
+	•	project
+	•	collection
+	•	scenario/folder/request
+	•	environment
+	•	startedAt
+	•	completedAt
+	•	status
+	•	requests
+	•	responses
+	•	assertion results
+	•	errors
+	•	artifacts
+	•	runID
+	•	bug relationships
+	•	requirement versions
+Possible statuses:
+passed
+failed
+partiallyPassed
+blocked
+cancelled
+error
+Requirement Linking
+Scenarios can reference requirement versions.
+Example:
+{
+  "scenarioId": "manual-review-close",
+  "requirements": [
+    {
+      "id": "manual-review-to-closed",
+      "version": 4
+    }
+  ]
+}
+When requirement v5 becomes active, AgentDesk can mark the scenario:
+Potentially stale
+Bug Detection Integration
+If a manual scenario fails:
+Scenario Failure
+      ↓
+User chooses Investigate
+      ↓
+Failure Analyzer
+      ↓
+Current Requirements
+      ↓
+Bug Registry Search
+      ↓
+Duplicate Detection
+      ↓
+New Bug / Existing Bug / Related Bug
+The user should not be forced to create a bug automatically after every failure.
+Postman Secrets
+Imported Postman environments may contain secrets.
+On import:
+	•	detect sensitive variable candidates
+	•	allow user to mark variables secret/non-secret
+	•	move secret values to macOS Keychain
+	•	replace local environment value with secretRef
+	•	never expose secrets to iPhone
+	•	never write secrets into traces/logs
+Import / Export
+Support:
+Import Collection
+Import Environment
+Refresh/Reimport
+Export sanitized AgentDesk copy
+When reimporting an updated collection:
+	•	preserve prior versions where useful
+	•	show differences
+	•	preserve AgentDesk metadata/relationships
+	•	do not silently destroy requirement/test/bug references
+Collection Versioning
+Imported collections should track version history when changed.
+Example:
+PAYNET Registration
+
+v1
+v2
+v3 ← Current
+Tests/runs should normally use the latest active version unless a historical version is explicitly selected.
+
+⸻
+
+116. Per-Project Dashboard, Statistics & Tool/Model Analytics
+Every Project must have its own Dashboard / Analytics page.
+This should provide an operational view of how AgentDesk is being used for that project.
+Example:
+CityPay / PAYNET
+Dashboard
+Time Filters
+Support:
+Today
+Last 5 Hours
+7 Days
+30 Days
+Custom
+Where useful also show:
+This Week
+Previous Week
+Run Statistics
+Show:
+	•	total runs
+	•	successful runs
+	•	failed runs
+	•	cancelled runs
+	•	blocked runs
+	•	approval-wait time
+	•	average run duration
+	•	total runtime
+	•	active runs
+	•	scenario runs
+	•	agent runs
+	•	workflow runs
+Example:
+This Week
+
+Runs              84
+Successful        67
+Failed            11
+Blocked            4
+Cancelled          2
+
+Average Runtime   04:21
+Agent Usage
+Show usage per agent.
+Example:
+QA Manager             21 runs
+Failure Analyzer       18 runs
+Test Designer          15 runs
+Automation Engineer    13 runs
+Bug Writer              7 runs
+Database Analyst        6 runs
+Provide daily/weekly trend views.
+Execution Profile / Model Usage
+Show which Codex execution profiles/models are being used.
+Examples:
+FAST          32 runs
+BALANCED      24 runs
+REASONING     17 runs
+CODING         9 runs
+MAX            2 runs
+If actual underlying Codex model information is exposed for a run, show it.
+Otherwise display the logical AgentDesk profile only.
+Do not fabricate model names.
+Support views such as:
+Today
+FAST          43%
+BALANCED      28%
+REASONING     19%
+CODING        10%
+and:
+Weekly Trend
+Tool Usage
+Track tool invocations.
+Examples:
+Git              143 calls
+PostgreSQL        91 calls
+Filesystem        87 calls
+Playwright        42 calls
+Shell             38 calls
+HTTP              31 calls
+Break down by:
+	•	day
+	•	week
+	•	agent
+	•	workflow
+	•	environment
+	•	success/failure
+Plugin Usage
+Show:
+Jira
+Read operations       41
+Write operations       6
+Approvals              6
+
+GitLab
+Read                  73
+Write                  9
+
+Grafana
+Search                15
+MCP Usage
+Show MCP activity:
+Jira MCP
+Tool calls       37
+
+PostgreSQL MCP
+Tool calls       22
+
+Playwright MCP
+Tool calls       11
+Also show:
+	•	errors
+	•	connection failures
+	•	average latency where useful
+Database Statistics
+Per connection:
+UZ TEST Verification DB
+
+Read Queries      56
+Write Queries      2
+Approval Requests  2
+Denied Queries     1
+Failures           3
+Never display sensitive query result data in aggregate analytics.
+Scenario / Collection Statistics
+Show:
+PAYNET Registration
+
+Runs             37
+Passed           29
+Failed            6
+Blocked           2
+
+Most failing scenario:
+Concurrent Registration
+Show Postman/ScenarioRunner usage by day/week.
+Bug Intelligence Statistics
+Show:
+	•	bugs detected
+	•	new bugs
+	•	duplicates detected
+	•	possible duplicates
+	•	scenarios blocked by known defects
+	•	Jira tickets registered
+	•	additional evidence attached to existing bugs
+Example:
+This Week
+
+New defects             4
+Duplicate failures     13
+Possible duplicates     2
+Blocked scenarios       7
+This helps quantify how much duplicate ticket creation AgentDesk prevented.
+Requirement Statistics
+Show:
+	•	total active requirements
+	•	requirement updates
+	•	stale tests
+	•	stale scenarios
+	•	unlinked tests
+	•	impact analyses
+Example:
+Requirements
+
+Active              74
+Updated this week    6
+Potentially stale
+tests                9
+Usage / Tokens
+When genuine Codex token metadata exists, aggregate it by project.
+Example:
+Codex Usage — PAYNET
+
+Today
+Input tokens       ...
+Output tokens      ...
+Cached tokens      ...
+
+This Week
+...
+If unavailable:
+Provider token usage unavailable from installed Codex CLI.
+Local AgentDesk run statistics should still be shown.
+Tool/Model Combination Analytics
+Support useful analysis such as:
+Failure Analyzer
+
+Primary profile
+REASONING
+
+Most used tools:
+PostgreSQL
+HTTP
+Git
+
+Average duration:
+03:42
+or:
+Automation Engineer
+
+CODING        92%
+BALANCED       8%
+
+Git            63%
+Shell          21%
+Playwright     16%
+Environment Statistics
+Example:
+UZ TEST     64 runs
+UZ DEV      21 runs
+GEO TEST    12 runs
+TR TEST      8 runs
+Dashboard Privacy
+Analytics must obey strict workspace/project boundaries.
+CityPay statistics cannot include PokerStars or Cascador runs.
+The only place cross-workspace aggregate statistics may exist is an explicit global AgentDesk dashboard, and even there no confidential content should be merged into model context.
+Global vs Project Dashboard
+Provide both:
+AgentDesk Overview
+for high-level totals across the local application, and:
+Workspace Dashboard
+Project Dashboard
+for detailed scoped analytics.
+Project Dashboard is the richest view.
+Analytics Data Source
+Analytics must be derived from structured local telemetry already generated by:
+	•	Runs
+	•	RunSteps
+	•	TraceEvents
+	•	Tool calls
+	•	Plugin calls
+	•	MCP calls
+	•	Database operations
+	•	ScenarioRuns
+	•	Approvals
+	•	Artifacts
+	•	Bug Registry
+	•	Requirement Registry
+	•	Codex usage metadata
+Do not create a second disconnected analytics tracking system when existing operational telemetry can be aggregated.
+Performance
+Analytics queries should be efficient.
+Add appropriate SQLite indexes and pre-aggregated summaries only when required.
+The dashboard should load quickly even after thousands of runs.
+Export
+Allow project analytics to be exported later as:
+JSON
+CSV
+and potentially a report artifact.
+Export must remain workspace/project scoped.
+:::
+
+So your numbering becomes:
+
+- **97** → replace with the socket/live-progress version above.
+- **114** → keep your existing final acceptance scenario unchanged.
+- **115** → Postman/manual deterministic scenario runner.
+- **116** → per-project dashboards and daily/weekly tool/model/agent statistics.
+
+The Postman part is particularly important architecturally because it gives AgentDesk two execution paths:
+
+```text
+Known predefined scenario
+        ↓
+RUN DIRECTLY
+fast deterministic execution
+versus:
+New/ambiguous QA problem
+        ↓
+AGENT REASONING
+        ↓
+Codex + tools
+That distinction will make the system much faster and consume considerably less Codex usage for repetitive QA work.
+117. Environment Snapshot & Reproducibility
+Every important run should record an environment snapshot so failures can be reproduced later.
+Capture when available:
+	•	workspace
+	•	project
+	•	environment
+	•	repository
+	•	branch
+	•	commit SHA
+	•	dirty Git state
+	•	agent configuration version
+	•	skill versions
+	•	workflow version
+	•	requirement versions
+	•	Postman collection version
+	•	Postman environment version
+	•	database connection identifier
+	•	plugin versions/config versions
+	•	MCP server versions where discoverable
+	•	Codex execution profile
+	•	operating system/runtime information relevant to the test
+Example:
+Run #4832
+
+Project
+PAYNET
+
+Environment
+UZ TEST
+
+Repository
+partner-onboarding
+
+Branch
+qa/paynet-concurrency
+
+Commit
+7d3f41a
+
+Requirement
+paynet-registration v7
+
+Collection
+PAYNET Registration v4
+
+Agent
+Failure Analyzer config v12
+This allows the user to answer:
+“Why did this pass yesterday but fail today?”
+without guessing what changed.
+Never store secrets in the snapshot.
+
+⸻
+
+118. Evidence Provenance
+Every piece of evidence should know where it came from.
+Examples:
+	•	user provided
+	•	API response
+	•	Playwright
+	•	Postman
+	•	database query
+	•	Jira
+	•	Git repository
+	•	Grafana
+	•	MCP
+	•	Codex analysis
+	•	generated artifact
+Evidence record should include:
+id
+type
+source
+sourceReference
+capturedAt
+runID
+stepID
+workspaceID
+projectID
+environmentID
+contentHash
+artifactReference
+Where appropriate also store:
+requestID
+HTTP status
+database connection
+Git commit
+Jira ticket
+This is important because agents must distinguish:
+FACT / OBSERVED EVIDENCE
+from:
+MODEL INTERPRETATION
+Example UI:
+Observed Evidence
+
+HTTP Response
+Source: Postman
+Status: 422
+
+Database State
+Source: UZ TEST Verification DB
+
+Agent Interpretation
+
+Likely same root defect as B2C-1234
+Do not let generated analysis silently become factual evidence.
+
+⸻
+
+119. Confidence / Evidence Quality
+Do not rely on vague model confidence percentages.
+Instead calculate confidence using evidence completeness.
+Example:
+Duplicate Classification
+
+DUPLICATE
+
+Evidence:
+
+✓ Same endpoint
+✓ Same status transition
+✓ Same HTTP status
+✓ Same requirement
+✓ Same persisted DB state
+○ Different environment
+Then optionally derive:
+Match strength
+High
+Use understandable levels:
+Low
+Medium
+High
+Very High
+This is preferable to fabricated values such as 97.3% unless a deterministic similarity algorithm actually produces that score.
+
+⸻
+
+120. Task Templates / Quick Actions
+Users should be able to save commonly repeated tasks.
+Example:
+Quick Actions
+
+Run PAYNET Registration Smoke
+
+Investigate Failed Playwright Test
+
+Analyze Jira Ticket
+
+Generate Test Cases
+
+Check Existing Bug
+
+Run Refund Regression
+
+Compare Requirement Versions
+A TaskTemplate may define:
+agent
+workflow
+project
+environment
+inputs
+execution profile
+required plugins
+required databases
+approval behavior
+Example:
+{
+  "id": "paynet-smoke",
+  "workflow": "paynet-registration-smoke",
+  "project": "paynet",
+  "environment": "UZ_TEST",
+  "executionProfile": "FAST"
+}
+These should be launchable from:
+	•	macOS UI
+	•	Command-K
+	•	menu bar
+	•	iPhone
+	•	AgentDesk MCP
+This reduces repetitive prompting.
+
+⸻
+
+121. Run Replay / Clone Run
+Allow:
+Run Again
+Clone Run
+When cloning, preserve the previous run configuration while resolving explicitly whether the user wants:
+Latest requirements
+or
+Original requirement versions
+Default normal reruns should use current requirements.
+Historical reproduction should use the original snapshot.
+Example:
+Re-run Mode
+
+● Current Project State
+  Requirement v8
+  Current collection
+  Current branch
+
+○ Reproduce Original Run
+  Requirement v6
+  Collection v3
+  Commit 7d3f41a
+This distinction is critical.
+
+⸻
+
+122. Compare Runs
+Allow two runs to be compared.
+Useful dimensions:
+	•	requirements
+	•	input
+	•	environment
+	•	API responses
+	•	DB state
+	•	execution steps
+	•	changed files
+	•	failures
+	•	duration
+	•	Codex profile
+	•	artifacts
+Example:
+Run #4811 vs Run #4832
+
+HTTP
+200 → 422
+
+DB Master Status
+APPROVED → APPROVED
+
+Requirement
+v6 → v7
+
+Repository
+7d3f41a → 91ac55e
+This is especially useful for regressions.
+
+⸻
+
+123. Test Coverage Map
+Create a project-level QA coverage view.
+Relationship:
+Requirement
+    ↓
+Test Scenario
+    ↓
+Automation
+    ↓
+Latest Result
+Example:
+PAYNET Registration
+
+Requirement                         Tests   Automated   Latest
+
+Valid registration                    4       4/4       PASS
+Invalid PINFL                         7       6/7       PASS
+Duplicate phone                       3       3/3       PASS
+Concurrent identity creation          2       1/2       FAIL
+Account restoration                   5       4/5       BLOCKED
+This gives AgentDesk a real test-management capability without trying to replace Jira/TestRail completely.
+Support statuses:
+Covered
+Partially Covered
+Not Covered
+Stale
+Blocked
+Failing
+Unknown
+
+⸻
+
+124. Missing Coverage Detection
+When requirements change, AgentDesk should be able to find requirements with no corresponding tests.
+Example:
+Requirement v8 introduced:
+
+"PINFL containing Unicode digits must be rejected."
+
+Coverage:
+
+No matching scenario found.
+
+Suggested action:
+Create test scenario
+This can be deterministic first, with Codex used for semantic comparison when necessary.
+
+⸻
+
+125. Test Data Management
+QA automation often fails because test data becomes unmanaged.
+Add project-level Test Data definitions.
+Examples:
+Fresh customer
+Approved customer
+Manual-review customer
+Blacklisted customer
+Closed customer
+Refundable transaction
+Store definitions, not sensitive real customer data by default.
+Example:
+{
+  "id": "fresh-paynet-customer",
+  "type": "generator",
+  "fields": {
+    "phone": "generated",
+    "pinfl": "generated",
+    "externalCustomerId": "uuid"
+  }
+}
+Support:
+	•	generators
+	•	reusable fixtures
+	•	setup workflows
+	•	cleanup workflows
+	•	expiration
+	•	ownership
+	•	environment scope
+Secret or personally sensitive values must not casually become permanent project memory.
+
+⸻
+
+126. Preflight Checks
+Before starting a workflow, run deterministic preflight checks.
+Example:
+PAYNET Regression
+
+Preflight
+
+✓ Codex authenticated
+✓ Git repository available
+✓ Branch clean
+✓ Jira connected
+✓ UZ TEST DB connected
+✓ PAYNET collection available
+✓ UZ TEST environment available
+✕ VPN unavailable
+Do not start a 15-minute agent workflow only to discover at step 8 that an essential connection is unavailable.
+Preflight requirements should be declared by agents/workflows.
+
+⸻
+
+127. Tool Fallbacks
+Allow integrations to have fallback implementations.
+Example:
+Jira
+
+Preferred
+Jira MCP
+
+Fallback
+Native Jira Plugin
+or:
+API Scenario
+
+Preferred
+Native ScenarioRunner
+
+Fallback
+Newman
+The fallback should be configurable and visible.
+Do not silently switch to a capability with broader permissions.
+Fallback must still go through Policy Engine.
+
+⸻
+
+128. Workspace Lock / Visual Safety Indicator
+Because the user works across several companies, the currently active workspace must be visually obvious.
+Example persistent header:
+CITYPAY / PAYNET / UZ TEST
+Use distinct workspace identity styling.
+Before high-risk actions show:
+You are about to push using:
+
+Workspace
+CityPay
+
+Project
+PAYNET
+
+Repository
+partner-onboarding
+
+Environment
+UZ TEST
+This prevents accidental cross-company actions caused by human context switching.
+For destructive or external writes, workspace/project identity should never be hidden.
+
+⸻
+
+129. Production Safety Mode
+Production environments should have stronger defaults.
+Example:
+PRODUCTION SAFETY
+
+Database writes       DENY
+Kubernetes exec       DENY
+Deployment            DENY
+Jira read             ALLOW
+Logs read             APPROVAL
+DB read               APPROVAL
+Allow administrators/users to configure policies, but default toward read-only behavior.
+Consider an explicit:
+Production Access Enabled
+session with expiration for elevated read access.
+Do not allow an agent to elevate itself.
+
+⸻
+
+130. Dry Run Mode
+Agents/workflows that would perform side effects should support:
+Dry Run
+Example:
+Create Jira Ticket
+
+DRY RUN
+
+Would create:
+[Backend - UZ] ...
+
+No external action performed.
+Also useful for:
+	•	Git push
+	•	Jira comments
+	•	workflow actions
+	•	DB writes
+	•	plugin actions
+This makes new workflows safer to test.
+
+⸻
+
+131. Workflow Versioning
+Requirements are versioned; workflows should be too.
+Example:
+paynet-regression/
+├── workflow.v1.json
+├── workflow.v2.json
+└── current.json
+Runs record the exact workflow version executed.
+Do the same for critical:
+	•	agent definitions
+	•	skills
+	•	scenario definitions
+This makes historical runs reproducible.
+
+⸻
+
+132. Agent Configuration Versioning
+An agent change can materially change results.
+Store versions for:
+instructions
+skills
+tool access
+execution profile
+output schema
+delegation rules
+Run metadata records:
+Failure Analyzer
+config v14
+When comparing runs:
+Agent config
+v13 → v14
+can explain output changes.
+
+⸻
+
+133. Change Review Before Agent Configuration Save
+When modifying an agent from UI:
+Agent Configuration Changed
+
+Instructions      Modified
+DB permissions    Modified
+Skill             Added
+Execution profile REASONING → BALANCED
+Show a diff before saving major security-related changes.
+Permission changes should be particularly visible.
+
+⸻
+
+134. Run Budgets
+Each agent/workflow may declare execution budgets.
+Examples:
+maximum duration
+maximum Codex calls
+maximum tool calls
+maximum retries
+maximum concurrent subprocesses
+maximum generated artifacts
+Example:
+{
+  "maxDurationMinutes": 20,
+  "maxCodexExecutions": 5,
+  "maxRetries": 2
+}
+If the budget is reached:
+Run paused
+
+Execution budget reached.
+
+[Continue]
+[Stop]
+This prevents runaway autonomous workflows.
+
+⸻
+
+135. Concurrency Control
+AgentDesk will eventually execute many tasks.
+Add scheduler limits.
+Example:
+Global Codex runs       2
+CityPay DB queries      4
+Playwright browsers     2
+Heavy workflows         1
+Support queues.
+The UI should clearly show:
+Queued
+Position 2
+rather than silently starting unlimited subprocesses.
+
+⸻
+
+136. Resource Locks
+Some QA actions should not execute concurrently.
+Example:
+Shared test account
+Exclusive environment deployment
+Database migration
+Specific test fixture
+Allow workflows to acquire named locks:
+lock:
+  "citypay:uz-test:paynet-shared-account"
+Then release them at completion/failure.
+This prevents agents from interfering with each other’s tests.
+
+⸻
+
+137. Artifact Retention Policies
+Not all traces/evidence should live forever.
+Configure per project:
+Run logs              30 days
+Screenshots           30 days
+API evidence          90 days
+DB evidence           7 days
+Bug evidence          Keep
+Requirement history   Keep
+Allow:
+Keep Forever
+30 Days
+90 Days
+Custom
+Never automatically remove authoritative requirements or registered bug metadata.
+
+⸻
+
+138. Sensitive Data Classification
+Add metadata classifications:
+PUBLIC
+INTERNAL
+CONFIDENTIAL
+SECRET
+Typical defaults:
+Project requirement      INTERNAL
+API response             INTERNAL
+DB row                    CONFIDENTIAL
+Password                  SECRET
+Token                     SECRET
+Use this classification when deciding:
+	•	whether data can be shown on iPhone
+	•	whether artifact can persist
+	•	whether logs should contain it
+	•	whether it can be exported
+	•	whether Codex context may include it
+This will become important with three separate employers.
+
+⸻
+
+139. Redaction Engine
+Create a centralized redaction layer.
+Detect/configure patterns such as:
+	•	passwords
+	•	access tokens
+	•	authorization headers
+	•	cookies
+	•	private keys
+	•	DB URLs
+	•	sensitive field names
+Redaction must occur before:
+logging
+trace persistence
+mobile streaming
+artifact preview
+analytics
+Do not implement redaction separately in every plugin.
+
+⸻
+
+140. Audit Log
+Keep an immutable-style local audit trail for important actions.
+Examples:
+Jira ticket created
+Jira comment added
+Git push approved
+DB write rejected
+Plugin permission changed
+Device paired
+Device revoked
+Production access enabled
+Requirement v7 created
+Bug marked registered
+Audit event includes:
+who/agent
+device
+workspace
+project
+action
+timestamp
+result
+related run
+This is separate from noisy technical logs.
+
+⸻
+
+141. Plugin/MCP Permission Presets
+Setting every tool manually can become tedious.
+Provide presets:
+Read Only
+
+QA Safe
+
+Development
+
+Custom
+Example:
+Read Only
+All reads → ALLOW All writes → DENY
+QA Safe
+Reads → ALLOW normal external writes → APPROVAL destructive → DENY
+The user can customize afterward.
+
+⸻
+
+142. Connection Diagnostics
+For every connection provide a real diagnostics page.
+Example:
+PostgreSQL UZ TEST
+
+DNS            PASS
+TCP            PASS
+TLS            PASS
+Authentication PASS
+Database       PASS
+Schema         PASS
+Latency        41ms
+For MCP:
+Process
+Transport
+Handshake
+Tools discovery
+Resources discovery
+For Jira:
+Authentication
+Identity
+Project access
+Read issue
+This will make connection troubleshooting much easier.
+
+⸻
+
+143. Project Onboarding Wizard
+Creating a project manually from 10 different screens would be cumbersome.
+Provide:
+New Project
+wizard:
+	1	Project details
+	2	Repository
+	3	Environments
+	4	Database connections
+	5	Plugins
+	6	MCP servers
+	7	Requirements/documentation import
+	8	Postman collection
+	9	Agent templates
+	10	Permissions
+	11	Test connections
+	12	Finish
+All steps remain editable later.
+
+⸻
+
+144. Import Existing Project Context
+Allow importing existing material:
+	•	Markdown documentation
+	•	JSON requirements
+	•	OpenAPI specs
+	•	Postman collections
+	•	Postman environments
+	•	repository path
+	•	test directories
+	•	existing bug export
+	•	Jira ticket IDs/links
+	•	CSV test cases
+AgentDesk should classify imported data and suggest destinations.
+Do not silently convert ambiguous information into authoritative requirements.
+
+⸻
+
+145. OpenAPI Support
+Since API QA is a major part of the system, support OpenAPI specifications.
+Project:
+Testing
+→ API Specifications
+Allow import of:
+openapi.json
+openapi.yaml
+Capabilities:
+	•	browse endpoints
+	•	inspect schemas
+	•	inspect required fields
+	•	compare request/response with spec
+	•	generate scenarios
+	•	detect uncovered endpoints
+	•	connect endpoints to requirements
+	•	connect Postman requests to endpoints
+This complements Postman rather than replacing it.
+
+⸻
+
+146. Contract Drift Detection
+When OpenAPI or requirements change:
+API Spec v4 → v5
+detect changes such as:
+New required field
+Removed property
+Enum changed
+Response schema changed
+New endpoint
+Removed endpoint
+Then identify potentially impacted:
+	•	Postman requests
+	•	automated tests
+	•	requirements
+	•	scenarios
+This is highly valuable for AQA.
+
+⸻
+
+147. Git Integration as First-Class Project Setup
+Each project should register repositories.
+Example:
+PAYNET
+
+Backend
+~/Projects/citypay/partner-onboarding
+
+Automation
+~/Projects/citypay/qa-automation
+Store:
+	•	local path
+	•	remote reference
+	•	default branch
+	•	role/purpose
+AgentDesk should not make Codex guess which repository is relevant.
+
+⸻
+
+148. Repository Safety
+Before Codex edits:
+	•	confirm workspace mapping
+	•	confirm repository mapping
+	•	capture branch
+	•	capture dirty state
+	•	optionally create/require working branch
+Configurable policy:
+Modify default branch    DENY
+Create branch            ALLOW
+Commit                   APPROVAL
+Push                     APPROVAL
+
+⸻
+
+149. Notes / Manual Findings
+Not every QA observation deserves a requirement or bug.
+Allow:
+Project Notes
+A note may later be promoted to:
+Requirement
+Bug
+Validation Rule
+Test Scenario
+Documentation
+This gives the user somewhere safe to capture uncertain information without polluting authoritative memory.
+
+⸻
+
+150. Inbox / Unclassified Information
+When information enters AgentDesk but its destination is unclear, store it in a project Inbox.
+Example:
+Inbox
+
+3 unclassified items
+
+- Slack explanation of refund rule
+- API response screenshot
+- developer note about status propagation
+Actions:
+Save as Requirement Update
+Save as Evidence
+Save as Note
+Attach to Bug
+Attach to Test
+Ignore
+This is safer than making every agent decide automatically.
+
+⸻
+
+151. Universal Project Timeline
+Each project should have a chronological timeline of significant events.
+Example:
+Sep 9
+
+16:42 Requirement v8 created
+16:50 PAYNET regression started
+16:53 B2C-1234 detected as duplicate
+17:01 New evidence attached
+17:03 Jira comment approved
+
+Sep 8
+
+14:12 Postman collection v4 imported
+13:50 Bug B2C-1187 registered
+This gives a useful history beyond individual Runs.
+
+⸻
+
+152. Deep Linking
+Support stable internal links such as:
+agentdesk://workspace/citypay/project/paynet/run/4832
+agentdesk://.../bug/B2C-1234
+agentdesk://.../requirement/manual-review-to-closed
+Notifications and iPhone actions should use these.
+
+⸻
+
+153. Backup & Restore
+Because project knowledge is local, backup is essential.
+Support:
+Backup AgentDesk
+Restore Backup
+Backup should include:
+	•	configurations
+	•	project memory
+	•	requirement versions
+	•	bug registry
+	•	workflow definitions
+	•	agent definitions
+	•	SQLite operational data if selected
+Secrets should be handled separately and securely.
+Do not casually export raw Keychain credentials into normal backup archives.
+
+⸻
+
+154. Git-Based Configuration Backup
+Because most configuration is human-readable, optionally allow a dedicated local/private Git repository for:
+agents
+skills
+requirements
+workflows
+project definitions
+Operational evidence and secrets should not automatically be committed.
+This allows history and restore without treating the database as the only backup.
+
+⸻
+
+155. Extension Readiness
+Do not build a massive public plugin marketplace now.
+But architecture should allow future extension packages that can contribute:
+	•	plugin integrations
+	•	MCP definitions
+	•	agents
+	•	skills
+	•	workflow nodes
+	•	scenario runners
+	•	DB drivers
+	•	importers
+Every extension still goes through:
+Workspace isolation
+Policy Engine
+Secrets
+Audit
+No extension gets unrestricted access automatically.
+
+⸻
+
+156. Command-Line Interface for AgentDesk
+In addition to the Swift UI, eventually provide a small local:
+agentdesk
+CLI.
+Examples:
+agentdesk run paynet-smoke --env uz-test
+
+agentdesk agent run failure-analyzer \
+  --project paynet \
+  --input failure.json
+
+agentdesk runs active
+
+agentdesk bug find "manual review closed"
+This is NOT a replacement for Codex CLI.
+It is a command interface to the AgentDesk runtime itself.
+It also makes scripting and CI integration much easier.
+
+⸻
+
+157. CI Invocation
+Architect workflows so selected AgentDesk scenarios can eventually be triggered from CI.
+Example:
+GitLab CI
+   ↓
+AgentDesk CLI / local runner
+   ↓
+Scenario
+   ↓
+Results
+Do not expose the entire desktop application to CI.
+Create a reusable runtime layer underneath the UI.
+
+⸻
+
+158. Final Architecture Principle: AgentDesk Is the System of Context
+The long-term architecture should treat AgentDesk as the local engineering context/control plane.
+Codex is interchangeable execution intelligence.
+Plugins and MCP expose capabilities.
+Project Memory supplies validated knowledge.
+ScenarioRunner supplies fast deterministic testing.
+Workflows orchestrate repeatable work.
+The Policy Engine controls side effects.
+The Mac executes.
+The iPhone observes and approves.
+Conceptually:
+                  AgentDesk
+                     │
+       ┌─────────────┼───────────────┐
+       │             │               │
+ Project Memory   Workflows       Policy
+       │             │               │
+       ├─────────────┼───────────────┤
+                     │
+              Execution Router
+                     │
+        ┌────────────┼────────────┐
+        │            │            │
+      Codex       Scenarios      Tools
+        │            │            │
+        │        Postman/API      ├── Plugins
+        │                        ├── MCP
+        │                        ├── DB
+        │                        ├── Git
+        │                        └── Browser
+        │
+        └────────────┬────────────
+                     │
+               Run / Evidence
+                     │
+                Mac Runtime
+                     │
+             Live socket events
+                     │
+                  iPhone
+This separation should remain intact as the product grows.
+159. Calendar Sync & Upcoming Event Widget
+AgentDesk should support calendar synchronization so the user can see upcoming meetings/events without leaving the application.
+Calendar is a lightweight productivity integration and should not dominate the UI.
+Calendar Providers
+Architect calendar access through a provider abstraction.
+Initial priority:
+	•	Apple Calendar / EventKit
+	•	Google Calendar
+	•	Microsoft Outlook / Microsoft 365 Calendar
+Where possible, use native Apple integrations and supported authentication flows.
+Do not require calendar credentials to be stored in plaintext.
+Each calendar connection should be configurable and enable/disable independently.
+Example:
+Settings
+→ Connections
+→ Calendars
+or:
+Workspace
+→ Connections
+→ Calendar
+depending on whether the calendar is global or workspace-specific.
+Support both:
+	•	global personal calendar
+	•	optional workspace-specific calendar associations
+Small Upcoming Event Widget
+AgentDesk should show a very small, unobtrusive upcoming-event widget somewhere persistent.
+Good locations include:
+	•	top toolbar
+	•	Overview header
+	•	sidebar footer
+	•	menu bar popover
+Example:
+Next
+
+15:30
+QA Daily
+
+in 24 min
+or:
+15:30 QA Daily · 24m
+Keep it compact.
+Do not create a large calendar card on the main dashboard.
+If no upcoming meeting exists:
+No upcoming events
+Widget Behavior
+The compact widget should display the nearest upcoming relevant event.
+Display when available:
+	•	start time
+	•	title
+	•	countdown
+	•	meeting status
+Optional small indicators:
+● Now
+in 12m
+in 1h 20m
+Clicking the widget opens the full Day Calendar view.
+Day Calendar View
+The expanded calendar should display the current day’s events on an hourly vertical timeline.
+Example:
+Wednesday, Sep 9
+
+09:00 ─────────────────────────
+
+09:30
+      ┌─────────────────────────┐
+      │ CityPay Daily           │
+      │ 09:30 – 09:45           │
+      └─────────────────────────┘
+
+10:00 ─────────────────────────
+
+11:00
+      ┌─────────────────────────┐
+      │ Cascador Team Meeting   │
+      │ 11:00 – 11:30           │
+      └─────────────────────────┘
+
+12:00 ─────────────────────────
+
+13:00 ─────────────────────────
+
+14:00
+      ┌─────────────────────────┐
+      │ QA Sync                 │
+      │ 14:00 – 15:00           │
+      └─────────────────────────┘
+
+15:00 ─────────────────────────
+The timeline should make:
+	•	gaps
+	•	overlaps
+	•	meeting duration
+	•	current time
+	•	upcoming meetings
+easy to understand visually.
+Current-Time Indicator
+When viewing today, show a live current-time line.
+Example:
+14:37 ─────────────── NOW ───────────────
+The calendar should update automatically while the application remains open.
+Calendar Navigation
+Support:
+← Previous Day
+Today
+Next Day →
+The main focus remains the daily timeline.
+A future weekly view may be added but is not required for the initial implementation.
+Event Details
+Clicking an event opens details.
+Display when available:
+	•	title
+	•	start/end time
+	•	calendar
+	•	organizer
+	•	attendees
+	•	description
+	•	location
+	•	meeting URL
+	•	recurrence information
+Actions may include:
+Join Meeting
+Open in Calendar
+Copy Meeting Link
+Do not expose private calendar information unnecessarily to agents.
+Meeting Links
+Detect common meeting links when present:
+	•	Google Meet
+	•	Microsoft Teams
+	•	Zoom
+	•	Slack Huddle or other supported links
+Show:
+[Join]
+in the event detail where appropriate.
+Workspace Association
+Allow events to be optionally associated with AgentDesk workspaces/projects.
+Example:
+CityPay Daily
+Workspace: CityPay
+
+Cascador Daily
+Workspace: Cascador
+Association may be based on:
+	•	selected calendar
+	•	configurable rules
+	•	explicit manual assignment
+Do not let calendar matching automatically move confidential event content between workspaces.
+Calendar Filters
+Allow selecting which calendars are visible.
+Example:
+Calendars
+
+✓ Work
+✓ CityPay
+✓ Cascador
+○ Birthdays
+○ Holidays
+The upcoming-event widget should respect these filters.
+Calendar Privacy
+Calendar content is sensitive.
+By default, calendar data should be used only for UI/personal scheduling context.
+Do not automatically inject all calendar event descriptions or attendee information into Codex prompts.
+Agents should receive calendar information only when:
+	•	workflow explicitly requests scheduling context
+	•	user explicitly provides/authorizes it
+	•	the agent has calendar-read permission
+Agent Calendar Permission
+Calendar integration should use the normal permission model.
+Example:
+Calendar
+
+List events         ALLOW
+Read title/time     ALLOW
+Read descriptions   APPROVAL
+Create event        APPROVAL
+Edit event          APPROVAL
+Delete event        DENY
+If write support is added later, all modifications must pass through the Policy Engine.
+Calendar Sync
+Keep local cached event metadata for responsive UI.
+Sync should:
+	•	refresh on application launch
+	•	refresh when provider signals changes where supported
+	•	refresh periodically without aggressive polling
+	•	update after calendar edits
+	•	tolerate temporary offline state
+Cached events should have a configurable retention period.
+Offline Behavior
+If calendar data has previously been synchronized, AgentDesk may display cached events while offline.
+Clearly indicate stale state when appropriate.
+Example:
+Calendar temporarily offline
+Last synced 14:31
+Menu Bar Integration
+The AgentDesk menu bar can optionally display:
+Next Meeting
+
+15:30 QA Daily
+in 24 min
+Clicking it can:
+	•	open the calendar
+	•	open event details
+	•	join the meeting
+Keep this optional in Settings.
+iPhone Calendar View
+The iPhone companion may also display:
+Next
+15:30 QA Daily
+and a simplified daily event timeline.
+However, the iPhone can also use its native calendar permissions directly where architecturally appropriate.
+Do not unnecessarily route personal calendar secrets through the Mac server.
+Notifications
+Optionally support AgentDesk meeting reminders.
+Examples:
+QA Daily starts in 10 minutes
+or:
+Cascador Meeting
+Starting now
+Allow reminder behavior to be disabled to avoid duplicating native Calendar notifications.
+Calendar + Runs
+Future workflows may optionally use calendar information.
+Example:
+You have a meeting in 18 minutes.
+
+This workflow is expected to take approximately 30 minutes.
+or:
+Pause noncritical long-running work before the next meeting.
+Do not automatically cancel or modify runs solely because of calendar events.
+Calendar Dashboard Integration
+The main project dashboard should remain focused on project analytics.
+Calendar should appear only as a small auxiliary widget.
+Example:
+Next Meeting
+15:30 QA Daily · 24m
+Clicking opens the full daily timeline.
+Acceptance Criteria
+	1	Connect at least one calendar provider.
+	2	Read today’s upcoming events.
+	3	Show the nearest event in a compact widget.
+	4	Display title, time, and countdown.
+	5	Clicking the widget opens a daily hourly timeline.
+	6	Current time is visibly marked.
+	7	Multiple events display correctly.
+	8	Overlapping events remain readable.
+	9	Meeting details can be opened.
+	10	Meeting URL can be opened when present.
+	11	Calendar visibility filters work.
+	12	Calendar connection can be disabled/disconnected.
+	13	Calendar data is not automatically exposed to unrelated agents.
+	14	Permission controls apply to agent calendar access.
+	15	Cached events remain viewable during temporary provider outages.
+So yes: after the earlier additions, this should be **159**.
+
+
+That is the target AgentDesk product.

@@ -1,6 +1,6 @@
 # Codex CLI provider and account management
 
-Status: planned design. Source: [final architecture](final-architecture.txt), sections 23–28. No particular CLI flag or machine-readable event format is claimed as verified here.
+Status: executable discovery, normalized diagnostics and supported account-command adapters are implemented in P1-08a. Native Settings integration and the execution provider follow separately. Source: [final architecture](final-architecture.txt), sections 23–28. See [diagnostics validation](../Development/p1-08a-validation.md).
 <!-- Source sections: 23,24,25,26,27,28 -->
 
 Codex CLI is the sole current AI backend behind `ExecutionProvider` and `CodexCLIProvider`. Agent definitions refer to logical execution profiles so provider-specific model names do not spread through domain code.
@@ -28,3 +28,15 @@ Use officially supported login/logout flows. AgentDesk must not manage ChatGPT c
 Map FAST, BALANCED, REASONING, CODING and MAX to current installed-provider configuration. Agent routing choices include AUTO, FASTEST, BALANCED, BEST_QUALITY and FIXED. Deterministic classification comes before model reasoning. Escalation is driven by output-schema validity, required fields/evidence, test outcomes, exit codes and missing information; self-reported confidence alone is insufficient.
 
 Test missing/wrong executables, logged-out/expired/limited responses, safe argument/stdin handling with shell metacharacters, streaming chunks, malformed events, failure exits, cancellation, timeout, profile mapping and validator-driven escalation. Never use fabricated account, model or usage values to make a UI appear connected.
+
+## Implemented diagnostics adapter
+
+`MacCodexDiagnostics` uses a fixed list of common installation locations or an explicitly selected executable. Paths must resolve to executable regular local files. Discovery does not search repositories, shell startup scripts, browser data or credential stores. Version output must match the Codex CLI format; supported capabilities are extracted from that installation's help. Optional capabilities stay false when absent.
+
+The installed CLI verified on 2026-09-09 is `0.153.4`, located in the ChatGPT application's Resources directory. Its public help supports `login`, `login status`, `logout`, noninteractive `exec`, stdin prompts, JSON events, ephemeral sessions and ignoring user configuration. These facts do not claim that the future execution provider is implemented. Official references: [CLI commands](https://learn.chatgpt.com/docs/developer-commands?surface=cli) and [authentication](https://learn.chatgpt.com/docs/auth).
+
+The status adapter requires both the recognized public status text and matching exit code. It distinguishes ChatGPT credentials present, signed out, unsupported authentication method and unknown/error. Credentials present does not prove network availability, token freshness, subscription plan or remaining usage; these remain unavailable unless later supported diagnostics establish them. Raw command output never enters the public snapshot. Login/logout recheck executable capabilities and refresh status afterward; overlapping account operations are rejected. The live development probe ran only version/help/status and preserved the existing login.
+
+Commands use argument-array `posix_spawn`, a fresh process group, default signal dispositions, empty signal mask, null stdin and a private temporary working directory. A small explicit environment allowlist forwards normal CLI home/location context without arbitrary token variables. Stdout/stderr are drained independently into a combined 64 KiB bounded buffer. Ordinary diagnostics time out after 10 seconds; browser login after 180 seconds. Cancellation, timeout, output overflow and process exit clean up descriptors and remaining group children. The adapter does not interpret a login URL, read cached tokens, invoke a shell or expose arbitrary command execution to iPhone.
+
+This first commit provides the real Mac library boundary and tests. Native Settings, app-host access to the user's CLI context, active-run logout handling and browser-flow UI acceptance are P1-08b; execution streaming/stdin, policy and the run coordinator are separate gates. No installed-account logout or new browser login was performed as a test.

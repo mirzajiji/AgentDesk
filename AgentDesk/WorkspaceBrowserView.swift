@@ -6,6 +6,7 @@ import SwiftUI
 struct WorkspaceBrowserView: View {
     @ObservedObject var model: WorkspaceBrowserModel
     @State private var editor: CatalogEditor?
+    @State private var selectedProject: ProjectRecord?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -63,6 +64,9 @@ struct WorkspaceBrowserView: View {
                 }
             }
         }
+        .sheet(item: $selectedProject) { project in
+            ProjectAgentsView(project: project) { try await model.agentStore(for: project) }
+        }
         .sheet(item: $editor) { item in
             CatalogNameEditor(editor: item) { name in
                 switch item {
@@ -107,6 +111,8 @@ struct WorkspaceBrowserView: View {
                                 Text("Local project").font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
+                            Button("Agents") { selectedProject = project }
+                                .accessibilityIdentifier("project.agents.\(project.name)")
                             Button("Rename") { editor = .renameProject(project) }
                                 .accessibilityIdentifier("project.rename.\(project.name)")
                         }

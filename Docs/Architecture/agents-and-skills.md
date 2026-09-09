@@ -1,6 +1,6 @@
 # Agents, templates and skills
 
-Status: planned design. Source: [final architecture](final-architecture.txt), sections 18, 19 and 21.
+Status: project agent creation/editing, native instruction editor, versioned snapshots, templates and archive/restore implemented in P1-06a; configuration composition, skills, environment constraints and output schemas follow in P1-06b. See [P1-06a native validation](../Development/p1-06a-validation.md). Source: [final architecture](final-architecture.txt), sections 18, 19 and 21.
 <!-- Source sections: 18,19,21 -->
 
 An agent definition combines task-specific instructions and explicitly permitted capabilities. It is configuration consumed by the runtime, not a separate security authority.
@@ -28,3 +28,15 @@ Version critical configuration, record exact versions on runs, and review materi
 ## Verification
 
 Test validated CRUD/reopen, template instantiation without privilege grants, invalid references and output schemas, include cycles, secret exclusion, cross-workspace agent/skill denial, disabled-state handling and preservation of run configuration versions. See [configuration](configuration.md), [workflows](workflows.md) and [agent evals](testing-and-coverage.md).
+
+## Initial agent editor and storage
+
+On Mac, open a project's **Agents** panel, create an agent from one of eleven templates, and edit its name, description, instructions and Codex execution profile. All templates request read-only access and use the provider's default model unless the user configures an override. The editor supports disabling, archiving and restoring agents. These settings do not run Codex or grant access; runtime policy enforcement arrives before execution is exposed.
+
+`WorkspaceCatalog.agentStore(in:)` validates workspace/project membership and returns a `ProjectAgentStore` bound to that exact project. Every store operation checks the requested scope. Configuration lives below `Projects/<project UUID>/Agents/<agent UUID>/`: `current.json` selects a revision under `Versions/<revision>/`, with readable `agent.json` and `instructions.md`. Every save, archive and restore creates a new immutable revision. Old files remain unchanged. New versions are staged and published atomically before the current pointer changes. An unpublished version left by a failed pointer update is preserved and skipped when allocating the next revision; it is not automatically made current.
+
+Saves require the expected current revision, so stale editors cannot silently overwrite a later save. Names are normalized and unique among active agents in their project. Archived names may be reused; restoring an archived agent fails if an active agent now has its name. Archived agents cannot be edited until restored. Queued/active-run handling is deferred until runs exist and must use frozen agent snapshots.
+
+The catalog's advisory lock now opens a separate file description for each operation. This matters because several project-agent actors can share a catalog root: locking a shared descriptor alone would not serialize those actors. Tests cover both concurrent stores and reentrant attempts on a shared directory handle.
+
+Agent profiles currently contain a Codex model override, read-only/workspace-write request, maximum steps and timeout. Inputs are bounded and validated; instructions must be nonempty UTF-8 text no larger than 64 KB. Advanced capabilities remain pending and are not shown as usable settings. This slice does not claim composed instructions, skill installation, output-schema execution or live Codex runs.

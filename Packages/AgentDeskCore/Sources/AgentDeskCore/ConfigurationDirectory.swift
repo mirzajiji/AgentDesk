@@ -125,8 +125,12 @@ final class ConfigurationDirectory: Sendable {
 
     func withLock<T>(_ operation: () throws -> T) throws -> T {
         try Task.checkCancellation()
-        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else { throw CatalogError.busy }
-        defer { flock(descriptor, LOCK_UN) }
+        // Separate actors may share this directory handle. Each lock needs its own open description.
+        let lock = openat(descriptor, ".", O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        guard lock >= 0 else { throw Self.failure() }
+        defer { Darwin.close(lock) }
+        guard flock(lock, LOCK_EX | LOCK_NB) == 0 else { throw CatalogError.busy }
+        defer { flock(lock, LOCK_UN) }
         return try operation()
     }
 

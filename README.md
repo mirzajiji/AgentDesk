@@ -2,7 +2,7 @@
 
 A local-first, native Apple platform for engineering agents, QA workflows, project knowledge, and execution review. The Mac executes; an iPhone companion monitors and controls explicitly permitted operations over the local network.
 
-**Status:** Phase 1 is underway on `codex/native-foundation`. The Mac now creates, renames and reopens local workspaces and projects, with scoped storage and Core/Design packages. Native validation is recorded per task. Personal GitHub push succeeds. See the [implementation tasks](Docs/Development/tasks.md).
+**Status:** Phase 1 is underway on `codex/native-foundation`. The Mac creates, renames and reopens local workspaces and projects. Project agent templates, instruction editing and immutable revisions are implemented, alongside scoped configuration, SQLite run storage and native Keychain support. Native validation is recorded per task. Personal GitHub push succeeds. See the [implementation tasks](Docs/Development/tasks.md).
 
 ## Product and development references
 
@@ -22,9 +22,9 @@ Configuration stays human-readable; operational data stays local. Workspace and 
 
 ## Native foundation in progress
 
-Open `AgentDesk.xcodeproj` and select the shared `AgentDesk` scheme. It includes app, unit-test and UI-test targets. The Mac has an initial workspace/run/connection sidebar; the iPhone shows that no Mac is connected. On Mac, choose **Create Workspace**, name it, then choose **Create Project**. Names and selected workspace persist across launches. Rename controls preserve identities and project membership. Codex execution and secure pairing are not implemented yet.
+Open `AgentDesk.xcodeproj` and select the shared `AgentDesk` scheme. It includes app, unit-test and UI-test targets. The Mac has an initial workspace/run/connection sidebar; the iPhone shows that no Mac is connected. On Mac, choose **Create Workspace**, name it, then choose **Create Project**. Names and selected workspace persist across launches. Rename controls preserve identities and project membership. Each project now has an **Agents** panel for templates, editable instructions and saved versions. Codex execution and secure pairing are not implemented yet.
 
-Local Swift packages are under `Packages/AgentDeskCore` and `Packages/AgentDeskDesign`. The app uses Swift 6, targeting macOS 15 and iOS 18 or newer. Native Mac and iPhone 16 Pro/iOS 26 unit and UI suites pass. Broader device/OS coverage is reserved for final project acceptance.
+Local Swift packages are under `Packages/AgentDeskCore`, `Packages/AgentDeskDesign`, `Packages/AgentDeskPersistence` and `Packages/AgentDeskSecurity`. The app uses Swift 6, targeting macOS 15 and iOS 18 or newer. Native Mac and iPhone 16 Pro/iOS 26 unit and UI suites pass. Broader device/OS coverage is reserved for final project acceptance.
 
 ```sh
 python3 Scripts/validate-documentation.py

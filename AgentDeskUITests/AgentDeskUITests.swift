@@ -13,6 +13,7 @@ final class AgentDeskUITests: XCTestCase {
         let app = XCUIApplication()
         #if os(macOS)
         app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         #endif
         app.launch()
         #if os(macOS)
@@ -26,9 +27,24 @@ final class AgentDeskUITests: XCTestCase {
 
     #if os(macOS)
     @MainActor
+    func testLaunchPresentsWindowAfterPreviousWindowWasClosed() {
+        let app = XCUIApplication()
+        app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
+        app.launch()
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(app.windows.firstMatch.waitForNonExistence(timeout: 5))
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.staticTexts["No workspaces yet"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     func testWorkspaceProjectCreationIsolationRenameAndReopen() {
         let app = XCUIApplication()
         app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         app.launch()
         XCTAssertTrue(app.buttons["workspace.create.empty"].waitForExistence(timeout: 5))
         app.buttons["workspace.create.empty"].click()
@@ -61,9 +77,60 @@ final class AgentDeskUITests: XCTestCase {
     }
 
     @MainActor
+    func testAgentInstructionsPersistAcrossEditArchiveRestoreAndRelaunch() {
+        let app = XCUIApplication()
+        app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
+        app.launch()
+        XCTAssertTrue(app.buttons["workspace.create.empty"].waitForExistence(timeout: 5))
+        app.buttons["workspace.create.empty"].click()
+        saveName("Personal", in: app)
+        XCTAssertTrue(app.buttons["project.create.empty"].waitForExistence(timeout: 5))
+        app.buttons["project.create.empty"].click()
+        saveName("Agent Project", in: app)
+        XCTAssertTrue(app.buttons["project.agents.Agent Project"].waitForExistence(timeout: 5))
+        app.buttons["project.agents.Agent Project"].click()
+        XCTAssertTrue(app.staticTexts["No agents yet"].waitForExistence(timeout: 5))
+        app.buttons["agent.create"].click()
+        let name = app.textFields["agent.name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.click(); name.typeKey("a", modifierFlags: .command); name.typeText("Project Helper")
+        let instructions = app.textViews["agent.instructions"]
+        XCTAssertTrue(instructions.waitForExistence(timeout: 5))
+        instructions.click(); instructions.typeKey("a", modifierFlags: .command)
+        instructions.typeText("Inspect synthetic requirements and cite evidence.")
+        app.buttons["agent.save"].click()
+        XCTAssertTrue(app.buttons["agent.edit.Project Helper"].waitForExistence(timeout: 5))
+        app.buttons["agent.edit.Project Helper"].click()
+        XCTAssertTrue(instructions.waitForExistence(timeout: 5))
+        XCTAssertEqual(instructions.value as? String, "Inspect synthetic requirements and cite evidence.")
+        instructions.click(); instructions.typeKey("a", modifierFlags: .command)
+        instructions.typeText("Updated instructions with explicit unknowns.")
+        app.buttons["agent.save"].click()
+        XCTAssertTrue(app.staticTexts["Version 2"].waitForExistence(timeout: 5))
+        app.buttons["agent.archive.Project Helper"].click()
+        XCTAssertTrue(app.staticTexts["Archived"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["agent.edit.Project Helper"].isEnabled)
+        app.buttons["agent.archive.Project Helper"].click()
+        XCTAssertTrue(app.staticTexts["Version 4"].waitForExistence(timeout: 5))
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["project.agents.Agent Project"].waitForExistence(timeout: 5))
+        app.buttons["project.agents.Agent Project"].click()
+        XCTAssertTrue(app.buttons["agent.edit.Project Helper"].waitForExistence(timeout: 5))
+        app.buttons["agent.edit.Project Helper"].click()
+        XCTAssertTrue(instructions.waitForExistence(timeout: 5))
+        XCTAssertEqual(instructions.value as? String, "Updated instructions with explicit unknowns.")
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "Versioned agent instruction editor"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    @MainActor
     func testWorkspaceValidationAndCancelPreserveSavedData() {
         let app = XCUIApplication()
         app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         app.launch()
         XCTAssertTrue(app.buttons["workspace.create.empty"].waitForExistence(timeout: 5))
         app.buttons["workspace.create.empty"].click()
@@ -96,6 +163,7 @@ final class AgentDeskUITests: XCTestCase {
         let app = XCUIApplication()
         #if os(macOS)
         app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         #endif
         app.launch()
         app.staticTexts["Runs"].firstMatch.click()
@@ -111,6 +179,7 @@ final class AgentDeskUITests: XCTestCase {
         let app = XCUIApplication()
         #if os(macOS)
         app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         #endif
         app.launchArguments += ["-UIPreferredContentSizeCategoryName",
                                 UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue]
@@ -128,6 +197,7 @@ final class AgentDeskUITests: XCTestCase {
         let app = XCUIApplication()
         #if os(macOS)
         app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         #endif
         app.launch()
         XCUIDevice.shared.orientation = .landscapeLeft

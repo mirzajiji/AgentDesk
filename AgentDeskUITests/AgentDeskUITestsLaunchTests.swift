@@ -15,6 +15,7 @@ final class AgentDeskUITestsLaunchTests: XCTestCase {
         let app = XCUIApplication()
         #if os(macOS)
         app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         #endif
         app.launch()
 

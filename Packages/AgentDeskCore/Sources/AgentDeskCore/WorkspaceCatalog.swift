@@ -133,6 +133,15 @@ public actor WorkspaceCatalog {
         }
     }
 
+    public func agentStore(in scope: ProjectScope) throws -> ProjectAgentStore {
+        try root.withLock {
+            _ = try loadWorkspace(scope.workspaceID)
+            _ = try loadProject(scope)
+            return try ProjectAgentStore(scope: scope, workspaceRoot: root,
+                                         project: root.child(scope.workspaceID.rawValue).child("Projects").child(scope.projectID.rawValue))
+        }
+    }
+
     private func readWorkspaces() throws -> [WorkspaceRecord] {
         var records: [WorkspaceRecord] = []
         for name in try root.names() where !name.hasPrefix(".") {

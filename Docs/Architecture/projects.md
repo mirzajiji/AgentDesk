@@ -1,6 +1,6 @@
 # Projects, environments and onboarding
 
-Status: planned design. Source: [final architecture](final-architecture.txt), sections 143 and 147; workspace structure is detailed in [workspaces](workspaces.md).
+Status: local project creation, validation, renaming, listing and reopening implemented; repository registration and the full onboarding wizard remain planned. Source: [final architecture](final-architecture.txt), sections 143 and 147; workspace structure is detailed in [workspaces](workspaces.md).
 <!-- Source sections: 143,147 -->
 
 A project groups repositories, environments, connections, requirements, test assets, bugs and agent/workflow scope inside one workspace. Creating a project establishes its identity and human-readable configuration before optional integrations are configured.
@@ -9,7 +9,7 @@ A project groups repositories, environments, connections, requirements, test ass
 
 The full wizard covers project details, repositories, environments, databases, plugins, MCP, requirement/documentation import, Postman collections, agent templates, permissions, connection tests and completion. Steps remain editable later. Optional integrations can remain unconfigured; the UI must not label them connected just because a configuration file was saved.
 
-Proposed initial Phase 1 slice: project name/identity, workspace membership, storage location and repository registration. Later wizard steps should appear only when their implementation exists. Distinguish partial setup from a ready-to-run project and explain missing prerequisites for a selected action.
+The initial Phase 1 slice implements project name/identity, workspace membership and local configuration storage. Repository registration follows separately. Later wizard steps should appear only when their implementation exists. Distinguish partial setup from a ready-to-run project and explain missing prerequisites for a selected action.
 
 ## Repository registration
 

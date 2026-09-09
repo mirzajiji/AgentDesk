@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ContentView: View {
     #if os(macOS)
+    @StateObject private var catalog = WorkspaceBrowserModel()
     @State private var navigation = ShellNavigation(role: .macHost)
     #endif
 
@@ -31,7 +32,8 @@ struct ContentView: View {
             destinationView(navigation.selection)
                 .navigationTitle(navigation.selection.title)
         }
-        .frame(minWidth: 760, minHeight: 480)
+        .frame(minWidth: 900, minHeight: 560)
+        .task { await catalog.reload() }
         #else
         NavigationStack {
             destinationView(.companion)
@@ -53,9 +55,11 @@ struct ContentView: View {
     private func destinationView(_ destination: ShellDestination) -> some View {
         switch destination {
         case .workspaces:
-            DeskEmptyState("No workspaces yet", systemImage: "square.stack.3d.up",
-                           message: "Your projects and agents will be organized into workspaces on this Mac.",
-                           accessibilityIdentifier: "empty.workspaces")
+            #if os(macOS)
+            WorkspaceBrowserView(model: catalog)
+            #else
+            EmptyView()
+            #endif
         case .runs:
             DeskEmptyState("No runs yet", systemImage: "play.rectangle",
                            message: "Agent activity and results will appear here when you start a run.",

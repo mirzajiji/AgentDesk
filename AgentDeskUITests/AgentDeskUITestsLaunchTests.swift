@@ -13,6 +13,9 @@ final class AgentDeskUITestsLaunchTests: XCTestCase {
     @MainActor
     func testLaunch() throws {
         let app = XCUIApplication()
+        #if os(macOS)
+        app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        #endif
         app.launch()
 
         #if os(macOS)

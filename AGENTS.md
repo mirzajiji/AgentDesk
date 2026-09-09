@@ -66,7 +66,7 @@ The supplied product specification is preserved in `Docs/Architecture/final-arch
 
 - Follow `Docs/Development/testing.md`. Unit tests are required for behavioral changes and regression fixes. Use fake providers and isolated temporary storage; live Codex/company access must not be a prerequisite for ordinary unit tests.
 - Cover happy paths, failure paths, cancellation, timeouts, isolation, malformed input, and permission enforcement where relevant.
-- Build macOS and iOS targets for shared-code changes. Run native iPhone tests in Apple's local Simulator on representative compact and large devices, the minimum supported iOS runtime, and the newest installed supported runtime. Record unavailable runtimes rather than claiming coverage.
+- Build macOS and iOS targets for shared-code changes. During development, run native Mac tests and use iPhone 16 Pro as the primary local Simulator device (user update, 2026-09-09). Defer the compact/large and minimum/newest iOS runtime matrix until final full-project acceptance. Record unavailable runtimes rather than claiming coverage.
 - Test native UI behavior, accessibility/Dynamic Type, keyboard and navigation, empty/error states, run updates, diffs, and approvals as those features arrive. A responsive web preview is not an iPhone emulator.
 - Before a feature commit, run affected unit/integration/UI tests and review staged content for credentials, company data, build output, and unintended files.
 - A feature blocked by missing tools or permissions remains incomplete. Do not continue building a backlog of uncommitted completed tasks when the commit gate cannot be satisfied.

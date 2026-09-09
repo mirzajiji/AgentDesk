@@ -1,5 +1,7 @@
 # Current validation — repository move, 2026-09-09
 
+Latest: B01 is committed and pushed as `4d027e9`. Native tooling access is restored, and foundation acceptance is proceeding. Continue from [P1-01 validation](p1-01-validation.md). Earlier records below are historical.
+
 The user moved the complete app repository to `/Users/mirza/Documents/ChatGPT/AgentDesk/AgentDeskProject/AgentDesk`. This is the Git root for implementation; the outer documentation workspace has a separate empty Git repository and must not be used for app commits.
 
 - A temporary source-file write succeeds.

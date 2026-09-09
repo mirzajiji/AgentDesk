@@ -1,5 +1,7 @@
 # Continue AgentDesk in the updated local project
 
+Latest: B01 is committed and pushed as `4d027e9`. Native tooling access is restored, and foundation acceptance is proceeding. Continue from [P1-01 validation](p1-01-validation.md). Earlier records below are historical.
+
 Current continuation: the user moved the app to `/Users/mirza/Documents/ChatGPT/AgentDesk/AgentDeskProject/AgentDesk`. Source and Git writes now succeed on `codex/native-foundation`; finish B01 and proceed through the task plan. GitHub DNS and CoreSimulator remain blocked. See [current validation](updated-project-validation.md). The original handoff below is historical; do not repeat the documentation import or move any Git metadata.
 
 ## Original handoff

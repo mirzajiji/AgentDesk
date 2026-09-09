@@ -2,7 +2,7 @@
 
 A local-first, native Apple platform for engineering agents, QA workflows, project knowledge, and execution review. The Mac executes; an iPhone companion monitors and controls explicitly permitted operations over the local network.
 
-**Status:** the original Xcode multiplatform scaffold and complete 159-section architecture are preserved here. Phase 1 implementation is beginning on `codex/native-foundation`. Source and Git writes now work after the user moved the app into this task’s workspace. GitHub DNS and local Simulator service access remain blocked. See the [current validation record](Docs/Development/updated-project-validation.md).
+**Status:** Phase 1 is underway on `codex/native-foundation`. The native shell and Core/Design packages are implemented; native Mac and iPhone 16 Pro tests pass. Personal GitHub push succeeds. See the [foundation validation record](Docs/Development/p1-01-validation.md).
 
 ## Product and development references
 
@@ -20,11 +20,18 @@ Swift, SwiftUI, Swift Package Manager, SQLite, macOS Keychain, and the officiall
 
 Configuration stays human-readable; operational data stays local. Workspace and project isolation is enforced in code. Company data, credentials, and generated evidence must not be committed to this source repository.
 
-## Existing scaffold
+## Native foundation in progress
 
-Open `AgentDesk.xcodeproj` in Xcode. It contains the `AgentDesk`, `AgentDeskTests`, and `AgentDeskUITests` targets; the application currently displays “Hello, world!” and its tests are template tests. The template declares macOS/iOS/visionOS 26.0 and Swift language mode 5.0. P1-01 will establish the Mac+iPhone package foundation, shared schemes, deployment decisions, and meaningful tests.
+Open `AgentDesk.xcodeproj` and select the shared `AgentDesk` scheme. It includes app, unit-test and UI-test targets. The Mac has an initial workspace/run/connection sidebar; the iPhone shows that no Mac is connected. Workspace creation, Codex execution and secure pairing are not implemented yet.
 
-Documentation checks run with `python3 Scripts/validate-documentation.py`. Native build and Simulator commands and their actual results are recorded in [validation](Docs/Development/updated-project-validation.md). There is no SwiftPM package yet.
+Local Swift packages are under `Packages/AgentDeskCore` and `Packages/AgentDeskDesign`. The app uses Swift 6, targeting macOS 15 and iOS 18 or newer. Native Mac and iPhone 16 Pro/iOS 26 unit and UI suites pass. Broader device/OS coverage is reserved for final project acceptance.
+
+```sh
+python3 Scripts/validate-documentation.py
+swift test --package-path Packages/AgentDeskCore
+```
+
+Supplementary source checks and host XCTest execution are available with `python3 Scripts/check-foundation-sources.py`; they do not replace Xcode build or Simulator testing. Exact commands and current limitations are in [validation](Docs/Development/p1-01-validation.md).
 
 ## Development workflow
 

@@ -28,4 +28,4 @@ Preserve source requirements and traceability when splitting or renaming pages. 
 
 ## Current locations
 
-The app and this documentation now share `/Users/mirza/Documents/AgentDeskProject/AgentDesk`. The original documentation remains in `/Users/mirza/Documents/ChatGPT/AgentDesk` as provenance. The import is uncommitted; current access and validation are recorded in [updated-project validation](../Development/updated-project-validation.md). Session restrictions are not product architecture decisions.
+The app and current documentation share `/Users/mirza/Documents/ChatGPT/AgentDesk/AgentDeskProject/AgentDesk`. The outer workspace retains historical documentation. B01 is committed as `4d027e9`; foundation source and current test evidence are recorded in [P1-01 validation](../Development/p1-01-validation.md). Session restrictions are not product architecture decisions.

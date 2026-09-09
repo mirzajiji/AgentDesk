@@ -1,41 +1,60 @@
-//
-//  AgentDeskUITests.swift
-//  AgentDeskUITests
-//
-//  Created by Mirza on 09/09/2026.
-//
-
 import XCTest
+#if os(iOS)
+import UIKit
+#endif
 
 final class AgentDeskUITests: XCTestCase {
-
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testLaunchShowsTruthfulEmptyState() {
         let app = XCUIApplication()
         app.launch()
+        #if os(macOS)
+        XCTAssertTrue(app.staticTexts["No workspaces yet"].waitForExistence(timeout: 5))
+        #else
+        XCTAssertTrue(app.staticTexts["No Mac connected"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Run"].exists)
+        #endif
+        XCTAssertFalse(app.staticTexts["Hello, world!"].exists)
+    }
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+    #if os(macOS)
+    @MainActor
+    func testSidebarNavigatesBetweenEmptySections() {
+        let app = XCUIApplication()
+        app.launch()
+        app.staticTexts["Runs"].firstMatch.click()
+        XCTAssertTrue(app.staticTexts["No runs yet"].waitForExistence(timeout: 5))
+        app.staticTexts["Connections"].firstMatch.click()
+        XCTAssertTrue(app.staticTexts["No connections configured"].waitForExistence(timeout: 5))
+        app.staticTexts["Workspaces"].firstMatch.click()
+        XCTAssertTrue(app.staticTexts["No workspaces yet"].waitForExistence(timeout: 5))
+    }
+    #else
+    @MainActor
+    func testCompanionSupportsLargestAccessibilityText() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-UIPreferredContentSizeCategoryName",
+                                UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["No Mac connected"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No Mac connected"].isHittable)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "Companion largest accessibility text"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     @MainActor
-    func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
-        }
+    func testCompanionRemainsDisconnectedAfterRotation() {
+        let app = XCUIApplication()
+        app.launch()
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        XCTAssertTrue(app.staticTexts["No Mac connected"].waitForExistence(timeout: 5))
     }
+    #endif
 }

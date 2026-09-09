@@ -1,6 +1,6 @@
 # Native Apple targets and package structure
 
-Status: planned design. Source: [final architecture](final-architecture.txt), sections 4 and 75.
+Status: initial native foundation implemented and tested on Mac/iPhone 16 Pro. Most modules remain planned. Source: [final architecture](final-architecture.txt), sections 4 and 75.
 <!-- Source sections: 4,75 -->
 
 The Mac application is the execution host. The iOS application is a constrained companion. Both share domain and protocol types through Swift packages; platform-specific adapters stay at the application/runtime boundary.
@@ -34,9 +34,15 @@ Use navigation split views, inspectors, toolbars, sheets, context menus, Command
 
 ## Decisions to close during implementation
 
-- Select minimum supported macOS/iOS versions using the required APIs and the test matrix. The current template targets version 26.0; this is a scaffold setting, not a completed product-support decision.
+- Verify the selected macOS 15/iOS 18 minimums on real supported runtimes before treating them as release-support guarantees.
 - Establish the supported distribution/signing and Mac execution-host arrangement for Codex and local tooling. The template's app-sandbox setting alone does not prove subprocess execution can satisfy product requirements.
-- Adopt a tested Swift language/concurrency mode and shared schemes. The template currently declares Swift 5.0 despite the installed Swift 6.2 toolchain.
-- Decide whether to remove incidental visionOS template support after assessing the requested Mac+iPhone scope.
+- Complete Xcode/runtime acceptance for Swift 6 and the new shared scheme; direct compiler checks are supplementary.
+- Keep platform support aligned with Mac+iPhone; visionOS is outside current scope.
 
 Validate both native builds, package dependency direction, platform exclusions, real unit targets, application launch and iPhone simulator execution before calling the platform foundation complete.
+
+## Current implementation — P1-01
+
+The original multiplatform Xcode target now links local Core and Design packages with substantive shell-navigation and shared empty-state code. The shared scheme includes both existing test targets. Swift 6 and macOS 15/iOS 18 compilation targets are selected; incidental visionOS and iPad device-family support is removed. Mac execution services, mobile pairing and the other planned modules have not been implemented.
+
+Core has five passing SwiftPM cases, reused in native unit targets. Full Xcode builds, app launch and unit/UI tests pass on the Mac and iPhone 16 Pro/iOS 26. Mac arm64/Intel and iPhone simulator/device source compilation checks also pass. The wider device/OS matrix is deferred to final acceptance by user instruction. See [P1-01 validation](../Development/p1-01-validation.md) for exact evidence and commands.

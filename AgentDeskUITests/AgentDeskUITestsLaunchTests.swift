@@ -1,10 +1,3 @@
-//
-//  AgentDeskUITestsLaunchTests.swift
-//  AgentDeskUITests
-//
-//  Created by Mirza on 09/09/2026.
-//
-
 import XCTest
 
 final class AgentDeskUITestsLaunchTests: XCTestCase {
@@ -22,11 +15,19 @@ final class AgentDeskUITestsLaunchTests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        // Insert steps here to perform after app launch but before taking a screenshot,
-        // such as logging into a test account or navigating somewhere in the app
+        #if os(macOS)
+        XCTAssertTrue(app.staticTexts["No workspaces yet"].waitForExistence(timeout: 5))
+        #else
+        XCTAssertTrue(app.staticTexts["No Mac connected"].waitForExistence(timeout: 5))
+        #endif
 
+        #if os(macOS)
+        // Capture only AgentDesk; a desktop screenshot can include other workspaces.
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        #else
         let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "Launch Screen"
+        #endif
+        attachment.name = "AgentDesk initial state"
         attachment.lifetime = .keepAlways
         add(attachment)
     }

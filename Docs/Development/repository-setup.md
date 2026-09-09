@@ -14,12 +14,12 @@ The outer `/Users/mirza/Documents/ChatGPT/AgentDesk` workspace has a separate em
 
 After the user moved the complete project, source writes and branch creation succeed. Git integrity passes after removal of stray Finder metadata from its references directory. The initial commit and staged documentation survived the move.
 
-GitHub DNS remains unavailable. CoreSimulator cannot be reached, so device/runtime enumeration and iPhone tests remain blocked. The earlier default Mac build reported a missing development signing certificate; native build verification must distinguish compilation from signing, launch and UI-test coverage. Exact evidence and historical results are in [validation](updated-project-validation.md).
+Session approval review now permits the authorized GitHub and native development commands. Personal branch push succeeds; ordinary SwiftPM tests and native Mac tests pass. Simulator runtimes can be enumerated and iPhone tests run. Current evidence is in [foundation validation](p1-01-validation.md); the earlier permission failures are historical. GitHub authentication uses the user's existing configuration; no credential is stored in this repository.
 
 ## Development sequence
 
-1. Validate and commit B01 documentation separately.
-2. Implement the native foundation in the [task plan](tasks.md), including meaningful unit tests and shared schemes.
+1. B01 documentation is committed as `4d027e9`; do not repeat the import.
+2. Complete validation for the native foundation already in the working tree; see [P1-01 evidence](p1-01-validation.md) and the [task plan](tasks.md).
 3. Build both platforms and run local Mac/iPhone tests according to [testing](testing.md), recording unavailable checks honestly.
 4. Commit each validated task independently. Verify effective author/committer and remote before a normal push of the intended branch when connectivity permits.
 

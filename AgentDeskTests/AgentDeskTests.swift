@@ -1,16 +1,14 @@
-//
-//  AgentDeskTests.swift
-//  AgentDeskTests
-//
-//  Created by Mirza on 09/09/2026.
-//
+import AgentDeskCore
+import XCTest
 
-import Testing
-
-struct AgentDeskTests {
-
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
+final class AgentDeskTests: XCTestCase {
+    func testPlatformRestoresOnlyItsOwnNavigation() {
+        #if os(macOS)
+        let navigation = ShellNavigation(role: .macHost, restoring: .companion)
+        XCTAssertEqual(navigation.selection, .workspaces)
+        #else
+        let navigation = ShellNavigation(role: .iPhoneCompanion, restoring: .connections)
+        XCTAssertEqual(navigation.selection, .companion)
+        #endif
     }
-
 }

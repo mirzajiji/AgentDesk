@@ -23,7 +23,11 @@ Documentation-only changes use document integrity/link checks instead of artific
 
 Ordinary automated tests must use synthetic data, fake providers, and temporary stores. Do not require a paid/live Codex run or company services merely to test the code. Add explicit opt-in integration checks when real supported CLI behavior is being validated.
 
-## iPhone matrix
+## Development device and final iPhone matrix
+
+User update, 2026-09-09: use **iPhone 16 Pro** for routine development and keep native Mac unit/UI testing. Defer the broader device and OS matrix below until full-project acceptance. The current primary simulator is `C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE` on iOS 26.0, named `AgentDesk iPhone 16 Pro`. Device identifiers are machine-local; enumerate replacements on other Macs.
+
+Per-feature tests run the affected suites on Mac and this iPhone. The final matrix remains a release requirement.
 
 Use Apple's local Simulator. A simulator build is necessary but is not equivalent to launching the app or running its tests. A web viewport or browser device emulation is not sufficient for this native application.
 
@@ -46,7 +50,7 @@ xcrun simctl list runtimes
 xcrun simctl list devices available
 ```
 
-The existing Xcode project has the `AgentDesk`, `AgentDeskTests`, and `AgentDeskUITests` targets and an automatically available `AgentDesk` scheme. The test sources are templates; there is no SwiftPM package or checked-in shared scheme yet. P1-01 must add the package foundation, checked-in shared schemes, meaningful tests, and runnable validation commands. Do not count template tests as feature coverage. See the [current validation record](updated-project-validation.md) for the baseline build and Simulator discovery attempts.
+The Xcode project has `AgentDesk`, `AgentDeskTests`, and `AgentDeskUITests` targets and a checked-in shared `AgentDesk` scheme. P1-01 adds local Core/Design packages, five Core tests, an app routing test and native UI checks. The Core suite passes through ordinary SwiftPM and the native Xcode app unit target. Native Mac and iPhone test access is restored. See [P1-01 validation](p1-01-validation.md) for the distinction between source checks, host tests and native acceptance.
 
 Save generated `.xcresult` bundles and screenshots under ignored `TestResults/`. Record the app version/commit, Xcode version, simulator model/UDID, exact iOS version, command, pass/fail counts, and any manual inspection. CI supplements the requested local simulator testing; it does not replace it.
 

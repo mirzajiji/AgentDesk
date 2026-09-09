@@ -1,6 +1,6 @@
 # Native navigation, onboarding and interaction
 
-Status: planned design. Source: [final architecture](final-architecture.txt), sections 76–82, 104 and 152.
+Status: initial shell implemented and native UI-tested; full interfaces remain planned. Source: [final architecture](final-architecture.txt), sections 76–82, 104 and 152.
 <!-- Source sections: 76,77,78,79,80,81,82,104,152 -->
 
 The Mac navigation covers Overview, Workspaces, Projects, Agents, Runs, Workflows, Skills, Connections (plugins/MCP/databases/repositories), Project Memory (requirements/validation/bugs/tests/documentation), Approvals, Artifacts, Traces and Settings. Add destinations as real functionality exists; blank panels must not imply implemented features.
@@ -24,3 +24,7 @@ Stable `agentdesk://` links address authorized workspace/project resources such 
 ## Accessibility and verification
 
 Use native labels, focus order, keyboard shortcuts, scalable layout and clear status text beyond color alone. Test empty/loading/error/offline states, long names, large text, light/dark appearance, split-view resizing, command routing, invalid/deleted deep-link targets and context switching during active work. UI success must reflect persisted/authoritative state, not optimistic placeholder data.
+
+## Initial shell
+
+P1-01 introduces a native Mac split-view sidebar with empty Workspaces, Runs and Connections destinations and an unpaired iPhone screen. These surfaces do not yet create resources, execute agents or pair devices. Selection is a small Core value type; views own only presentation state. Native XCTest covers selection, launch, Mac sidebar navigation, appearance, iPhone rotation and largest accessibility text. Mac and primary iPhone runs pass. See [foundation validation](../Development/p1-01-validation.md).

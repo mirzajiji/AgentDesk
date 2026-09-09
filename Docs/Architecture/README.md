@@ -1,6 +1,6 @@
 # AgentDesk architecture documentation
 
-**Current product state:** the actual app repository contains the initial Xcode multiplatform scaffold. The pages below describe the intended product, implementation boundaries and acceptance requirements; they do not claim working features.
+**Current product state:** initial native shell and Core/Design packages are implemented. Native Mac and primary iPhone test evidence is recorded in [P1-01 validation](../Development/p1-01-validation.md). The remaining subsystem pages describe target behavior unless explicitly marked implemented.
 
 **Current location:** this documentation lives with the Xcode app in `/Users/mirza/Documents/ChatGPT/AgentDesk/AgentDeskProject/AgentDesk`. Source writes and implementation-branch creation now succeed. See the [current validation record](../Development/updated-project-validation.md).
 
@@ -54,6 +54,6 @@
 
 ## Status and unresolved implementation decisions
 
-No app code, new app commit, or product unit/simulator pass was produced by this documentation task. The native scaffold still needs real domain models, services, UI flows and tests. Decisions such as supported deployment versions, execution-host distribution, concrete persistence schemas, MCP/remote protocol versions, cryptographic pairing and supported collection runners must be implemented and verified before they become release claims.
+B01 is a documentation-only commit. P1-01 adds the native shell and shared packages; SwiftPM, Mac and primary iPhone acceptance tests pass. Workspace/project domain models, execution services, persistence, full UI flows and secure pairing remain planned. Deployment targets are selected but still need runtime verification. P1-01 is a foundation milestone; the complete Phase 1 workflow is still pending.
 
 Documentation-only validation checks source integrity, section coverage, local links, required pages and formatting. Future feature commits must update their subsystem pages alongside actual test evidence.

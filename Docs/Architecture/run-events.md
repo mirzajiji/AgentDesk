@@ -1,6 +1,6 @@
 # Operational events, traces, artifacts and provenance
 
-Status: durable run-state replay/live delivery is implemented in P1-07a; step/tool/output events, redaction and artifacts follow in subsequent tasks. Source: [final architecture](final-architecture.txt), sections 68–70, 102, 118–119.
+Status: durable run-state and stage/step progress replay/live delivery is implemented in P1-07a/b; tool/output events, redaction and artifacts follow in subsequent tasks. Source: [final architecture](final-architecture.txt), sections 68–70, 102, 118–119.
 <!-- Source sections: 68,69,70,102,118,119 -->
 
 Use a typed internal event system for runs, steps, public Codex output, tools, plugins, MCP, databases, file changes, artifacts, approvals and terminal results. Events connect runtime observability, persistence, native UI and eventual mobile streaming.
@@ -36,3 +36,9 @@ Buffers retain the oldest events, defaulting to 256 entries, with a validated ra
 Terminal state delivery finishes the stream. A subscription after an already-terminal run's latest sequence finishes empty. Unknown/future cursors and foreign scope are rejected. Explicit subscription cancellation, consuming-task cancellation, service shutdown and deallocation all release observers. Shutdown uses a distinct `closed` error, so a disconnected runtime is not confused with a completed run. Consumers that stop iterating without cancelling their task should explicitly cancel their subscription.
 
 This is an internal Mac lifecycle boundary, also compiled/tested with shared code on iPhone. It is not yet a mobile transport or authorization API. Native remote pairing, authenticated sockets, policy-bound commands and richer sanitized payloads remain separate implementation gates.
+
+## Progress delivery
+
+State and progress events share one durable per-run sequence and the same replay/live subscription. `StoredRunEvent.Kind` distinguishes `runState` from `progress`. Progress events carry a complete validated work-plan snapshot; terminal state events also carry the final plan when configured. An ordinary nonterminal state event leaves progress unchanged. Subscribers apply the payload when present and retain their prior plan otherwise.
+
+Snapshot updates and event insertion are one SQLite transaction. Failed writes neither advance the snapshot nor publish a live event. Restarted services recover the same plan and event values, including timestamps. Full snapshots are currently bounded to 128 KiB per event; the existing subscriber capacity bounds retained event memory. Streaming raw text, compact deltas, retention and mobile wire envelopes remain future tasks.

@@ -13,14 +13,19 @@ public struct StoredRun: Equatable, Sendable, Identifiable {
 }
 
 public struct StoredRunEvent: Equatable, Sendable {
+    public enum Kind: String, Codable, Sendable { case runState, progress }
     public let runID: RunID
     public let scope: ProjectScope
     public let sequence: Int64
     public let state: PersistedRunState
     public let recordedAt: Date
+    public let kind: Kind
+    public let progress: RunWorkPlan?
 
-    public init(runID: RunID, scope: ProjectScope, sequence: Int64, state: PersistedRunState, recordedAt: Date) {
+    public init(runID: RunID, scope: ProjectScope, sequence: Int64, state: PersistedRunState, recordedAt: Date,
+                kind: Kind = .runState, progress: RunWorkPlan? = nil) {
         self.runID = runID; self.scope = scope; self.sequence = sequence; self.state = state; self.recordedAt = recordedAt
+        self.kind = kind; self.progress = progress
     }
 }
 
@@ -37,13 +42,14 @@ public actor OperationalStore {
         self.workspaceID = workspaceID
     }
 
-    public func createRun(in scope: ProjectScope, id: RunID = RunID(), at date: Date = Date()) throws -> StoredRun {
+    public func createRun(in scope: ProjectScope, id: RunID = RunID(), at inputDate: Date = Date()) throws -> StoredRun {
         try validate(scope)
-        let timestamp = try Self.timestamp(date)
+        let timestamp = try Self.timestamp(inputDate)
+        let date = Date(timeIntervalSince1970: timestamp)
         return try database.transaction {
             try database.execute("INSERT INTO runs VALUES (?, ?, ?, ?, 'queued')",
                                  [.text(workspaceID.rawValue), .text(scope.projectID.rawValue), .text(id.rawValue), .real(timestamp)])
-            try database.execute("INSERT INTO run_events VALUES (?, ?, ?, 1, 'queued', ?)",
+            try database.execute("INSERT INTO run_events (workspace_id, project_id, run_id, sequence, state, recorded_at) VALUES (?, ?, ?, 1, 'queued', ?)",
                                  [.text(workspaceID.rawValue), .text(scope.projectID.rawValue), .text(id.rawValue), .real(timestamp)])
             return StoredRun(id: id, scope: scope, createdAt: date, state: .queued, sequence: 1)
         }
@@ -64,21 +70,27 @@ public actor OperationalStore {
     /// Stores an authoritative lifecycle decision with optimistic sequence checking.
     /// Legal state transitions are enforced by the runtime lifecycle service, not inferred by storage.
     public func recordState(_ state: PersistedRunState, for id: RunID, in scope: ProjectScope,
-                            expectedSequence: Int64, at date: Date = Date()) throws -> StoredRunEvent {
+                            expectedSequence: Int64, at inputDate: Date = Date()) throws -> StoredRunEvent {
         try validate(scope)
         guard expectedSequence > 0, expectedSequence < Int64.max else { throw OperationalStoreError.invalidInput }
-        let timestamp = try Self.timestamp(date)
+        let timestamp = try Self.timestamp(inputDate)
+        let date = Date(timeIntervalSince1970: timestamp)
         return try database.transaction {
             guard let existing = try loadRun(id, in: scope) else { throw OperationalStoreError.missingRun }
             guard existing.sequence == expectedSequence else { throw OperationalStoreError.staleSequence }
-            guard timestamp >= existing.createdAt.timeIntervalSince1970 else { throw OperationalStoreError.invalidInput }
+            try validateEventDate(timestamp, run: existing)
             let sequence = expectedSequence + 1
             let keys: [SQLValue] = [.text(workspaceID.rawValue), .text(scope.projectID.rawValue), .text(id.rawValue)]
-            try database.execute("INSERT INTO run_events VALUES (?, ?, ?, ?, ?, ?)",
-                                 keys + [.integer(sequence), .text(state.rawValue), .real(timestamp)])
+            let progress = state.isTerminal ? try loadProgress(id, in: scope)?.ending(with: state, at: date) : nil
+            if let progress {
+                let json = try Self.encodeProgress(progress)
+                try database.execute("UPDATE run_progress SET plan_json = ? WHERE workspace_id = ? AND project_id = ? AND run_id = ?",
+                                     [.json(json)] + keys)
+            }
+            try insertEvent(id, scope: scope, sequence: sequence, state: state, date: date, kind: .runState, progress: progress)
             try database.execute("UPDATE runs SET state = ? WHERE workspace_id = ? AND project_id = ? AND run_id = ?",
                                  [.text(state.rawValue)] + keys)
-            return StoredRunEvent(runID: id, scope: scope, sequence: sequence, state: state, recordedAt: date)
+            return StoredRunEvent(runID: id, scope: scope, sequence: sequence, state: state, recordedAt: date, progress: progress)
         }
     }
 
@@ -87,7 +99,7 @@ public actor OperationalStore {
         try validate(scope)
         guard sequence >= 0, (1...1_000).contains(limit) else { throw OperationalStoreError.invalidInput }
         return try database.query("""
-            SELECT sequence, state, recorded_at FROM run_events
+            SELECT sequence, state, recorded_at, event_kind, progress_json FROM run_events
             WHERE workspace_id = ? AND project_id = ? AND run_id = ? AND sequence > ?
             ORDER BY sequence LIMIT ?
             """, [.text(workspaceID.rawValue), .text(scope.projectID.rawValue), .text(id.rawValue),
@@ -98,9 +110,104 @@ public actor OperationalStore {
             }
             let timestamp = sqlite3_column_double(statement, 2)
             guard timestamp.isFinite else { throw OperationalStoreError.invalidDatabase }
+            guard let kind = StoredRunEvent.Kind(rawValue: try SQLiteConnection.text(statement, 3)) else {
+                throw OperationalStoreError.invalidDatabase
+            }
+            let progress = sqlite3_column_type(statement, 4) == SQLITE_NULL ? nil : try Self.decodeProgress(SQLiteConnection.text(statement, 4, maximumBytes: 131_072), id: id, scope: scope)
+            guard kind != .progress || progress != nil else { throw OperationalStoreError.invalidDatabase }
             return StoredRunEvent(runID: id, scope: scope, sequence: sequence, state: state,
-                                  recordedAt: Date(timeIntervalSince1970: timestamp))
+                                  recordedAt: Date(timeIntervalSince1970: timestamp), kind: kind, progress: progress)
         }
+    }
+
+    public func progressPlan(for id: RunID, in scope: ProjectScope) throws -> RunWorkPlan? {
+        try validate(scope)
+        return try loadProgress(id, in: scope)
+    }
+
+    public func configureProgress(_ plan: RunWorkPlan, in scope: ProjectScope, expectedSequence: Int64,
+                                  at inputDate: Date = Date()) throws -> StoredRunEvent {
+        try validate(scope)
+        let date = Date(timeIntervalSince1970: try Self.timestamp(inputDate))
+        guard plan.scope == scope else { throw OperationalStoreError.scopeMismatch }
+        try plan.validate()
+        guard plan.items.allSatisfy({ $0.state == .pending }) else { throw OperationalStoreError.invalidInput }
+        return try database.transaction {
+            let run = try checkedRun(plan.runID, scope: scope, expectedSequence: expectedSequence, date: date)
+            guard run.state == .queued else { throw WorkPlanError.invalidTransition }
+            try database.execute("INSERT INTO run_progress VALUES (?, ?, ?, ?)",
+                [.text(workspaceID.rawValue), .text(scope.projectID.rawValue), .text(plan.runID.rawValue), .json(Self.encodeProgress(plan))])
+            try insertEvent(plan.runID, scope: scope, sequence: expectedSequence + 1, state: run.state, date: date, kind: .progress, progress: plan)
+            return StoredRunEvent(runID: plan.runID, scope: scope, sequence: expectedSequence + 1, state: run.state,
+                                  recordedAt: date, kind: .progress, progress: plan)
+        }
+    }
+
+    public func changeProgress(_ change: WorkPlanChange, for id: RunID, in scope: ProjectScope, expectedSequence: Int64,
+                               at inputDate: Date = Date()) throws -> StoredRunEvent {
+        try validate(scope)
+        let date = Date(timeIntervalSince1970: try Self.timestamp(inputDate))
+        return try database.transaction {
+            let run = try checkedRun(id, scope: scope, expectedSequence: expectedSequence, date: date)
+            guard run.state == .running else { throw WorkPlanError.invalidTransition }
+            guard let existing = try loadProgress(id, in: scope) else { throw WorkPlanError.invalidPlan }
+            let updated = try existing.applying(change, at: date)
+            try database.execute("UPDATE run_progress SET plan_json = ? WHERE workspace_id = ? AND project_id = ? AND run_id = ?",
+                [.json(Self.encodeProgress(updated)), .text(workspaceID.rawValue), .text(scope.projectID.rawValue), .text(id.rawValue)])
+            try insertEvent(id, scope: scope, sequence: expectedSequence + 1, state: run.state, date: date, kind: .progress, progress: updated)
+            return StoredRunEvent(runID: id, scope: scope, sequence: expectedSequence + 1, state: run.state,
+                                  recordedAt: date, kind: .progress, progress: updated)
+        }
+    }
+
+    private func checkedRun(_ id: RunID, scope: ProjectScope, expectedSequence: Int64, date: Date) throws -> StoredRun {
+        guard expectedSequence > 0, expectedSequence < Int64.max else { throw OperationalStoreError.invalidInput }
+        guard let run = try loadRun(id, in: scope) else { throw OperationalStoreError.missingRun }
+        guard run.sequence == expectedSequence else { throw OperationalStoreError.staleSequence }
+        try validateEventDate(Self.timestamp(date), run: run)
+        return run
+    }
+
+    private func validateEventDate(_ timestamp: Double, run: StoredRun) throws {
+        let dates = try database.query("SELECT recorded_at FROM run_events WHERE workspace_id = ? AND project_id = ? AND run_id = ? AND sequence = ?",
+            [.text(workspaceID.rawValue), .text(run.scope.projectID.rawValue), .text(run.id.rawValue), .integer(run.sequence)]) { sqlite3_column_double($0, 0) }
+        guard let previous = dates.first, previous.isFinite else { throw OperationalStoreError.invalidDatabase }
+        guard timestamp >= previous, timestamp >= run.createdAt.timeIntervalSince1970 else { throw OperationalStoreError.invalidInput }
+    }
+
+    private func insertEvent(_ id: RunID, scope: ProjectScope, sequence: Int64, state: RunState, date: Date,
+                             kind: StoredRunEvent.Kind, progress: RunWorkPlan?) throws {
+        let keys: [SQLValue] = [.text(workspaceID.rawValue), .text(scope.projectID.rawValue), .text(id.rawValue),
+                              .integer(sequence), .text(state.rawValue), .real(date.timeIntervalSince1970), .text(kind.rawValue)]
+        if let progress {
+            try database.execute("INSERT INTO run_events VALUES (?, ?, ?, ?, ?, ?, ?, ?)", keys + [.json(Self.encodeProgress(progress))])
+        } else {
+            try database.execute("INSERT INTO run_events VALUES (?, ?, ?, ?, ?, ?, ?, NULL)", keys)
+        }
+    }
+
+    private func loadProgress(_ id: RunID, in scope: ProjectScope) throws -> RunWorkPlan? {
+        try database.query("SELECT plan_json FROM run_progress WHERE workspace_id = ? AND project_id = ? AND run_id = ?",
+            [.text(workspaceID.rawValue), .text(scope.projectID.rawValue), .text(id.rawValue)]) {
+                try Self.decodeProgress(SQLiteConnection.text($0, 0, maximumBytes: 131_072), id: id, scope: scope)
+            }.first
+    }
+
+    private static func encodeProgress(_ progress: RunWorkPlan) throws -> String {
+        try progress.validate()
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        let bytes = try encoder.encode(progress)
+        guard bytes.count <= 131_072, let value = String(data: bytes, encoding: .utf8) else { throw WorkPlanError.limitExceeded }
+        return value
+    }
+
+    private static func decodeProgress(_ value: String, id: RunID, scope: ProjectScope) throws -> RunWorkPlan {
+        do {
+            let plan = try JSONDecoder().decode(RunWorkPlan.self, from: Data(value.utf8))
+            guard plan.scope == scope, plan.runID == id else { throw OperationalStoreError.scopeMismatch }
+            try plan.validate()
+            return plan
+        } catch { throw OperationalStoreError.invalidDatabase }
     }
 
     private func validate(_ scope: ProjectScope) throws {

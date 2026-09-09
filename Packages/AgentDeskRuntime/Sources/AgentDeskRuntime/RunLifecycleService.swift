@@ -62,7 +62,8 @@ public actor RunLifecycleService {
         guard run.sequence == expectedSequence else { throw RunLifecycleError.staleSequence }
         guard run.state.canTransition(to: next) else { throw RunLifecycleError.invalidTransition }
         let previous = try await store.events(for: id, in: scope, after: run.sequence - 1, limit: 1)
-        guard let last = previous.last, date.timeIntervalSince1970.isFinite, date >= last.recordedAt else {
+        guard let last = previous.last, date.timeIntervalSince1970.isFinite,
+              date.timeIntervalSince1970 >= last.recordedAt.timeIntervalSince1970 else {
             throw RunLifecycleError.invalidTimestamp
         }
         try validate(requested)
@@ -76,6 +77,30 @@ public actor RunLifecycleService {
         try validate(requested)
         guard try await store.run(id, in: scope) != nil else { throw RunLifecycleError.missingRun }
         return try await store.events(for: id, in: scope, after: sequence, limit: limit)
+    }
+
+    public func configureProgress(_ plan: RunWorkPlan, in requested: ProjectScope, expectedSequence: Int64,
+                                  at date: Date = Date()) async throws -> StoredRunEvent {
+        try begin(plan.runID, requested: requested)
+        defer { inFlight.remove(plan.runID) }
+        let event = try await store.configureProgress(plan, in: scope, expectedSequence: expectedSequence, at: date)
+        publish(event)
+        return event
+    }
+
+    public func changeProgress(_ change: WorkPlanChange, for id: RunID, in requested: ProjectScope,
+                               expectedSequence: Int64, at date: Date = Date()) async throws -> StoredRunEvent {
+        try begin(id, requested: requested)
+        defer { inFlight.remove(id) }
+        let event = try await store.changeProgress(change, for: id, in: scope, expectedSequence: expectedSequence, at: date)
+        publish(event)
+        return event
+    }
+
+    public func progress(for id: RunID, in requested: ProjectScope) async throws -> RunWorkPlan? {
+        try validate(requested)
+        guard try await store.run(id, in: scope) != nil else { throw RunLifecycleError.missingRun }
+        return try await store.progressPlan(for: id, in: scope)
     }
 
     /// Replay and registration share the per-run operation gate, so local transitions cannot fall into a gap.

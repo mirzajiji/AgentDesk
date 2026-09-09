@@ -3,7 +3,7 @@ import Foundation
 /// Forward-only, transactional migrations. A failed or future schema is never reset.
 enum OperationalMigrations {
     static let applicationID = 1_095_189_579 // "AGDK"
-    static let currentVersion = 2
+    static let currentVersion = 3
     static let versionOne = [
         """
         CREATE TABLE runs (
@@ -33,6 +33,21 @@ enum OperationalMigrations {
         "CREATE INDEX runs_project_date ON runs(workspace_id, project_id, created_at DESC, run_id)"
     ]
 
+    static let versionThree = [
+        "ALTER TABLE run_events ADD COLUMN event_kind TEXT NOT NULL DEFAULT 'runState' CHECK (event_kind IN ('runState','progress'))",
+        "ALTER TABLE run_events ADD COLUMN progress_json TEXT",
+        """
+        CREATE TABLE run_progress (
+            workspace_id TEXT NOT NULL,
+            project_id TEXT NOT NULL,
+            run_id TEXT NOT NULL,
+            plan_json TEXT NOT NULL,
+            PRIMARY KEY (workspace_id, project_id, run_id),
+            FOREIGN KEY (workspace_id, project_id, run_id) REFERENCES runs(workspace_id, project_id, run_id)
+        )
+        """
+    ]
+
     static func apply(to database: SQLiteConnection) throws {
         try database.execute("PRAGMA foreign_keys = ON")
         try database.transaction {
@@ -52,9 +67,14 @@ enum OperationalMigrations {
                 for statement in versionTwo { try database.execute(statement) }
                 try database.execute("PRAGMA user_version = 2")
             }
+            if version < 3 {
+                for statement in versionThree { try database.execute(statement) }
+                try database.execute("PRAGMA user_version = 3")
+            }
             // Verify required columns even when the database already claims the latest schema.
             _ = try database.query("SELECT workspace_id, project_id, run_id, state, created_at FROM runs LIMIT 0") { _ in 0 }
-            _ = try database.query("SELECT workspace_id, project_id, run_id, sequence, state, recorded_at FROM run_events LIMIT 0") { _ in 0 }
+            _ = try database.query("SELECT workspace_id, project_id, run_id, sequence, state, recorded_at, event_kind, progress_json FROM run_events LIMIT 0") { _ in 0 }
+            _ = try database.query("SELECT workspace_id, project_id, run_id, plan_json FROM run_progress LIMIT 0") { _ in 0 }
             guard try database.integer("PRAGMA foreign_keys") == 1 else { throw OperationalStoreError.invalidDatabase }
         }
     }

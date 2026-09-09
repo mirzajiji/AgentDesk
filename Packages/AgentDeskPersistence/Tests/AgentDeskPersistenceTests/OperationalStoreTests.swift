@@ -140,7 +140,7 @@ final class OperationalStoreTests: XCTestCase {
         try connection.execute("INSERT INTO runs VALUES (?, ?, ?, 10, 'queued')",
                                [.text(fixture.workspace.rawValue), .text(fixture.project.rawValue), .text(id.rawValue)])
         let store = try fixture.store()
-        XCTAssertEqual(try connection.integer("PRAGMA user_version"), 2)
+        XCTAssertEqual(try connection.integer("PRAGMA user_version"), 3)
         let record = try await store.run(id, in: fixture.scope)
         XCTAssertEqual(record?.createdAt, Date(timeIntervalSince1970: 10))
         let events = try await store.events(for: id, in: fixture.scope)

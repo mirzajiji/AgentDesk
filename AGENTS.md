@@ -3,7 +3,7 @@
 ## Repository ownership and commits
 
 - This project belongs to the user's **personal GitHub account**, associated with `mirzajijieshvili@gmail.com`.
-- Set `user.name` to `Mirza Jijieshvili` and `user.email` to `mirzajijieshvili@gmail.com` **locally in this repository**. Do not change global Git settings or the user's work GitLab identity (`mirza.jijieshvili@cactus-now.com`).
+- Set `user.name` to `Mirza Jijieshvili` and `user.email` to `mirzajijieshvili@gmail.com` **locally in this repository**. Do not change global Git settings or the user's work GitLab identity.
 - The user created the repository and explicitly supplied `https://github.com/mirzajiji/AgentDesk.git`. Use that exact personal remote; do not create another repository or change its visibility. Verify the effective commit author/committer and remote before pushing. Preserve existing remote history; never force-push without explicit authorization.
 - Use `main` as the main branch and `codex/` for implementation branches. Do not overwrite an existing remote repository.
 - Each separate task gets a separate, focused commit. For each important change: implement it, exercise the behavior, add or update meaningful unit tests, run those tests and affected checks, inspect the diff, then commit. Tests for a feature belong in the same commit as that feature.

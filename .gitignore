@@ -1,0 +1,38 @@
+# Apple / Swift build output
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xcresult/
+*.ipa
+*.dSYM/
+
+# Local operational state and company data never belong in this source repository.
+/Data/*
+!/Data/README.md
+/Workspaces/*
+!/Workspaces/README.md
+/TestResults/
+/Deliverables/
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+*.db-shm
+*.db-wal
+
+# Signing material and credentials
+*.p12
+*.p8
+*.mobileprovision
+*.key
+
+# Local editor state
+.idea/
+.vscode/

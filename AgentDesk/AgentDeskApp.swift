@@ -9,9 +9,17 @@ import SwiftUI
 
 @main
 struct AgentDeskApp: App {
+    #if os(macOS)
+    @StateObject private var codex = CodexSettingsModel()
+    #endif
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
+        #if os(macOS)
+        Settings {
+            CodexSettingsView(model: codex)
+        }
+        #endif
     }
 }

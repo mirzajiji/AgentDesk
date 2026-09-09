@@ -18,6 +18,7 @@ final class AgentDeskUITests: XCTestCase {
         app.launch()
         #if os(macOS)
         XCTAssertTrue(app.staticTexts["No workspaces yet"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["catalog.error"].exists)
         #else
         XCTAssertTrue(app.staticTexts["No Mac connected"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["Run"].exists)
@@ -26,6 +27,38 @@ final class AgentDeskUITests: XCTestCase {
     }
 
     #if os(macOS)
+    @MainActor
+    func testCodexSettingsHealthDisconnectAndReconnectPersistWithoutSigningOut() {
+        let app = XCUIApplication()
+        app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settings.open"].waitForExistence(timeout: 5))
+        app.buttons["settings.open"].click()
+        let settings = app.windows["AgentDesk Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        let health = settings.buttons["codex.refresh"]
+        let ready = NSPredicate(format: "enabled == true")
+        expectation(for: ready, evaluatedWith: health)
+        waitForExpectations(timeout: 20)
+        XCTAssertTrue(settings.buttons["codex.choose"].isEnabled)
+        let attachment = XCTAttachment(screenshot: settings.screenshot())
+        attachment.name = "Native Codex connection settings"; attachment.lifetime = .keepAlways; add(attachment)
+        settings.buttons["codex.toggle"].click()
+        XCTAssertFalse(health.isEnabled)
+        XCTAssertFalse(settings.buttons["codex.login"].isEnabled)
+        XCTAssertFalse(settings.buttons["codex.logout"].isEnabled)
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["settings.open"].waitForExistence(timeout: 5))
+        app.buttons["settings.open"].click()
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        XCTAssertFalse(settings.buttons["codex.refresh"].isEnabled)
+        settings.buttons["codex.toggle"].click()
+        expectation(for: ready, evaluatedWith: settings.buttons["codex.refresh"])
+        waitForExpectations(timeout: 20)
+        // Actual account sign-out is deliberately not invoked by UI regression tests.
+    }
+
     @MainActor
     func testLaunchPresentsWindowAfterPreviousWindowWasClosed() {
         let app = XCUIApplication()

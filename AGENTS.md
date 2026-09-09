@@ -9,6 +9,7 @@
 - Each separate task gets a separate, focused commit. For each important change: implement it, exercise the behavior, add or update meaningful unit tests, run those tests and affected checks, inspect the diff, then commit. Tests for a feature belong in the same commit as that feature.
 - The user has authorized creating the personal GitHub repository and committing completed tasks. Do not repeatedly ask for confirmation for those actions. Respect actual environment restrictions and report blocked commits honestly.
 - Do not claim tests passed when they were skipped or blocked. Record commands, results, simulator model, and OS version in the task's validation record. Do not substitute an iOS build for a simulator test run.
+- After every commit, give the user a very short count of completed and remaining documented tasks. State the counted scope; later phases that are not decomposed into tasks must not disappear from the remaining-work report. Continue working after the update.
 - Keep unrelated changes out of a task's commit. Do not accumulate multiple completed implementation tasks in one commit. Documentation-only tasks need documentation checks; do not invent unit tests for prose.
 
 ## Architecture

@@ -50,10 +50,12 @@ xcrun simctl list runtimes
 xcrun simctl list devices available
 ```
 
-The Xcode project has `AgentDesk`, `AgentDeskTests`, and `AgentDeskUITests` targets and a checked-in shared `AgentDesk` scheme. P1-01 adds local Core/Design packages, five Core tests, an app routing test and native UI checks. The Core suite passes through ordinary SwiftPM and the native Xcode app unit target. Native Mac and iPhone test access is restored. See [P1-01 validation](p1-01-validation.md) for the distinction between source checks, host tests and native acceptance.
+The Xcode project has `AgentDesk`, `AgentDeskTests`, `AgentDeskUITests`, and the Mac-only `AgentDeskCodexHost` targets and a checked-in shared `AgentDesk` scheme. P1-01 adds local Core/Design packages, five Core tests, an app routing test and native UI checks. The Core suite passes through ordinary SwiftPM and the native Xcode app unit target. Native Mac and iPhone test access is restored. See [P1-01 validation](p1-01-validation.md) for the distinction between source checks, host tests and native acceptance.
 
 Mac UI launches use a random `AGENTDESK_TEST_CONTAINER_ID` for synthetic data and `-ApplePersistenceIgnoreState YES` to isolate window restoration between tests. The latter is limited to test process arguments; normal app restoration remains enabled. See [agent editor validation](p1-06a-validation.md) for the observed failure and resolution.
 
 Save generated `.xcresult` bundles and screenshots under ignored `TestResults/`. Record the app version/commit, Xcode version, simulator model/UDID, exact iOS version, command, pass/fail counts, and any manual inspection. CI supplements the requested local simulator testing; it does not replace it.
 
 Real device validation remains separately required for final LAN acceptance, including local-network privacy, hardware device authentication, background/foreground, Wi-Fi transitions, and Mac sleep/wake. Simulator testing alone cannot establish all of those behaviors.
+
+For Mac host changes, validate a normal signed build as well as native tests. Xcode injects testing entitlements into test products, so test success alone does not establish the ordinary sandbox boundary. Check app/helper signatures, app sandbox entitlement, Mac-only embedding and a normal LaunchServices launch. Codex account tests must preserve the developer's existing sign-in: use fake services for login/logout/cancellation and only read-only installed CLI diagnostics in live checks.

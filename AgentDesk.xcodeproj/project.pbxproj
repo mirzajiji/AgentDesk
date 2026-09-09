@@ -16,6 +16,18 @@
 		AD0000000000000000000007 /* AgentDeskSecurity in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000017 /* AgentDeskSecurity */; };
 		AD0000000000000000000008 /* AgentDeskRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000018 /* AgentDeskRuntime */; };
 		AD0000000000000000000009 /* AgentDeskRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000019 /* AgentDeskRuntime */; };
+		AE0000000000000000000001 = {
+			isa = "PBXBuildFile";
+			productRef = "AE000000000000000000000B";
+		};
+		AE0000000000000000000002 = {
+			isa = "PBXBuildFile";
+			fileRef = "AE000000000000000000000C";
+			settings = {
+				ATTRIBUTES = ("CodeSignOnCopy", "RemoveHeadersOnCopy", );
+			};
+			platformFilters = ("macos", );
+		};
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,12 +45,26 @@
 			remoteGlobalIDString = C514A9153051AAE0006A58EA;
 			remoteInfo = AgentDesk;
 		};
+		AE000000000000000000000D = {
+			isa = "PBXContainerItemProxy";
+			containerPortal = "C514A90E3051AAE0006A58EA";
+			proxyType = 1;
+			remoteGlobalIDString = "AE0000000000000000000014";
+			remoteInfo = "AgentDeskCodexHost";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		C514A9163051AAE0006A58EA /* AgentDesk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AgentDesk.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C514A9233051AAE2006A58EA /* AgentDeskTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AgentDeskTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C514A92D3051AAE2006A58EA /* AgentDeskUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AgentDeskUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AE000000000000000000000C = {
+			isa = "PBXFileReference";
+			explicitFileType = "wrapper.xpc-service";
+			includeInIndex = 0;
+			path = "AgentDeskCodexHost.xpc";
+			sourceTree = "BUILT_PRODUCTS_DIR";
+		};
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -81,6 +107,11 @@
 			path = Packages/AgentDeskRuntime/Tests/AgentDeskRuntimeTests;
 			sourceTree = "<group>";
 		};
+		AE000000000000000000000E = {
+			isa = "PBXFileSystemSynchronizedRootGroup";
+			path = "AgentDeskCodexHost";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -114,12 +145,19 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AE000000000000000000000F = {
+			isa = "PBXFrameworksBuildPhase";
+			buildActionMask = 2147483647;
+			files = ("AE0000000000000000000001", );
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		C514A90D3051AAE0006A58EA = {
 			isa = PBXGroup;
 			children = (
+				AE000000000000000000000E /* AgentDeskCodexHost */,
 				C514A9183051AAE0006A58EA /* AgentDesk */,
 				C514A9263051AAE2006A58EA /* AgentDeskTests */,
 				C514A9303051AAE2006A58EA /* AgentDeskUITests */,
@@ -134,6 +172,7 @@
 		C514A9173051AAE0006A58EA /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				AE000000000000000000000C /* AgentDeskCodexHost.xpc */,
 				C514A9163051AAE0006A58EA /* AgentDesk.app */,
 				C514A9233051AAE2006A58EA /* AgentDeskTests.xctest */,
 				C514A92D3051AAE2006A58EA /* AgentDeskUITests.xctest */,
@@ -151,10 +190,12 @@
 				C514A9123051AAE0006A58EA /* Sources */,
 				C514A9133051AAE0006A58EA /* Frameworks */,
 				C514A9143051AAE0006A58EA /* Resources */,
+				AE0000000000000000000012 /* Embed XPC Services */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AE0000000000000000000013 /* Codex Host dependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				C514A9183051AAE0006A58EA /* AgentDesk */,
@@ -225,6 +266,19 @@
 			productReference = C514A92D3051AAE2006A58EA /* AgentDeskUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		AE0000000000000000000014 = {
+			isa = "PBXNativeTarget";
+			buildConfigurationList = "AE0000000000000000000015";
+			buildPhases = ("AE0000000000000000000010", "AE000000000000000000000F", "AE0000000000000000000011", );
+			buildRules = ();
+			dependencies = ();
+			fileSystemSynchronizedGroups = ("AE000000000000000000000E", );
+			name = "AgentDeskCodexHost";
+			packageProductDependencies = ("AE000000000000000000000B", );
+			productName = "AgentDeskCodexHost";
+			productReference = "AE000000000000000000000C";
+			productType = "com.apple.product-type.xpc-service";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -269,6 +323,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				AE0000000000000000000014 /* AgentDeskCodexHost */,
 				C514A9153051AAE0006A58EA /* AgentDesk */,
 				C514A9223051AAE2006A58EA /* AgentDeskTests */,
 				C514A92C3051AAE2006A58EA /* AgentDeskUITests */,
@@ -298,6 +353,12 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AE0000000000000000000011 = {
+			isa = "PBXResourcesBuildPhase";
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -322,6 +383,12 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AE0000000000000000000010 = {
+			isa = "PBXSourcesBuildPhase";
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -334,6 +401,12 @@
 			isa = PBXTargetDependency;
 			target = C514A9153051AAE0006A58EA /* AgentDesk */;
 			targetProxy = C514A92E3051AAE2006A58EA /* PBXContainerItemProxy */;
+		};
+		AE0000000000000000000013 = {
+			isa = "PBXTargetDependency";
+			target = "AE0000000000000000000014";
+			targetProxy = "AE000000000000000000000D";
+			platformFilters = ("macos", );
 		};
 /* End PBXTargetDependency section */
 
@@ -640,6 +713,47 @@
 			};
 			name = Release;
 		};
+		AE0000000000000000000016 = {
+			isa = "XCBuildConfiguration";
+			buildSettings = {
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks", );
+				DEVELOPMENT_TEAM = "3R9673A8NL";
+				INFOPLIST_FILE = "Configuration/CodexHost-Info.plist";
+				SKIP_INSTALL = "YES";
+				ENABLE_APP_SANDBOX = "NO";
+				MACOSX_DEPLOYMENT_TARGET = "15.0";
+				GENERATE_INFOPLIST_FILE = "NO";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SUPPORTED_PLATFORMS = "macosx";
+				CODE_SIGN_STYLE = "Automatic";
+				SDKROOT = "macosx";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = "6.0";
+				ENABLE_HARDENED_RUNTIME = "YES";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mirza.AgentDesk.CodexHost";
+			};
+			name = "Debug";
+		};
+		AE0000000000000000000017 = {
+			isa = "XCBuildConfiguration";
+			buildSettings = {
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks", );
+				DEVELOPMENT_TEAM = "3R9673A8NL";
+				INFOPLIST_FILE = "Configuration/CodexHost-Info.plist";
+				SKIP_INSTALL = "YES";
+				ENABLE_APP_SANDBOX = "NO";
+				MACOSX_DEPLOYMENT_TARGET = "15.0";
+				GENERATE_INFOPLIST_FILE = "NO";
+				SUPPORTED_PLATFORMS = "macosx";
+				CODE_SIGN_STYLE = "Automatic";
+				SDKROOT = "macosx";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = "6.0";
+				ENABLE_HARDENED_RUNTIME = "YES";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mirza.AgentDesk.CodexHost";
+			};
+			name = "Release";
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -678,6 +792,12 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
+		};
+		AE0000000000000000000015 = {
+			isa = "XCConfigurationList";
+			buildConfigurations = ("AE0000000000000000000016", "AE0000000000000000000017", );
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = "Release";
 		};
 /* End XCConfigurationList section */
 
@@ -741,7 +861,24 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = AgentDeskRuntime;
 		};
+		AE000000000000000000000B = {
+			isa = "XCSwiftPackageProductDependency";
+			package = "AD0000000000000000000025";
+			productName = "AgentDeskRuntime";
+		};
 /* End XCSwiftPackageProductDependency section */
+/* Begin PBXCopyFilesBuildPhase section */
+		AE0000000000000000000012 = {
+			buildActionMask = "2147483647";
+			dstSubfolderSpec = "16";
+			isa = "PBXCopyFilesBuildPhase";
+			runOnlyForDeploymentPostprocessing = "0";
+			dstPath = "$(CONTENTS_FOLDER_PATH)/XPCServices";
+			files = ("AE0000000000000000000002", );
+			name = "Embed XPC Services";
+			platformFilters = ("macos", );
+		};
+/* End PBXCopyFilesBuildPhase section */
 	};
 	rootObject = C514A90E3051AAE0006A58EA /* Project object */;
 }

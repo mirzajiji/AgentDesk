@@ -33,6 +33,10 @@ struct ContentView: View {
                 .navigationTitle(navigation.selection.title)
         }
         .frame(minWidth: 900, minHeight: 560)
+        .toolbar {
+            SettingsLink { Label("Settings", systemImage: "gearshape") }
+                .accessibilityIdentifier("settings.open")
+        }
         .task { await catalog.reload() }
         #else
         NavigationStack {

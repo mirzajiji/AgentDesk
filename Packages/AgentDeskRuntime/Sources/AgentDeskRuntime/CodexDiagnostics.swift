@@ -1,14 +1,14 @@
 import Foundation
 
-public enum CodexAuthentication: String, Sendable, Equatable {
+public enum CodexAuthentication: String, Codable, Sendable, Equatable {
     case unknown, signedOut, chatGPT, unsupportedMethod
 }
 
-public enum CodexDiagnosticIssue: String, Error, Sendable, Equatable {
+public enum CodexDiagnosticIssue: String, Codable, Error, Sendable, Equatable {
     case notInstalled, invalidExecutable, incompatibleCLI, permissionDenied, timedOut, outputLimit, commandFailed, busy
 }
 
-public struct CodexCapabilities: Sendable, Equatable {
+public struct CodexCapabilities: Codable, Sendable, Equatable {
     public let login: Bool
     public let logout: Bool
     public let loginStatus: Bool
@@ -18,14 +18,14 @@ public struct CodexCapabilities: Sendable, Equatable {
     public let ignoreUserConfig: Bool
 }
 
-public struct CodexInstallation: Sendable, Equatable {
+public struct CodexInstallation: Codable, Sendable, Equatable {
     public let executable: URL
     public let version: String
     public let capabilities: CodexCapabilities
 }
 
 /// Only normalized public CLI facts. No raw diagnostics, account tokens, or inferred subscription data.
-public struct CodexDiagnosticSnapshot: Sendable, Equatable {
+public struct CodexDiagnosticSnapshot: Codable, Sendable, Equatable {
     public let installation: CodexInstallation?
     public let authentication: CodexAuthentication
     public let issue: CodexDiagnosticIssue?

@@ -9,11 +9,13 @@ final class ConfigurationDirectory: Sendable {
         guard trustedContainer.isFileURL, !trustedContainer.path.utf8.contains(0),
               let canonical = realpath(trustedContainer.path, nil) else { throw ScopedFileError.invalidRoot }
         defer { free(canonical) }
-        var current = Darwin.open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        // Traversing trusted ancestors requires search access, not permission to enumerate their data.
+        // The sandbox grants access to the application container without granting its parents' listings.
+        var current = Darwin.open("/", O_SEARCH | O_CLOEXEC)
         guard current >= 0 else { throw Self.failure() }
         do {
             for name in String(cString: canonical).split(separator: "/") {
-                let next = openat(current, String(name), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+                let next = openat(current, String(name), O_SEARCH | O_NOFOLLOW | O_CLOEXEC)
                 guard next >= 0 else { throw Self.failure() }
                 Darwin.close(current)
                 current = next

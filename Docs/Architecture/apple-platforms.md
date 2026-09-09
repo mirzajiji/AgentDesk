@@ -35,7 +35,7 @@ Use navigation split views, inspectors, toolbars, sheets, context menus, Command
 ## Decisions to close during implementation
 
 - Verify the selected macOS 15/iOS 18 minimums on real supported runtimes before treating them as release-support guarantees.
-- Establish the supported distribution/signing and Mac execution-host arrangement for Codex and local tooling. The template's app-sandbox setting alone does not prove subprocess execution can satisfy product requirements.
+- P1-08b establishes a signed app-private Mac XPC host for Codex diagnostics/account commands, explicitly approved without App Sandbox for that helper only. Main app sandbox remains enabled. Direct distribution is the current arrangement; production distribution/notarization acceptance and scoped tool execution remain future work.
 - Complete Xcode/runtime acceptance for Swift 6 and the new shared scheme; direct compiler checks are supplementary.
 - Keep platform support aligned with Mac+iPhone; visionOS is outside current scope.
 
@@ -46,3 +46,7 @@ Validate both native builds, package dependency direction, platform exclusions, 
 The original multiplatform Xcode target now links local Core and Design packages with substantive shell-navigation and shared empty-state code. The shared scheme includes both existing test targets. Swift 6 and macOS 15/iOS 18 compilation targets are selected; incidental visionOS and iPad device-family support is removed. Mac execution services, mobile pairing and the other planned modules have not been implemented.
 
 Core has five passing SwiftPM cases, reused in native unit targets. Full Xcode builds, app launch and unit/UI tests pass on the Mac and iPhone 16 Pro/iOS 26. Mac arm64/Intel and iPhone simulator/device source compilation checks also pass. The wider device/OS matrix is deferred to final acceptance by user instruction. See [P1-01 validation](../Development/p1-01-validation.md) for exact evidence and commands.
+
+## Mac Codex helper — P1-08b
+
+`AgentDeskCodexHost` is a native XPC-service target linked to Runtime, dependent/embedded only for macOS. Its explicit Info.plist uses an Application service and NSRunLoop. App and helper use the personal development team and mutually require their exact signed bundle identities. iPhone builds omit the target and embedded service, and compile-exclude the Foundation XPC client and subprocess implementation. See [Codex boundary](codex.md) and [validation](../Development/p1-08b-validation.md).

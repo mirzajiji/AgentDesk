@@ -21,6 +21,7 @@ public actor NativeRunService {
     private let captureRepository: Bool
     private let makeRedactor: @Sendable (RedactionContext) async throws -> ContentRedactor
     private var closed = false
+    private var repositoryAccess: RepositoryAccess?
 
     /// The executable comes from validated native Codex settings. The directory must be accessible
     /// under the main app's user-selected read grant; the caller retains that grant until shutdown.
@@ -31,6 +32,17 @@ public actor NativeRunService {
         return try await open(database: database, directory: directory, configuration: configuration, captureRepository: captureRepository,
                               redactor: redactor, provider: provider)
     }
+    /// Retains the selected-folder grant and registration lease until the service has shut down.
+    public static func open(database: URL, repository: RepositoryAccess, executable: URL,
+                            configuration: EffectiveExecutionConfiguration,
+                            redactor: @escaping @Sendable (RedactionContext) async throws -> ContentRedactor = { try ContentRedactor(context: $0) }) async throws -> NativeRunService {
+        guard repository.registration.scope == configuration.scope else { throw RunCoordinatorError.invalidPreparation }
+        let service = try await open(database: database, directory: repository.directory, executable: executable,
+            configuration: configuration, captureRepository: true, redactor: redactor)
+        await service.retain(repository)
+        return service
+    }
+    private func retain(_ access: RepositoryAccess) { repositoryAccess = access }
     static func open(database: URL, directory: URL, configuration: EffectiveExecutionConfiguration, captureRepository: Bool,
                      redactor: @escaping @Sendable (RedactionContext) async throws -> ContentRedactor = { try ContentRedactor(context: $0) },
                      provider: any ExecutionProvider) async throws -> NativeRunService {
@@ -69,7 +81,9 @@ public actor NativeRunService {
             repository = { context, redactor in try GitRepositoryCapture(root: directory, context: context, redactor: redactor) }
         } else { repository = nil }
         return try await coordinator.prepare(instructions: instructions, configuration: configuration, task: task,
-            requesterID: requesterID, redactor: makeRedactor, repository: repository)
+            requesterID: requesterID, location: RunLocationSnapshot(scope: scope, selectedDirectory: directory.path,
+                registrationID: repositoryAccess?.registration.id, registrationRevision: repositoryAccess?.registration.revision),
+            redactor: makeRedactor, repository: repository)
     }
     public func start(_ prepared: PreparedRun) async throws -> RunExecution {
         try checkOpen(); return try await coordinator.start(prepared.token)
@@ -107,7 +121,7 @@ public actor NativeRunService {
     public func trace(_ traceID: UUID, for id: RunID) async throws -> StoredTrace? {
         try await evidence(for: id).trace(traceID)
     }
-    public func shutdown() async { closed = true; await coordinator.shutdown() }
+    public func shutdown() async { closed = true; await coordinator.shutdown(); repositoryAccess = nil }
     private func evidence(for id: RunID) async throws -> EvidenceStore {
         try checkOpen()
         let action = try PolicyAction(scope: scope, environmentID: environmentID, runID: id, agentID: agentID,

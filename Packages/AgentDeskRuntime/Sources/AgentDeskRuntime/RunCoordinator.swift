@@ -56,13 +56,14 @@ actor RunCoordinator {
     }
 
     func prepare(instructions: ComposedInstructions, configuration: EffectiveExecutionConfiguration, task: String,
-                 requesterID: UUID,
+                 requesterID: UUID, location: RunLocationSnapshot? = nil,
                  redactor makeRedactor: @Sendable (RedactionContext) async throws -> ContentRedactor,
                  repository makeRepository: (@Sendable (RedactionContext, ContentRedactor) async throws -> any RunRepositoryCapturing)? = nil) async throws -> PreparedRun {
         try available()
         guard recovered, instructions.scope == scope, configuration.scope == scope,
               instructions.agentID == configuration.agentID, instructions.agentRevision == configuration.agentRevision,
               configuration.environment.id == environmentID else { throw RunCoordinatorError.invalidPreparation }
+        try location?.validate(in: scope)
         preparing = true; defer { finishPreparation() }
         let runID = RunID(), context = RedactionContext(scope: scope, environmentID: environmentID, runID: runID)
         var created = false
@@ -95,7 +96,7 @@ actor RunCoordinator {
             }
             let snapshot = RunInputSnapshot(configuration: configuration, instructions: request.instructions, task: request.task,
                 sources: sources, resource: provider.resource, maximumActivities: request.maximumActivities,
-                executionFingerprint: try .canonical(RunDispatchBinding(request: request, timeoutSeconds: configuration.timeoutSeconds)))
+                executionFingerprint: try .canonical(RunDispatchBinding(request: request, timeoutSeconds: configuration.timeoutSeconds)), location: location)
             let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
             let snapshotText = try redactor.redactJSON(String(decoding: encoder.encode(snapshot), as: UTF8.self), in: context)
             let fingerprint = try ActionFingerprint(bytes: Data(snapshotText.text.utf8))

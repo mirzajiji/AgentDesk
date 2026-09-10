@@ -1,6 +1,10 @@
 import Foundation
 
 enum GitCaptureConfiguration {
+    static let environment = ["PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C",
+        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_SYSTEM": "/dev/null", "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_ATTR_NOSYSTEM": "1", "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1", "GIT_TERMINAL_PROMPT": "0", "GIT_PAGER": "cat", "GIT_LITERAL_PATHSPECS": "1"]
     // Git's --null config output separates each key/value with a newline and records with NUL.
     // This input comes from --file <validated config> --no-includes outside any repository.
     static func overrides(configuration data: Data) throws -> [String] {

@@ -43,10 +43,7 @@ actor GitRepositoryCapture: RunRepositoryCapturing {
     private var active = false
     private let clock = ContinuousClock()
     private static let missing = GitWorkingFile(kind: .missing, digest: nil, text: nil)
-    private static let environment = ["PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C",
-        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_SYSTEM": "/dev/null", "GIT_CONFIG_GLOBAL": "/dev/null",
-        "GIT_ATTR_NOSYSTEM": "1", "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1",
-        "GIT_NO_REPLACE_OBJECTS": "1", "GIT_TERMINAL_PROMPT": "0", "GIT_PAGER": "cat", "GIT_LITERAL_PATHSPECS": "1"]
+
 
     init(root: URL, context: RedactionContext, redactor: ContentRedactor) throws {
         guard redactor.context == context else { throw RepositoryCaptureError.scopeMismatch }
@@ -144,7 +141,7 @@ actor GitRepositoryCapture: RunRepositoryCapturing {
         guard clock.now < deadline else { throw RepositoryCaptureError.timedOut }
         do {
             let output = try await MacCommandCapture.run(executable: executable, arguments: arguments,
-                directory: directory, environment: Self.environment, timeout: clock.now.duration(to: deadline), maximumBytes: 262_144)
+                directory: directory, environment: GitCaptureConfiguration.environment, timeout: clock.now.duration(to: deadline), maximumBytes: 262_144)
             guard output.status == 0 else { throw RepositoryCaptureError.commandFailed }
             try files.validateRoot()
             return output.stdout

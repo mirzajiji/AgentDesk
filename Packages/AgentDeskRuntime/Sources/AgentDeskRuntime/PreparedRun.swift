@@ -58,6 +58,7 @@ struct RunInputSnapshot: Encodable {
     let resource: ExecutionResource
     let maximumActivities: Int
     let executionFingerprint: ActionFingerprint
+    let location: RunLocationSnapshot?
 }
 
 /// Binds the exact sanitized dispatch independently of display redaction of configuration/schema fields.
@@ -74,5 +75,19 @@ struct RunDispatchBinding: Encodable {
         identity = request.identity; instructions = request.instructions; task = request.task; model = request.model
         self.timeoutSeconds = timeoutSeconds; maximumActivities = request.maximumActivities
         maximumOutputBytes = request.maximumOutputBytes; outputSchema = request.outputSchema
+    }
+}
+
+/// Nonsecret location provenance; operating-system bookmark bytes never enter a run snapshot.
+struct RunLocationSnapshot: Encodable, Sendable {
+    let scope: ProjectScope
+    let selectedDirectory: String
+    let registrationID: UUID?
+    let registrationRevision: Int?
+    func validate(in expected: ProjectScope) throws {
+        guard scope == expected, selectedDirectory.hasPrefix("/"), selectedDirectory.utf8.count <= 4_096,
+              !selectedDirectory.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
+              (registrationID == nil) == (registrationRevision == nil),
+              registrationRevision == nil || (1...1_000_000).contains(registrationRevision!) else { throw RunCoordinatorError.invalidPreparation }
     }
 }

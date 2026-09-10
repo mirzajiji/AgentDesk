@@ -5,7 +5,7 @@ import XCTest
 final class RunStateTests: XCTestCase {
     func testCompleteTransitionMatrixRejectsTerminalReopeningAndInvalidSkips() {
         let expected: [RunState: Set<RunState>] = [
-            .queued: [.running, .failed, .cancelled],
+            .queued: [.running, .waitingForApproval, .failed, .cancelled],
             .running: [.waitingForApproval, .paused, .completed, .failed, .cancelled],
             .waitingForApproval: [.running, .failed, .cancelled],
             .paused: [.running, .failed, .cancelled],

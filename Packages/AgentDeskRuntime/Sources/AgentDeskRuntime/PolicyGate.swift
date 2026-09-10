@@ -46,6 +46,24 @@ actor PolicyGate {
     }
     func removeAuthority(_ id: UUID) { authorities.removeValue(forKey: id) }
 
+    /// A continuation checkpoint, not a new grant. The coordinator compares the returned binding
+    /// with the one frozen before dispatch, including the requester's exact authority revision.
+    func continuationBinding(for action: PolicyAction, requesterID: UUID, expectedPolicy: ActionFingerprint) throws -> ActionFingerprint {
+        guard try policy.fingerprint == expectedPolicy else { throw AuthorizationError.stalePolicy }
+        try requireAllowedContext(action, requesterID: requesterID, at: instant())
+        return try binding(requesterID)
+    }
+
+    /// Preparation may read only when already allowed. It cannot manufacture a pending read approval.
+    func authorizePreparationRead(_ action: PolicyAction, requesterID: UUID) throws {
+        guard action.operation == .readEvidence else { throw AuthorizationError.invalidInput }
+        switch try evaluate(action, requesterID: requesterID, at: instant()).disposition {
+        case .allow: return
+        case .approval: throw AuthorizationError.approvalRequired
+        case .deny: throw AuthorizationError.denied
+        }
+    }
+
     func prepare(_ action: PolicyAction, requesterID: UUID, lifetime: TimeInterval = 600) async throws -> PolicyPreparation {
         let now = try instant(); let evaluation = try evaluate(action, requesterID: requesterID, at: now)
         switch evaluation.disposition {

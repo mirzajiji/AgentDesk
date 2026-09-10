@@ -2,7 +2,7 @@ import AgentDeskCore
 import Foundation
 
 /// Internal provider boundary. The run coordinator must authorize this context before using it.
-struct ExecutionIdentity: Equatable, Sendable {
+struct ExecutionIdentity: Codable, Equatable, Sendable {
     let scope: ProjectScope
     let runID: RunID
     let agentID: AgentID
@@ -80,5 +80,6 @@ struct ProviderExecution: Sendable {
     func cancel() { cancellation() }
 }
 protocol ExecutionProvider: Sendable {
+    var resource: ExecutionResource { get }
     func start(_ request: ExecutionRequest) async throws -> ProviderExecution
 }

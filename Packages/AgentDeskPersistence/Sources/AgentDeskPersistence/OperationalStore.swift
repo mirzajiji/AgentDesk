@@ -67,6 +67,31 @@ public actor OperationalStore {
                                   [.text(workspaceID.rawValue), .text(scope.projectID.rawValue), .integer(Int64(limit))], map: Self.decodeRun)
     }
 
+    /// Stable keyset pagination for the local project owner recovering interrupted runs.
+    public func unfinishedRuns(in scope: ProjectScope, afterRunID: RunID? = nil, limit: Int = 256) throws -> [StoredRun] {
+        try validate(scope)
+        guard (1...256).contains(limit) else { throw OperationalStoreError.invalidInput }
+        return try database.query(Self.runSelect + " WHERE r.workspace_id=? AND r.project_id=? AND r.run_id>? AND r.state NOT IN ('completed','failed','cancelled') ORDER BY r.run_id LIMIT ?",
+            [.text(workspaceID.rawValue), .text(scope.projectID.rawValue), .text(afterRunID?.rawValue ?? ""), .integer(Int64(limit))], map: Self.decodeRun)
+    }
+
+    public func evidenceBinding(for id: RunID, in scope: ProjectScope) throws -> EvidenceRunBinding? {
+        try validate(scope)
+        return try database.query("SELECT environment_id,binding_json FROM evidence_runs WHERE workspace_id=? AND project_id=? AND run_id=?",
+            [.text(workspaceID.rawValue), .text(scope.projectID.rawValue), .text(id.rawValue)]) { statement in
+            do {
+                let binding = try JSONDecoder().decode(EvidenceRunBinding.self,
+                    from: Data(SQLiteConnection.text(statement, 1, maximumBytes: 131_072).utf8))
+                try binding.validate()
+                guard binding.context.scope == scope, binding.context.runID == id,
+                      binding.context.environmentID.rawValue == (try SQLiteConnection.text(statement, 0)) else {
+                    throw OperationalStoreError.invalidDatabase
+                }
+                return binding
+            } catch { throw OperationalStoreError.invalidDatabase }
+        }.first
+    }
+
     /// Stores an authoritative lifecycle decision with optimistic sequence checking.
     /// Legal state transitions are enforced by the runtime lifecycle service, not inferred by storage.
     public func recordState(_ state: PersistedRunState, for id: RunID, in scope: ProjectScope,

@@ -2,14 +2,11 @@
 import AgentDeskSecurity
 import Foundation
 
-struct RepositoryEvidence: Sendable {
-    let snapshot: RedactedText
-    let diff: RedactedText
-}
-
 /// Internal read-only adapter. A project-authorized caller supplies the repository root and run context.
 /// No commit, reset, clean, index update, arbitrary Git command or remote operation is exposed.
-actor GitRepositoryCapture {
+actor GitRepositoryCapture: RunRepositoryCapturing {
+    nonisolated let context: RedactionContext
+    nonisolated let resource: ExecutionResource
     private struct Version: Equatable {
         let entry: GitStatusEntry
         let head: GitWorkingFile
@@ -54,6 +51,7 @@ actor GitRepositoryCapture {
     init(root: URL, context: RedactionContext, redactor: ContentRedactor) throws {
         guard redactor.context == context else { throw RepositoryCaptureError.scopeMismatch }
         files = try GitRepositoryFiles(root: root); executable = try GitExecutableLocator.installed(); self.redactor = redactor
+        self.context = context; resource = try files.resource(in: context.scope)
     }
     func captureBaseline() async throws -> RepositoryEvidence {
         guard !active else { throw RepositoryCaptureError.busy }

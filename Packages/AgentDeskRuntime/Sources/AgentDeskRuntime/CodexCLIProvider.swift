@@ -20,6 +20,7 @@ private final class ProviderCancellation: Sendable {
 
 /// Read-only local provider. It is internal until the coordinator supplies policy-authorized requests.
 actor CodexCLIProvider: ExecutionProvider {
+    nonisolated let resource: ExecutionResource
     private struct RootStamp: Equatable, Sendable { let device: Int32; let inode: UInt64 }
     let scope: ProjectScope
     private let directory: URL
@@ -40,6 +41,7 @@ actor CodexCLIProvider: ExecutionProvider {
         self.scope = scope; self.directory = canonical; self.executable = executable
         self.capacity = capacity; self.diagnostics = diagnostics; self.process = process
         rootStamp = try Self.stamp(canonical)
+        resource = try .directory(in: scope, device: Int64(rootStamp.device), inode: rootStamp.inode)
     }
     deinit { active?.cancellation.cancel() }
 

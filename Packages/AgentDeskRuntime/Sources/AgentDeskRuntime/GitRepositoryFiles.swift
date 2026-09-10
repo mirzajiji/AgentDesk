@@ -1,5 +1,6 @@
 #if os(macOS)
 import CryptoKit
+import AgentDeskCore
 import Darwin
 import Foundation
 
@@ -31,6 +32,9 @@ final class GitRepositoryFiles {
         descriptor = opened; device = info.st_dev; inode = info.st_ino; self.root = canonicalRoot
     }
     deinit { Darwin.close(descriptor) }
+    func resource(in scope: ProjectScope) throws -> ExecutionResource {
+        try .directory(in: scope, device: Int64(device), inode: UInt64(inode))
+    }
 
     func validateRoot() throws {
         try Task.checkCancellation()

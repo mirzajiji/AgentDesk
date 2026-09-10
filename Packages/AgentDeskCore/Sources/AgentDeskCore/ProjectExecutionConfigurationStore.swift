@@ -14,6 +14,13 @@ public actor ProjectExecutionConfigurationStore {
                               revision: Int? = nil) throws -> ExecutionConfigurationSnapshot? {
         try root.withLock { try validate(requested); return try read(level, revision: revision) }
     }
+    /// Both editor documents are read under the same catalog lock. This does not save defaults.
+    public func setup(in requested: ProjectScope) throws -> ExecutionSetupSnapshot {
+        try root.withLock {
+            try validate(requested)
+            return try ExecutionSetupSnapshot(scope: scope, workspace: read(.workspace), project: read(.project))
+        }
+    }
     public func save(_ draft: ExecutionConfigurationDraft, at level: ExecutionConfigurationLevel, in requested: ProjectScope,
                      expectedRevision: Int?) throws -> ExecutionConfigurationSnapshot {
         try root.withLock {

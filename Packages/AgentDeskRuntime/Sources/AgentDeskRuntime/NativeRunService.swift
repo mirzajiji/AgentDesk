@@ -85,6 +85,13 @@ public actor NativeRunService {
                 registrationID: repositoryAccess?.registration.id, registrationRevision: repositoryAccess?.registration.revision),
             redactor: makeRedactor, repository: repository)
     }
+    /// Revalidates the displayed native context before any preparation record or provider work.
+    public func prepare(context: ProjectRunContext, setup: ProjectExecutionSetupService, task: String) async throws -> PreparedRun {
+        try checkOpen()
+        guard context.scope == scope, setup.scope == scope else { throw RunCoordinatorError.invalidPreparation }
+        try await setup.validate(context)
+        return try await prepare(instructions: context.instructions, configuration: context.configuration, task: task)
+    }
     public func start(_ prepared: PreparedRun) async throws -> RunExecution {
         try checkOpen(); return try await coordinator.start(prepared.token)
     }

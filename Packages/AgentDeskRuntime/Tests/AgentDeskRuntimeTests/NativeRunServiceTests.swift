@@ -8,6 +8,34 @@ import XCTest
 
 @MainActor
 final class NativeRunServiceTests: XCTestCase {
+    func testStaleDisplayedContextCannotCreateRunAndRefreshedContextRequiresReview() async throws {
+        let f = try await RunCoordinatorTests.Fixture.make(disposition: .approval)
+        await f.coordinator.shutdown()
+        let catalog = try WorkspaceCatalog(container: f.root)
+        let setup = ProjectExecutionSetupService(catalog: catalog, scope: f.scope)
+        let initial = try await setup.preview(agentID: f.configuration.agentID)
+        let service = try await NativeRunService.open(database: f.database, directory: f.root, configuration: initial.configuration,
+            captureRepository: false, provider: f.provider)
+        let document = InstructionDocument(title: "Current context", text: "Use the revised synthetic test context.")
+        _ = try await catalog.instructionStore(in: f.scope).save(.init(documents: [document], roots: [document.id]),
+            at: .project, in: f.scope, expectedRevision: nil)
+        do { _ = try await service.prepare(context: initial, setup: setup, task: "Inspect"); XCTFail("Stale preview created a run") }
+        catch { XCTAssertEqual(error as? ExecutionSetupError, .staleContext) }
+        let storage = try OperationalStore(database: f.database, workspaceID: f.scope.workspaceID)
+        let empty = try await storage.runs(in: f.scope); XCTAssertTrue(empty.isEmpty)
+        let none = await f.provider.requests; XCTAssertTrue(none.isEmpty)
+        let current = try await setup.preview(agentID: f.configuration.agentID)
+        let prepared = try await service.prepare(context: current, setup: setup, task: "Inspect")
+        let waiting = try await service.run(prepared.runID); XCTAssertEqual(waiting?.state, .waitingForApproval)
+        do { _ = try await service.start(prepared); XCTFail("Review bypassed") }
+        catch { XCTAssertEqual(error as? AuthorizationError, .approvalRequired) }
+        _ = try await service.review(prepared, approve: true, expectedSequence: XCTUnwrap(prepared.approval?.sequence))
+        let execution = try await service.start(prepared), result = await execution.result()
+        XCTAssertEqual(result.state, .completed)
+        let requests = await f.provider.requests
+        XCTAssertEqual(requests.count, 1); XCTAssertTrue(requests.first?.instructions.contains(document.text) == true)
+        await service.shutdown(); await f.remove()
+    }
     func testLocalReviewDispatchAndScopedEvidenceFlow() async throws {
         let f = try await RunCoordinatorTests.Fixture.make(disposition: .approval)
         await f.coordinator.shutdown()

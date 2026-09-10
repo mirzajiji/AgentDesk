@@ -5,6 +5,8 @@ import SwiftUI
 
 struct WorkspaceBrowserView: View {
     @ObservedObject var model: WorkspaceBrowserModel
+    @Binding var command: NativeCommandAction?
+    @State private var commandError: String?
     @State private var editor: CatalogEditor?
     @State private var selectedProject: ProjectRecord?
     @State private var setupProject: ProjectRecord?
@@ -55,6 +57,42 @@ struct WorkspaceBrowserView: View {
                 }
             }
         }
+        .task(id: command) {
+            guard let action = command else { return }
+            defer { if command == action { command = nil } }
+            do {
+                switch action {
+                case .settings: break
+                case .createWorkspace: editor = .newWorkspace
+                case .switchWorkspace(let id), .createProject(let id):
+                    let workspace = try await model.resolveWorkspace(id)
+                    try Task.checkCancellation()
+                    try await model.selectCommandWorkspace(id)
+                    try Task.checkCancellation()
+                    guard model.selectedWorkspace == id else { return }
+                    if case .createProject = action { editor = .newProject(workspace) }
+                case .agents(let scope), .setup(let scope), .run(let scope):
+                    _ = try await model.resolveProject(scope)
+                    try Task.checkCancellation()
+                    try await model.selectCommandWorkspace(scope.workspaceID)
+                    try Task.checkCancellation()
+                    guard model.selectedWorkspace == scope.workspaceID else { return }
+                    let project = try await model.resolveProject(scope)
+                    try Task.checkCancellation()
+                    guard model.selectedWorkspace == scope.workspaceID else { return }
+                    switch action {
+                    case .agents: selectedProject = project
+                    case .setup: setupProject = project
+                    case .run: runProject = project
+                    default: break
+                    }
+                }
+            } catch is CancellationError { return }
+            catch { commandError = WorkspaceBrowserModel.message(for: error) }
+        }
+        .alert("Command unavailable", isPresented: Binding(get: { commandError != nil }, set: { if !$0 { commandError = nil } })) {
+            Button("OK") { commandError = nil }
+        } message: { Text(commandError ?? "") }
         .toolbar {
             ToolbarItemGroup {
                 Button("New Workspace", systemImage: "plus") { editor = .newWorkspace }

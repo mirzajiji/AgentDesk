@@ -5,6 +5,10 @@ import SwiftUI
 struct ContentView: View {
     #if os(macOS)
     @StateObject private var catalog = WorkspaceBrowserModel()
+    @Environment(\.openSettings) private var openSettings
+    @State private var paletteVisible = false
+    @State private var pendingCommand: NativeCommandAction?
+    @State private var routedCommand: NativeCommandAction?
     @State private var navigation = ShellNavigation(role: .macHost)
     #endif
 
@@ -37,6 +41,18 @@ struct ContentView: View {
             SettingsLink { Label("Settings", systemImage: "gearshape") }
                 .accessibilityIdentifier("settings.open")
         }
+        .focusedSceneValue(\.showCommandPalette, { paletteVisible = true })
+        .sheet(isPresented: $paletteVisible, onDismiss: {
+            guard let command = pendingCommand else { return }
+            pendingCommand = nil
+            if command == .settings { openSettings() }
+            else { navigation.select(.workspaces); routedCommand = command }
+        }) {
+            NativeCommandPalette(model: catalog) { command in
+                pendingCommand = command
+                paletteVisible = false
+            }
+        }
         .task { await catalog.reload() }
         #else
         NavigationStack {
@@ -60,7 +76,7 @@ struct ContentView: View {
         switch destination {
         case .workspaces:
             #if os(macOS)
-            WorkspaceBrowserView(model: catalog)
+            WorkspaceBrowserView(model: catalog, command: $routedCommand)
             #else
             EmptyView()
             #endif

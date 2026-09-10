@@ -15,7 +15,7 @@ First run checks Codex, Git and local runtime readiness, then helps create works
 
 ## Commands and persistent controls
 
-Command-K opens a searchable command palette for run/start, context switching, knowledge search, creation, connections, approvals and settings. Commands must share service and policy entry points with their visible UI actions. Preserve keyboard focus and predictable escape/return behavior.
+The target Command-K palette covers run/start, context switching, knowledge search, creation, connections, approvals and settings. The implemented Phase 1 palette opens Settings, workspace/project creation, workspace switching, agent/skill management, project setup and the existing run review console. Search includes workspace/project context and routes use stable identities revalidated against the current catalog; opening a command never starts or approves a run. Later capability phases add their corresponding commands. See [P1-14a validation](../Development/p1-14a-validation.md). Commands must share service and policy entry points with their visible UI actions. Preserve keyboard focus and predictable escape/return behavior.
 
 MenuBarExtra shows active runs, approvals and failure counts with open/run/approval controls and appropriate pause behavior. Native notifications cover approvals, completion/failure, important results, connection loss and device events. Make notifications optional and avoid sensitive content in previews.
 

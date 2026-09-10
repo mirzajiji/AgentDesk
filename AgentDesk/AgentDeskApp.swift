@@ -17,6 +17,9 @@ struct AgentDeskApp: App {
             ContentView()
         }
         #if os(macOS)
+        .commands { NativePaletteCommands() }
+        #endif
+        #if os(macOS)
         Settings {
             CodexSettingsView(model: codex)
         }

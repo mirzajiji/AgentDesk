@@ -52,6 +52,41 @@ final class WorkspaceBrowserModel: ObservableObject {
 
     var currentWorkspace: WorkspaceRecord? { workspaces.first { $0.id == selectedWorkspace } }
 
+    func commands() async throws -> NativeCommandCatalog {
+        guard let catalog else { throw CatalogError.invalidConfiguration }
+        let workspaces = try await catalog.workspaces()
+        var projects: [ProjectRecord] = []
+        for workspace in workspaces {
+            try Task.checkCancellation()
+            projects += try await catalog.projects(in: workspace.id)
+        }
+        return NativeCommandCatalog(workspaces: workspaces, projects: projects)
+    }
+
+    func resolveWorkspace(_ id: WorkspaceID) async throws -> WorkspaceRecord {
+        guard let catalog else { throw CatalogError.invalidConfiguration }
+        guard let workspace = try await catalog.workspaces().first(where: { $0.id == id }) else {
+            throw CatalogError.invalidConfiguration
+        }
+        return workspace
+    }
+
+    func selectCommandWorkspace(_ id: WorkspaceID) async throws {
+        guard let catalog else { throw CatalogError.invalidConfiguration }
+        let current = try await catalog.workspaces()
+        try Task.checkCancellation()
+        guard current.contains(where: { $0.id == id }) else { throw CatalogError.scopeMismatch }
+        workspaces = current
+        await select(id)
+        try Task.checkCancellation()
+        guard selectedWorkspace == id, errorMessage == nil else { throw CatalogError.scopeMismatch }
+    }
+
+    func resolveProject(_ scope: ProjectScope) async throws -> ProjectRecord {
+        guard let catalog else { throw CatalogError.invalidConfiguration }
+        return try await catalog.project(scope)
+    }
+
     func reload() async {
         guard let catalog else { return }
         isLoading = true

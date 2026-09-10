@@ -142,10 +142,12 @@ public actor ProjectBugStore {
     }
     public func list(in requested: ProjectScope, statuses: Set<BugStatus> = [.open, .resolved, .closed],
                      environment: EnvironmentID? = nil, registered: Bool? = nil,
-                     after: BugID? = nil, limit: Int = 50) throws -> [BugRecord] {
+                     after: BugID? = nil, limit: Int = 50, query: String = "", linkedTo: BugID? = nil) throws -> [BugRecord] {
         try files.root.withLock {
             try files.validate(requested)
             guard (1...100).contains(limit) else { throw BugRegistryError.limitExceeded }
+            try RequirementDraft.checkText(query, maximum: 1_024, empty: true)
+            let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
             let parent: ConfigurationDirectory
             do { parent = try files.project.child("Memory").child("Bugs") } catch ScopedFileError.notFound { return [] }
             var result: [BugRecord] = []
@@ -156,6 +158,16 @@ public actor ProjectBugStore {
                 guard let value = try files.read(id).first, statuses.contains(value.content.status) else { continue }
                 if let environment, value.content.environment != environment { continue }
                 if let registered, (value.content.ticket != nil) != registered { continue }
+                if let linkedTo, !value.content.relationships.contains(where: { $0.target == linkedTo }) { continue }
+                if !search.isEmpty {
+                    let draft = value.content
+                    let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+                    let details = String(decoding: try encoder.encode(draft.details), as: UTF8.self)
+                    let fields = [value.id.rawValue, draft.title, draft.rootBehavior, draft.expectedBehavior,
+                        draft.actualBehavior, draft.reproduction.joined(separator: "\n"), details, draft.ticket?.key ?? "", draft.ticket?.url ?? ""]
+                    guard fields.contains(where: { $0.range(of: search, options: [.caseInsensitive, .diacriticInsensitive],
+                        locale: Locale(identifier: "en_US_POSIX")) != nil }) else { continue }
+                }
                 result.append(value); if result.count == limit { break }
             }
             return result

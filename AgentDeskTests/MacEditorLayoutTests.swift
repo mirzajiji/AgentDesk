@@ -41,6 +41,21 @@ final class MacEditorLayoutTests: XCTestCase {
         assertFitsAndExpands(KnowledgeContextInspector(snapshot: String(repeating: "Synthetic reviewed source with version and provenance.\n", count: 500)))
     }
 
+    func testBugEditorsFitCompactAndLargeLogicalWindows() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let catalog = try WorkspaceCatalog(container: root)
+        let workspace = try await catalog.createWorkspace(name: "Synthetic bug layout")
+        let project = try await catalog.createProject(in: workspace.id, name: "Bug layout")
+        let store = try await catalog.bugStore(in: project.scope)
+        assertFitsAndExpands(BugEditorView(store: store, existing: nil, environments: [], onPublish: { _ in }))
+        assertFitsAndExpands(BugJSONEditor(model: BugEditorModel(store: store, existing: nil)))
+        assertFitsAndExpands(ProjectBugsView(project: project, open: {
+            NativeBugServices(store: store, environments: [], environmentIssue: nil)
+        }))
+    }
+
     func testMemoryEditorsFitCompactAndLargeLogicalWindows() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

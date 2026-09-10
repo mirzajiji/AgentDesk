@@ -5,7 +5,7 @@ import Foundation
 enum NativeCommandAction: Hashable {
     case settings, createWorkspace
     case switchWorkspace(WorkspaceID), createProject(WorkspaceID)
-    case agents(ProjectScope), setup(ProjectScope), run(ProjectScope), requirements(ProjectScope), memory(ProjectScope)
+    case agents(ProjectScope), setup(ProjectScope), run(ProjectScope), requirements(ProjectScope), memory(ProjectScope), bugs(ProjectScope)
 }
 
 struct NativeCommand: Identifiable, Equatable {
@@ -37,6 +37,7 @@ struct NativeCommandCatalog {
                     .init(action: .agents(project.scope), title: "Manage Agents and Skills", context: context, symbol: "person.crop.rectangle.stack"),
                     .init(action: .requirements(project.scope), title: "Manage Requirements", context: context, symbol: "doc.text"),
                     .init(action: .memory(project.scope), title: "Project Memory, Notes and Inbox", context: context, symbol: "brain"),
+                    .init(action: .bugs(project.scope), title: "Bug Registry", context: context, symbol: "ladybug"),
                     .init(action: .setup(project.scope), title: "Project Setup", context: context, symbol: "slider.horizontal.3")
                 ]
             }

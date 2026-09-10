@@ -19,6 +19,7 @@ final class NativeCommandCatalogTests: XCTestCase {
         XCTAssertEqual(catalog.search("beta requirements").map(\.action), [.requirements(second.scope)])
         XCTAssertEqual(catalog.search("beta memory").map(\.action), [.memory(second.scope)])
         XCTAssertEqual(catalog.search("alpha inbox").map(\.action), [.memory(first.scope)])
+        XCTAssertEqual(catalog.search("beta bug").map(\.action), [.bugs(second.scope)])
         XCTAssertTrue(catalog.search("not a capability").isEmpty)
         XCTAssertEqual(catalog.search("", limit: 1).map(\.action), [.settings])
         XCTAssertTrue(catalog.search("", limit: 0).isEmpty)
@@ -27,6 +28,7 @@ final class NativeCommandCatalogTests: XCTestCase {
         XCTAssertFalse(scoped.commands.contains { $0.action == .run(second.scope) })
         XCTAssertFalse(scoped.commands.contains { $0.action == .requirements(second.scope) })
         XCTAssertFalse(scoped.commands.contains { $0.action == .memory(second.scope) })
+        XCTAssertFalse(scoped.commands.contains { $0.action == .bugs(second.scope) })
     }
 
     func testCommandDiscoveryCreatesNoRunStorageAndRoutingResolvesCurrentProject() async throws {

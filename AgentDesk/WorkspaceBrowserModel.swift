@@ -174,6 +174,19 @@ final class WorkspaceBrowserModel: ObservableObject {
         }
     }
 
+    func bugServices(for project: ProjectRecord) async throws -> NativeBugServices {
+        guard let catalog else { throw CatalogError.invalidConfiguration }
+        let store = try await catalog.bugStore(in: project.scope)
+        do {
+            let settings = try await ProjectExecutionSetupService(catalog: catalog, scope: project.scope).settings()
+            return NativeBugServices(store: store, environments: settings.project?.draft.environments ?? [], environmentIssue: nil)
+        } catch is CancellationError { throw CancellationError() }
+        catch {
+            return NativeBugServices(store: store, environments: [],
+                environmentIssue: "Execution environments could not be read. Check project Setup; stored bug environments are preserved.")
+        }
+    }
+
     func agentStore(for project: ProjectRecord) async throws -> ProjectAgentStore {
         guard let catalog else { throw CatalogError.invalidConfiguration }
         return try await catalog.agentStore(in: project.scope)

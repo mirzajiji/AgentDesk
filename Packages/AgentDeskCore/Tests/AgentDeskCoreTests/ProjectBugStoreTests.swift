@@ -47,6 +47,34 @@ final class ProjectBugStoreTests: XCTestCase {
         catch { XCTAssertEqual(error as? BugRegistryError, .staleRevision) }
     }
 
+    func testNativeSearchAndIncomingRelationshipsKeepScopeAndFilters() async throws {
+        let f = try await Fixture(); defer { f.remove() }
+        let target = try await f.create()
+        var draft = f.draft("Café callback")
+        draft.ticket = try .init(key: "SYN-42"); draft.environment = EnvironmentID()
+        draft.details = ["endpoint": .text("/synthetic/callback")]
+        draft.relationships = [.init(kind: .blockedBy, target: target.id)]
+        draft.assessment = .blocked
+        let linked = try await f.create(draft)
+        for query in ["CAFE", "syn-42", "/synthetic/callback", linked.id.rawValue] {
+            let result = try await f.store.list(in: f.scope, environment: draft.environment, registered: true, query: query)
+            XCTAssertEqual(result.map(\.id), [linked.id])
+        }
+        let incoming = try await f.store.list(in: f.scope, linkedTo: target.id)
+        XCTAssertEqual(incoming.map(\.id), [linked.id])
+        let unrelated = try await f.store.list(in: f.scope, linkedTo: linked.id); XCTAssertTrue(unrelated.isEmpty)
+        let foreignEnvironment = try await f.store.list(in: f.scope, environment: EnvironmentID(), query: "CAFE")
+        XCTAssertTrue(foreignEnvironment.isEmpty)
+        do { _ = try await f.store.list(in: .init(workspaceID: f.scope.workspaceID, projectID: ProjectID()), query: "CAFE"); XCTFail() } catch { }
+        draft.status = .archived
+        let proposal = try await f.store.prepare(draft, id: linked.id, expectedRevision: 1, in: f.scope)
+        _ = try await f.store.publishReviewed(proposal, in: f.scope)
+        let hidden = try await f.store.list(in: f.scope, linkedTo: target.id); XCTAssertTrue(hidden.isEmpty)
+        let archived = try await f.store.list(in: f.scope, statuses: Set(BugStatus.allCases), query: "cafe", linkedTo: target.id)
+        XCTAssertEqual(archived.first?.revision, 2)
+        do { _ = try await f.store.list(in: f.scope, query: String(repeating: "x", count: 1_025)); XCTFail() } catch { }
+    }
+
     func testComparisonSnapshotResolvesLatestRequirementsAndDetectsRetirement() async throws {
         let f = try await Fixture(); defer { f.remove() }
         let environment = EnvironmentID(), v1 = try await f.requirement(1)

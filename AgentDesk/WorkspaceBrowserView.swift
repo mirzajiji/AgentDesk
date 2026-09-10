@@ -13,6 +13,8 @@ struct WorkspaceBrowserView: View {
     @State private var runProject: ProjectRecord?
     @State private var requirementsProject: ProjectRecord?
     @State private var memoryProject: ProjectRecord?
+    @State private var bugsProject: ProjectRecord?
+    @State private var availableHeight: CGFloat = 640
 
     var body: some View {
         VStack(spacing: 0) {
@@ -59,6 +61,7 @@ struct WorkspaceBrowserView: View {
                 }
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { availableHeight = $0 }
         .task(id: command) {
             guard let action = command else { return }
             defer { if command == action { command = nil } }
@@ -73,7 +76,7 @@ struct WorkspaceBrowserView: View {
                     try Task.checkCancellation()
                     guard model.selectedWorkspace == id else { return }
                     if case .createProject = action { editor = .newProject(workspace) }
-                case .agents(let scope), .setup(let scope), .run(let scope), .requirements(let scope), .memory(let scope):
+                case .agents(let scope), .setup(let scope), .run(let scope), .requirements(let scope), .memory(let scope), .bugs(let scope):
                     _ = try await model.resolveProject(scope)
                     try Task.checkCancellation()
                     try await model.selectCommandWorkspace(scope.workspaceID)
@@ -87,6 +90,7 @@ struct WorkspaceBrowserView: View {
                     case .setup: setupProject = project
                     case .requirements: requirementsProject = project
                     case .memory: memoryProject = project
+                    case .bugs: bugsProject = project
                     case .run:
                         if !NativeRunRegistry.shared.focus(scope) { runProject = project }
                     default: break
@@ -122,6 +126,10 @@ struct WorkspaceBrowserView: View {
         }
         .sheet(item: $memoryProject) { project in
             ProjectMemoryView(project: project, open: { try await model.memoryServices(for: project) })
+        }
+        .sheet(item: $bugsProject) { project in
+            ProjectBugsView(project: project, open: { try await model.bugServices(for: project) })
+                .frame(height: max(480, min(640, availableHeight - 64)))
         }
         .sheet(item: $runProject) { project in
             ProjectRunConsoleView(project: project, open: { try await model.executionServices(for: project) })
@@ -178,6 +186,8 @@ struct WorkspaceBrowserView: View {
                 .accessibilityIdentifier("project.requirements.\(project.name)")
             Button("Memory") { memoryProject = project }
                 .accessibilityIdentifier("project.memory.\(project.name)")
+            Button("Bugs") { bugsProject = project }
+                .accessibilityIdentifier("project.bugs.\(project.name)")
         }
     }
 

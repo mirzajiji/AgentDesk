@@ -4,7 +4,7 @@ This is an implementation plan, not a completion claim. The full source specific
 
 Finish the current task's validation and commit before starting another independent task. A task may be split further when its diff becomes difficult to review; never combine unrelated completed tasks just to reduce commit count. Behavioral tests belong in the feature commit.
 
-Progress after P2-10a: **43 documented tasks complete, 0 Phase 1 tasks remaining** (31 foundation tasks including bootstrap and regression fixes, plus 12 Phase 2 tasks). **Four Phase 2 tasks remain:** native Bug Registry, traceability/impact, duplicate/report review and Phase 2 acceptance. Phases 3–6 and their associated sections 115–159 additions also remain; those phases are not yet decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
+Progress after P2-10b: **44 documented tasks complete, 0 Phase 1 tasks remaining** (31 foundation tasks including bootstrap and regression fixes, plus 13 Phase 2 tasks). **Three Phase 2 tasks remain:** traceability/impact, duplicate/report review and Phase 2 acceptance. Phases 3–6 and their associated sections 115–159 additions also remain; those phases are not yet decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
 
 ## Bootstrap
 
@@ -71,7 +71,7 @@ Phase 2 is decomposed into 11 planned tasks (P2-06 split into index and context 
 | P2-08 | Complete: duplicate detection and evidence preparation | Scoped current-requirement comparison, reviewed Codex ambiguity, immutable local overrides and sanitized known-ticket drafts; 185 Core, 145 Runtime and 326 iPhone tests pass. Mac: 476 passed; two unchanged Keychain tests fail with interaction-not-allowed. See [validation](p2-08-validation.md). Native management remains P2-10. |
 | P2-09 | Complete: versioned CityPay bug-report skill | Native template, synthetic examples, scoped version pinning, current-requirement reports and same-root grouping; 191 Core, 146 Runtime, 332 iPhone tests pass. Mac: 483 initial passes and three successful unlocked rechecks, including native UI. See [validation](p2-09-validation.md). |
 | P2-10a | Complete: native memory, notes and inbox | Scoped browser/editor, exact sanitized review, promotion/archive/ignore and immutable history; 192 Core and 333 iPhone tests pass, plus native Mac model/layout/UI checks. See [validation](p2-10a-validation.md). |
-| P2-10b | Pending: native Bug Registry workspace | Scoped bug creation/editing, manual ticket links, immutable history, relationship navigation and empty/error states |
+| P2-10b | Complete: native Bug Registry workspace | Reviewed scoped bug edits, ticket links, immutable history, direct/inverse navigation and measured sheet sizing; 193 Core, 334 iPhone and native Mac model/layout/UI checks pass. See [validation](p2-10b-validation.md). |
 | P2-10c | Pending: native traceability and impact views | Requirement/test/workflow/documentation links, latest versus historical references, stale/impact inspection and reviewed edits |
 | P2-10d | Pending: native duplicate and report review | Current evidence, deterministic/semantic comparisons, explicit decisions, known-ticket additions and CityPay report/group review |
 | P2-11 | Pending: Phase 2 acceptance and documentation | Native latest-versus-historical scenario, stale tests, known duplicate with additional evidence, isolation, Mac/iPhone tests and docs |

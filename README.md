@@ -46,3 +46,5 @@ Native project Requirements now supports reviewed immutable versions, draft/acti
 Project memory storage now separates confirmed knowledge, notes and inbox items, preserves immutable revisions/source provenance and requires review for authoritative changes. Native memory management remains upcoming; see [memory validation](Docs/Development/p2-05-validation.md).
 
 A scoped FTS5 knowledge index now supports redacted search, classification/path filters and rebuild-safe pagination. Agents can select knowledge paths, exclusions and classifications in the **Knowledge** tab. The run console previews current redacted sources before approval and blocks dispatch if selected sources change. See [index validation](Docs/Development/p2-06a-validation.md) and [context validation](Docs/Development/p2-06b-validation.md).
+
+The persistent Bug Registry now retains reviewed defect versions, manual ticket associations and link history, exact requirement/evidence references and project-scoped relationships. Native bug management and duplicate analysis remain upcoming; see [registry validation](Docs/Development/p2-07-validation.md).

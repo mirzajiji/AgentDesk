@@ -348,3 +348,36 @@ extension ProjectRequirementStore {
         return parent
     }
 }
+
+
+extension ProjectRequirementStore {
+    /// Bug publication and requirement validation share the root descriptor lock: a requirement edit
+    /// cannot slip between reference validation and the immutable bug-version write.
+    func withBugReferences(_ requests: [BugRequirementRequest], in requested: ProjectScope,
+                           environment: EnvironmentID?, body: @Sendable ([BugRequirementReference]) throws -> BugRecord) throws -> BugRecord {
+        try root.withLock {
+            try validate(requested)
+            guard requests.count <= 64 else { throw BugRegistryError.limitExceeded }
+            var identities = Set<String>()
+            let references = try requests.map { request -> BugRequirementReference in
+                try Task.checkCancellation()
+                guard identities.insert("\(request.role.rawValue)/\(request.requirement.id)").inserted else { throw BugRegistryError.invalidDocument }
+                let history = try read(request.requirement.id)
+                let version: RequirementVersion?
+                if let number = request.requirement.historicalVersion {
+                    guard (1...1_000_000).contains(number) else { throw BugRegistryError.invalidDocument }
+                    version = history.first { $0.version == number }
+                } else {
+                    let decision = history.first { $0.content.status != .draft }
+                    version = decision?.content.status == .active ? decision : nil
+                }
+                guard let version, version.content.environmentScope.isEmpty || environment.map({ version.content.environmentScope.contains($0) }) == true else {
+                    throw BugRegistryError.unavailableReference
+                }
+                return BugRequirementReference(role: request.role, requirement: TracedRequirement(id: version.id, version: version.version,
+                    fingerprint: try version.fingerprint, historical: request.requirement.historicalVersion != nil))
+            }
+            return try body(references)
+        }
+    }
+}

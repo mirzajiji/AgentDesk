@@ -17,6 +17,8 @@ final class NativeCommandCatalogTests: XCTestCase {
         XCTAssertEqual(catalog.search("RUN cafe").map(\.action), [.run(first.scope), .run(second.scope)])
         XCTAssertEqual(catalog.search("beta cafe run").map(\.action), [.run(second.scope)])
         XCTAssertEqual(catalog.search("beta requirements").map(\.action), [.requirements(second.scope)])
+        XCTAssertEqual(catalog.search("beta memory").map(\.action), [.memory(second.scope)])
+        XCTAssertEqual(catalog.search("alpha inbox").map(\.action), [.memory(first.scope)])
         XCTAssertTrue(catalog.search("not a capability").isEmpty)
         XCTAssertEqual(catalog.search("", limit: 1).map(\.action), [.settings])
         XCTAssertTrue(catalog.search("", limit: 0).isEmpty)
@@ -24,6 +26,7 @@ final class NativeCommandCatalogTests: XCTestCase {
         let scoped = NativeCommandCatalog(workspaces: [alpha], projects: [first, second])
         XCTAssertFalse(scoped.commands.contains { $0.action == .run(second.scope) })
         XCTAssertFalse(scoped.commands.contains { $0.action == .requirements(second.scope) })
+        XCTAssertFalse(scoped.commands.contains { $0.action == .memory(second.scope) })
     }
 
     func testCommandDiscoveryCreatesNoRunStorageAndRoutingResolvesCurrentProject() async throws {

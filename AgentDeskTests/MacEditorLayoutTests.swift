@@ -41,6 +41,21 @@ final class MacEditorLayoutTests: XCTestCase {
         assertFitsAndExpands(KnowledgeContextInspector(snapshot: String(repeating: "Synthetic reviewed source with version and provenance.\n", count: 500)))
     }
 
+    func testMemoryEditorsFitCompactAndLargeLogicalWindows() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let catalog = try WorkspaceCatalog(container: root)
+        let workspace = try await catalog.createWorkspace(name: "Synthetic memory layout")
+        let project = try await catalog.createProject(in: workspace.id, name: "Memory layout")
+        let store = try await catalog.memoryStore(in: project.scope)
+        assertFitsAndExpands(MemoryEditorView(store: store, existing: nil, environments: [], onPublish: { _ in }))
+        assertFitsAndExpands(MemoryJSONEditor(model: MemoryEditorModel(store: store, existing: nil)))
+        assertFitsAndExpands(ProjectMemoryView(project: project, open: {
+            NativeMemoryServices(store: store, environments: [], environmentIssue: nil)
+        }))
+    }
+
     func testExecutionFormsFitCompactWindowsAndExpandOnLargeDesktops() {
         let scope = ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID())
         let environments = (0..<20).map { index in

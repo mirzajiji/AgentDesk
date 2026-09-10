@@ -161,6 +161,19 @@ final class WorkspaceBrowserModel: ObservableObject {
         }
     }
 
+    func memoryServices(for project: ProjectRecord) async throws -> NativeMemoryServices {
+        guard let catalog else { throw CatalogError.invalidConfiguration }
+        let store = try await catalog.memoryStore(in: project.scope)
+        do {
+            let settings = try await ProjectExecutionSetupService(catalog: catalog, scope: project.scope).settings()
+            return NativeMemoryServices(store: store, environments: settings.project?.draft.environments ?? [], environmentIssue: nil)
+        } catch is CancellationError { throw CancellationError() }
+        catch {
+            return NativeMemoryServices(store: store, environments: [],
+                environmentIssue: "Execution environments could not be read. Check project Setup; stored memory selections are preserved.")
+        }
+    }
+
     func agentStore(for project: ProjectRecord) async throws -> ProjectAgentStore {
         guard let catalog else { throw CatalogError.invalidConfiguration }
         return try await catalog.agentStore(in: project.scope)

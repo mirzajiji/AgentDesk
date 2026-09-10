@@ -1,6 +1,6 @@
 # Project memory, retrieval and knowledge relationships
 
-Status: scoped structured memory/notes/inbox storage, FTS search and selective run-context integration implemented; timeline projections and native memory management remain planned. Run-context acceptance is tracked in P2-06b. Source: [final architecture](final-architecture.txt), sections 11, 12, 17, 103, 107 and 149–151.
+Status: scoped structured memory/notes/inbox storage, FTS search and selective run-context integration implemented; native memory management implemented and validated in P2-10a. Timeline projections remain planned. Run-context acceptance is tracked in P2-06b. Source: [final architecture](final-architecture.txt), sections 11, 12, 17, 103, 107 and 149–151.
 <!-- Source sections: 11,12,17,103,107,149,150,151 -->
 
 Project Memory holds reusable confirmed knowledge: project descriptions, accepted behavior, rules, API/state/environment semantics, test expectations, architecture, QA decisions, terminology and linked defects. Store separate structured JSON records rather than one growing monolithic document.
@@ -72,3 +72,15 @@ Preparation first authorizes the run and evidence read, then rebuilds the scoped
 Raw source-history fingerprints remain in the in-memory revalidation closure; persisted input contains fingerprints of sanitized bytes. Original source provenance remains distinct from interpretation. The exact packet is appended to the task as untrusted data and included in the existing input/dispatch fingerprint. Enabling selection without a reader fails preparation. Before approval consumption and again immediately before provider dispatch, selected source and relationship fingerprints are checked against current files. Changed sources require another preparation. A concurrent external edit immediately after this last check cannot be made atomic with starting an external process; the persisted packet still records the exact reviewed input used by that run.
 
 See the [P2-06b validation record](../Development/p2-06b-validation.md) for acceptance status. This adds no automatic knowledge promotion, semantic search, global company aggregation or external infrastructure access.
+
+## Native memory management (P2-10a)
+
+Open **Memory** beside a project, or search the command palette for its memory, notes or inbox action. Routing resolves the current project scope; names are labels, not identity. The browser shows current records with kind, environment and archived/ignored filters. Literal case/diacritic-insensitive search checks current title, body, structured JSON, tags and logical path directly in the authoritative store, bounded to 1,024 characters and 50 matching records per page. This administrative search is separate from the run-context FTS index. Changing a filter resets pagination and selection.
+
+**New Memory** starts a note with a local human-statement source. Choose a kind/topic and provide content and a version reason. The **Scope & Sources** tab retains environment selections and displays provenance; **Structured Fields** supports validated JSON edits to structured content and source metadata. Unknown stored environments are preserved if Setup is unavailable. Cross-project sources and invalid classifications fail validation.
+
+**Review Changes** prepares the exact sanitized candidate and presents changed fields with before/after values. **Publish Version** is the explicit local administrative review action. Cancelling a review writes nothing. Confirmation requires a topic and keeps source origin intact. Editing, archiving and ignoring an inbox entry all create immutable versions. Concurrent changes or expired proposals require another review. The version picker inspects earlier content; **Edit Latest Version** always starts from the current version. An archived/ignored result disappears from the default list and can be reopened with **Include archived/ignored**.
+
+Native display and publication use centralized content redaction before presenting existing content or preparing a candidate. The local preview uses an ephemeral redaction context that is never recorded as execution provenance. It does not read or enumerate Keychain secrets. The browser shows source identity and content rather than exposing raw integrity hashes as output evidence. Original version files remain authoritative; masking their display does not rewrite history.
+
+The views adapt to logical window sizes with scrollable forms and reachable review controls. This is a Mac administrative flow; it does not grant mobile configuration authority or perform automatic knowledge promotion. See [P2-10a validation](../Development/p2-10a-validation.md) for current acceptance and platform coverage.

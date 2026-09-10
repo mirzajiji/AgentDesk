@@ -12,6 +12,7 @@ struct WorkspaceBrowserView: View {
     @State private var setupProject: ProjectRecord?
     @State private var runProject: ProjectRecord?
     @State private var requirementsProject: ProjectRecord?
+    @State private var memoryProject: ProjectRecord?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -72,7 +73,7 @@ struct WorkspaceBrowserView: View {
                     try Task.checkCancellation()
                     guard model.selectedWorkspace == id else { return }
                     if case .createProject = action { editor = .newProject(workspace) }
-                case .agents(let scope), .setup(let scope), .run(let scope), .requirements(let scope):
+                case .agents(let scope), .setup(let scope), .run(let scope), .requirements(let scope), .memory(let scope):
                     _ = try await model.resolveProject(scope)
                     try Task.checkCancellation()
                     try await model.selectCommandWorkspace(scope.workspaceID)
@@ -85,6 +86,7 @@ struct WorkspaceBrowserView: View {
                     case .agents: selectedProject = project
                     case .setup: setupProject = project
                     case .requirements: requirementsProject = project
+                    case .memory: memoryProject = project
                     case .run:
                         if !NativeRunRegistry.shared.focus(scope) { runProject = project }
                     default: break
@@ -117,6 +119,9 @@ struct WorkspaceBrowserView: View {
         }
         .sheet(item: $requirementsProject) { project in
             ProjectRequirementsView(project: project, open: { try await model.requirementServices(for: project) })
+        }
+        .sheet(item: $memoryProject) { project in
+            ProjectMemoryView(project: project, open: { try await model.memoryServices(for: project) })
         }
         .sheet(item: $runProject) { project in
             ProjectRunConsoleView(project: project, open: { try await model.executionServices(for: project) })
@@ -171,6 +176,8 @@ struct WorkspaceBrowserView: View {
                 .accessibilityIdentifier("project.agents.\(project.name)")
             Button("Requirements") { requirementsProject = project }
                 .accessibilityIdentifier("project.requirements.\(project.name)")
+            Button("Memory") { memoryProject = project }
+                .accessibilityIdentifier("project.memory.\(project.name)")
         }
     }
 

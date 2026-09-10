@@ -53,10 +53,12 @@ public actor ProjectMemoryStore {
     }
     public func list(in requested: ProjectScope, kinds: Set<MemoryKind> = Set(MemoryKind.allCases),
                      environment: EnvironmentID? = nil, includeInactive: Bool = false,
-                     after: MemoryID? = nil, limit: Int = 50) throws -> [MemoryRecord] {
+                     after: MemoryID? = nil, limit: Int = 50, query: String = "") throws -> [MemoryRecord] {
         try root.withLock {
             try validate(requested)
             guard (1...100).contains(limit) else { throw RequirementError.limitExceeded }
+            try RequirementDraft.checkText(query, maximum: 1_024, empty: true)
+            let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
             let parent: ConfigurationDirectory
             do { parent = try project.child("Memory").child("Knowledge") } catch ScopedFileError.notFound { return [] }
             var results: [MemoryRecord] = []
@@ -68,6 +70,14 @@ public actor ProjectMemoryStore {
                       includeInactive || record.content.disposition == .active else { continue }
                 if let environment, !record.content.environmentScope.isEmpty,
                    !record.content.environmentScope.contains(environment) { continue }
+                if !search.isEmpty {
+                    let value = record.content
+                    let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+                    let structured = String(decoding: try encoder.encode(value.structured), as: UTF8.self)
+                    let searchable = [value.title, value.body, structured, value.tags.joined(separator: " "), value.knowledgePath?.rawValue ?? ""]
+                    guard searchable.contains(where: { $0.range(of: search, options: [.caseInsensitive, .diacriticInsensitive],
+                        locale: Locale(identifier: "en_US_POSIX")) != nil }) else { continue }
+                }
                 results.append(record); if results.count == limit { break }
             }
             return results

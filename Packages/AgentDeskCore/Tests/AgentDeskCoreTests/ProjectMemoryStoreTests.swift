@@ -38,6 +38,27 @@ final class ProjectMemoryStoreTests: XCTestCase {
         }
     }
 
+    func testNativeSearchFindsCurrentFieldsWithScopeEnvironmentAndInactiveFilters() async throws {
+        let f = try await Fixture(); defer { f.remove() }
+        var value = f.draft(.note); value.title = "Café response"; value.body = "Exact synthetic phrase"
+        value.tags = ["regression"]; value.structured = ["endpoint": .text("/synthetic/refunds")]
+        value.environmentScope = [f.environment]
+        let record = try await f.review(value)
+        for query in ["CAFE", "synthetic phrase", "regression", "/synthetic/refunds"] {
+            let matches = try await f.store.list(in: f.scope, environment: f.environment, query: query)
+            XCTAssertEqual(matches.map(\.id), [record.id])
+        }
+        let differentEnvironment = try await f.store.list(in: f.scope, environment: EnvironmentID(), query: "cafe")
+        XCTAssertTrue(differentEnvironment.isEmpty)
+        value.disposition = .archived
+        _ = try await f.review(value, id: record.id, expected: 1)
+        let active = try await f.store.list(in: f.scope, query: "cafe"); XCTAssertTrue(active.isEmpty)
+        let archived = try await f.store.list(in: f.scope, includeInactive: true, query: "cafe")
+        XCTAssertEqual(archived.first?.revision, 2)
+        do { _ = try await f.store.list(in: f.scope, query: String(repeating: "x", count: 1_025)); XCTFail() }
+        catch { XCTAssertEqual(error as? RequirementError, .limitExceeded) }
+    }
+
     func testCaptureCannotConfirmKnowledgeAndReviewedPromotionPreservesHistory() async throws {
         let f = try await Fixture(); defer { f.remove() }
         do { _ = try await f.store.capture(f.draft(.confirmed), in: f.scope); XCTFail() }

@@ -1,6 +1,6 @@
 # Immutable requirements and traceability
 
-Status: requirement storage/resolution implemented and validated; native editing/review and deterministic executable validation implemented; traceability remains planned. Source: [final architecture](final-architecture.txt), sections 13–16.
+Status: requirement storage/resolution implemented and validated; native editing/review, deterministic executable validation and traceability services implemented. Source: [final architecture](final-architecture.txt), sections 13–16.
 <!-- Source sections: 13,14,15,16 -->
 
 Requirement content is immutable after creation. A behavior change creates a new version and advances a current pointer; it never rewrites a prior version.
@@ -68,3 +68,13 @@ A path component is a literal object `key` or zero-based array `index`, encoded 
 `RequirementValidator` reads the exact scope-bound store and defaults to latest active; `historicalVersion` is an explicit reproduction choice. Observations carry project/environment identity, source and capture time, plus run/agent identity when applicable. The resulting report preserves the resolved requirement version/fingerprint, rule, observed value and deterministic result. It performs no network or company-data collection. Reports remain in memory; future adapters must redact before storing or displaying evidence.
 
 Absent evidence, incompatible traversal/comparison and zero executable rules produce unavailable results. An explicit existence predicate can fail on a missing path in available structured evidence. JSON null remains observed data. Aggregate status is unavailable when any rule is unavailable, otherwise failed when any predicate fails, otherwise passed. Individual failures remain visible even when other evidence is unavailable; these results do not themselves register a defect. See [validation record](../Development/p2-03-validation.md).
+
+## Reviewed traceability (P2-04)
+
+Project-scoped automated-test, manual-test, bug, documentation and workflow identities can carry reviewed requirement links. `prepareTrace` resolves each ID to latest active unless a historical version is explicitly supplied. `publishReviewedTrace` revalidates exact requirement fingerprints and the prior link record under the catalog lock; `cancelTrace` changes no files. The candidate contains title, environment, change reason and archive state for review. Tokens expire in five minutes and cannot transfer between stores or be replayed.
+
+Current link metadata lives in `Memory/Traceability/<kind>/<id>.json`; reviewed updates atomically replace that record with a higher revision. This is separate from immutable requirement files. IDs are inert readable slugs; links do not execute tests, open external records or create bugs. Native relationship management is a later P2-10 surface.
+
+`resolveTrace` uses current active behavior for ordinary reruns while retaining creation references. Set `reproduceLinkedVersions` explicitly for historical reproduction. Both paths validate stored fingerprints. `impact` reports saved and active versions, environment applicability and potentially stale/unavailable status, with affected counts for each subject kind. Archived relationships are excluded. Draft-only changes preserve current status; retirement or excluded environments become unavailable. A stale link means review is needed, not proof that the linked test is wrong.
+
+The store supports up to 64 requirement links per record. Impact scans are bounded to 1,000 records and 16 MiB and fail explicitly beyond those limits. All operations revalidate ownership and use the same filesystem lock and descriptor safety boundary as requirement storage. See [P2-04 validation](../Development/p2-04-validation.md).

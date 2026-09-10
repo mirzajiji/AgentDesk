@@ -9,6 +9,7 @@ public actor ProjectRequirementStore {
     private let project: ConfigurationDirectory
     private let clock: @Sendable () -> Date
     private var proposals: [UUID: RequirementProposal] = [:]
+    private var traceProposals: [UUID: TraceabilityProposal] = [:]
 
     init(scope: ProjectScope, root: ConfigurationDirectory, workspace: ConfigurationDirectory,
          project: ConfigurationDirectory, clock: @escaping @Sendable () -> Date = { Date() }) {
@@ -204,5 +205,146 @@ public actor ProjectRequirementStore {
         let currentFile: String
         let fingerprint: ActionFingerprint
         let activeVersion: Int?
+    }
+}
+
+extension ProjectRequirementStore {
+    /// No files are changed until this exact link proposal is reviewed and published.
+    public func prepareTrace(subject: TraceabilitySubject, title: String, environment: EnvironmentID,
+                             requirements: [RequirementLinkRequest], changeReason: String, archived: Bool = false,
+                             expectedRevision: Int? = nil, in requested: ProjectScope) throws -> TraceabilityProposal {
+        try root.withLock {
+            try validate(requested)
+            guard (1...64).contains(requirements.count), Set(requirements.map(\.id)).count == requirements.count else {
+                throw RequirementError.invalidDocument
+            }
+            let now = clock()
+            guard now.timeIntervalSince1970.isFinite, now.timeIntervalSince1970 >= 0 else { throw RequirementError.invalidReview }
+            traceProposals = traceProposals.filter { $0.value.expiresAt > now }
+            guard traceProposals.count < 16 else { throw RequirementError.limitExceeded }
+            let existing = try readTrace(subject)
+            guard existing?.revision == expectedRevision else { throw RequirementError.staleVersion }
+            guard existing == nil || now >= existing!.updatedAt else { throw RequirementError.invalidReview }
+            let links = try requirements.map { request -> TracedRequirement in
+                let version = try traceVersion(request.id, environment: environment, historical: request.historicalVersion)
+                return TracedRequirement(id: version.id, version: version.version, fingerprint: try version.fingerprint,
+                                         historical: request.historicalVersion != nil)
+            }
+            let candidate = RequirementTraceRecord(schemaVersion: 1, scope: scope, subject: subject, title: title,
+                environment: environment, revision: (existing?.revision ?? 0) + 1, requirements: links,
+                archived: archived, changeReason: changeReason, updatedAt: Date(timeIntervalSince1970: floor(now.timeIntervalSince1970)))
+            try candidate.validate(); _ = try encode(candidate)
+            let proposal = TraceabilityProposal(token: UUID(), candidate: candidate, expiresAt: now.addingTimeInterval(300),
+                previousFingerprint: try existing.map { try ActionFingerprint.canonical($0) })
+            traceProposals[proposal.token] = proposal
+            return proposal
+        }
+    }
+    public func cancelTrace(_ proposal: TraceabilityProposal) { traceProposals.removeValue(forKey: proposal.token) }
+
+    public func publishReviewedTrace(_ proposal: TraceabilityProposal, in requested: ProjectScope) throws -> RequirementTraceRecord {
+        try root.withLock {
+            try validate(requested)
+            let candidate = proposal.candidate, now = clock()
+            guard traceProposals[proposal.token] == proposal, candidate.scope == scope,
+                  now >= candidate.updatedAt, now < proposal.expiresAt else { throw RequirementError.invalidReview }
+            traceProposals.removeValue(forKey: proposal.token)
+            let existing = try readTrace(candidate.subject)
+            guard try existing.map({ try ActionFingerprint.canonical($0) }) == proposal.previousFingerprint,
+                  candidate.revision == (existing?.revision ?? 0) + 1 else { throw RequirementError.staleVersion }
+            // A latest-active proposal cannot silently attach to behavior changed during review.
+            for link in candidate.requirements {
+                let current = try traceVersion(link.id, environment: candidate.environment, historical: link.historical ? link.version : nil)
+                guard current.version == link.version, try current.fingerprint == link.fingerprint else { throw RequirementError.staleVersion }
+            }
+            let directory = try traceDirectory(candidate.subject.kind, create: true)
+            try directory.write(encode(candidate), to: "\(candidate.subject.id).json", replacing: existing != nil)
+            return candidate
+        }
+    }
+    public func trace(_ subject: TraceabilitySubject, in requested: ProjectScope) throws -> RequirementTraceRecord? {
+        try root.withLock { try validate(requested); return try readTrace(subject) }
+    }
+    /// A saved creation link never silently pins an ordinary rerun to old behavior.
+    public func resolveTrace(_ subject: TraceabilitySubject, in requested: ProjectScope,
+                             reproduceLinkedVersions: Bool = false) throws -> [RequirementVersion] {
+        try root.withLock {
+            try validate(requested)
+            guard let record = try readTrace(subject), !record.archived else { throw RequirementValidationError.requirementUnavailable }
+            return try record.requirements.map { link in
+                let value = try traceVersion(link.id, environment: record.environment,
+                                             historical: reproduceLinkedVersions ? link.version : nil)
+                if reproduceLinkedVersions, try value.fingerprint != link.fingerprint { throw RequirementError.invalidDocument }
+                return value
+            }
+        }
+    }
+    public func impact(of id: RequirementID, in requested: ProjectScope) throws -> RequirementImpactReport {
+        try root.withLock {
+            try validate(requested)
+            let history = try read(id)
+            let decision = history.first { $0.content.status != .draft }
+            let active = decision?.content.status == .active ? decision : nil
+            var links: [RequirementImpact] = [], count = 0, bytes = 0
+            for kind in TraceabilitySubject.Kind.allCases {
+                let directory: ConfigurationDirectory
+                do { directory = try traceDirectory(kind) } catch ScopedFileError.notFound { continue }
+                for name in try directory.names() where !name.hasPrefix(".") {
+                    try Task.checkCancellation(); count += 1
+                    guard count <= 1_000 else { throw RequirementError.limitExceeded }
+                    guard name.hasSuffix(".json"), let subjectID = RequirementID(rawValue: String(name.dropLast(5))) else { throw RequirementError.invalidDocument }
+                    let data = try directory.read(name, maximumBytes: 262_144)
+                    bytes += data.count; guard bytes <= 16_777_216 else { throw RequirementError.limitExceeded }
+                    let record: RequirementTraceRecord = try decode(data); try record.validate()
+                    guard record.scope == scope, record.subject == TraceabilitySubject(kind: kind, id: subjectID) else { throw RequirementError.scopeMismatch }
+                    guard !record.archived, let link = record.requirements.first(where: { $0.id == id }) else { continue }
+                    guard let pinned = history.first(where: { $0.version == link.version }), try pinned.fingerprint == link.fingerprint else {
+                        throw RequirementError.invalidDocument
+                    }
+                    let applicable = active.map { $0.content.environmentScope.isEmpty || $0.content.environmentScope.contains(record.environment) } ?? false
+                    let status: RequirementImpact.Status = !applicable ? .unavailable : active?.version == link.version ? .current : .potentiallyStale
+                    links.append(RequirementImpact(record: record, linked: link, activeVersion: active?.version, status: status))
+                }
+            }
+            return RequirementImpactReport(scope: scope, requirement: id, links: links)
+        }
+    }
+    private func traceVersion(_ id: RequirementID, environment: EnvironmentID, historical: Int?) throws -> RequirementVersion {
+        let history = try read(id)
+        let version: RequirementVersion?
+        if let historical {
+            guard (1...1_000_000).contains(historical) else { throw RequirementError.invalidDocument }
+            version = history.first { $0.version == historical }
+        } else {
+            let decision = history.first { $0.content.status != .draft }
+            version = decision?.content.status == .active ? decision : nil
+        }
+        guard let version, version.content.environmentScope.isEmpty || version.content.environmentScope.contains(environment) else {
+            throw RequirementValidationError.requirementUnavailable
+        }
+        return version
+    }
+    private func readTrace(_ subject: TraceabilitySubject) throws -> RequirementTraceRecord? {
+        let data: Data
+        do { data = try traceDirectory(subject.kind).read("\(subject.id).json", maximumBytes: 262_144) }
+        catch ScopedFileError.notFound { return nil }
+        let record: RequirementTraceRecord = try decode(data); try record.validate()
+        guard record.scope == scope, record.subject == subject else { throw RequirementError.scopeMismatch }
+        for link in record.requirements {
+            let pinned = try traceVersion(link.id, environment: record.environment, historical: link.version)
+            guard try pinned.fingerprint == link.fingerprint else { throw RequirementError.invalidDocument }
+        }
+        return record
+    }
+    private func traceDirectory(_ kind: TraceabilitySubject.Kind, create: Bool = false) throws -> ConfigurationDirectory {
+        var parent = project
+        for component in ["Memory", "Traceability", kind.rawValue] {
+            do { parent = try parent.child(component) }
+            catch ScopedFileError.notFound {
+                guard create else { throw ScopedFileError.notFound }
+                parent = try parent.createChild(component)
+            }
+        }
+        return parent
     }
 }

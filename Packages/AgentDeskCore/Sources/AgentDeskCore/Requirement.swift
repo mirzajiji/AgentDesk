@@ -74,6 +74,8 @@ public struct RequirementDraft: Codable, Equatable, Sendable {
     public var rules: [String]
     public var acceptanceCriteria: [String]
     public var validationRules: [String]
+    /// Optional so legacy content retains its exact canonical encoding and historical fingerprint.
+    public var executableValidationRules: [RequirementValidationRule]?
     public var expectedBehavior: [String: KnowledgeValue]
     public var environmentScope: [EnvironmentID]
     /// Source descriptions/links are inert metadata; the store never opens them.
@@ -83,11 +85,13 @@ public struct RequirementDraft: Codable, Equatable, Sendable {
     public init(description: String, changeReason: String, status: RequirementStatus = .draft,
                 preconditions: [String] = [], rules: [String] = [], acceptanceCriteria: [String] = [],
                 validationRules: [String] = [], expectedBehavior: [String: KnowledgeValue] = [:],
-                environmentScope: [EnvironmentID] = [], references: [String] = []) {
+                environmentScope: [EnvironmentID] = [], references: [String] = [],
+                executableValidationRules: [RequirementValidationRule]? = nil) {
         self.description = description; self.changeReason = changeReason; self.status = status
         self.preconditions = preconditions; self.rules = rules; self.acceptanceCriteria = acceptanceCriteria
         self.validationRules = validationRules; self.expectedBehavior = expectedBehavior
         self.environmentScope = environmentScope; self.references = references
+        self.executableValidationRules = executableValidationRules
     }
     public func validate() throws {
         try Self.checkText(description, maximum: 32_768); try Self.checkText(changeReason, maximum: 4_096)
@@ -96,6 +100,11 @@ public struct RequirementDraft: Codable, Equatable, Sendable {
             for text in list { try Self.checkText(text, maximum: 8_192) }
         }
         guard environmentScope.count <= 128, Set(environmentScope).count == environmentScope.count else { throw RequirementError.invalidDocument }
+        if let executableValidationRules {
+            guard executableValidationRules.count <= 128,
+                  Set(executableValidationRules.map(\.id)).count == executableValidationRules.count else { throw RequirementError.invalidDocument }
+            for rule in executableValidationRules { try rule.validate() }
+        }
         var nodes = 0; try KnowledgeValue.object(expectedBehavior).validate(nodes: &nodes)
     }
     static func checkText(_ text: String, maximum: Int, empty: Bool = false) throws {

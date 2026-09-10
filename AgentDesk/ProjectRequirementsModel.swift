@@ -55,10 +55,23 @@ final class ProjectRequirementsModel: ObservableObject {
             }
         }
     }
+    // Native List bindings must observe their new selection synchronously.
+    func selectFromUI(_ id: RequirementID) {
+        guard services != nil else { return }
+        let token = beginSelection(id)
+        Task { await loadSelection(id, token: token) }
+    }
     func select(_ id: RequirementID) async {
-        guard let services else { return }
-        selection += 1; let token = selection
+        guard services != nil else { return }
+        await loadSelection(id, token: beginSelection(id))
+    }
+    private func beginSelection(_ id: RequirementID) -> Int {
+        selection += 1
         selectedID = id; selectedVersion = nil; history = []; isSelecting = true; errorMessage = nil
+        return selection
+    }
+    private func loadSelection(_ id: RequirementID, token: Int) async {
+        guard token == selection, let services else { return }
         defer { if token == selection { isSelecting = false } }
         do {
             let history = try await services.store.history(id, in: project.scope)

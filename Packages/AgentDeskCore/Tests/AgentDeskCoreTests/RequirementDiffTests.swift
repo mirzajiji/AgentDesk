@@ -23,7 +23,7 @@ final class RequirementDiffTests: XCTestCase {
             expectedBehavior: ["values": .array([.boolean(true), .null, .number(Decimal(string: "9007199254740993")!)])],
             environmentScope: [EnvironmentID()])
         let changes = try draft.changes(from: nil)
-        XCTAssertEqual(changes.count, 10); XCTAssertTrue(changes.allSatisfy { $0.before == nil })
+        XCTAssertEqual(changes.count, 11); XCTAssertTrue(changes.allSatisfy { $0.before == nil })
         XCTAssertTrue(try XCTUnwrap(changes.first { $0.field == "Expected behavior" }).after.contains("9007199254740993"))
         XCTAssertEqual(changes.first { $0.field == "Environment scope" }?.after, draft.environmentScope[0].rawValue)
     }

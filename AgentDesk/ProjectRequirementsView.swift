@@ -42,7 +42,7 @@ struct ProjectRequirementsView: View {
                     .accessibilityIdentifier("requirements.empty")
             } else {
                 List(selection: Binding(get: { model.selectedID }, set: { id in
-                    if let id { Task { await model.select(id) } }
+                    if let id { model.selectFromUI(id) }
                 })) {
                     ForEach(model.records, id: \.id) { record in
                         VStack(alignment: .leading, spacing: 4) {

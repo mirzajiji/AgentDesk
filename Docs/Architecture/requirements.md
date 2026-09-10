@@ -1,6 +1,6 @@
 # Immutable requirements and traceability
 
-Status: requirement storage/resolution implemented and validated; native editing/review implemented; executable validation and traceability remain planned. Source: [final architecture](final-architecture.txt), sections 13–16.
+Status: requirement storage/resolution implemented and validated; native editing/review and deterministic executable validation implemented; traceability remains planned. Source: [final architecture](final-architecture.txt), sections 13–16.
 <!-- Source sections: 13,14,15,16 -->
 
 Requirement content is immutable after creation. A behavior change creates a new version and advances a current pointer; it never rewrites a prior version.
@@ -29,7 +29,7 @@ Create v1 and v2; byte-compare v1 after publication; verify version allocation, 
 
 ## Initial store contract (P2-01)
 
-`WorkspaceCatalog.requirementStore(in:)` opens a scope-bound local administrative store without creating memory files. Each readable requirement ID permits lowercase ASCII letters, digits and internal hyphens, up to 96 bytes. Storage is `Memory/Requirements/<id>/requirement.vN.json` plus `current.json` inside the selected project. Versions hold scope, schema/version identity, publication ancestry/fingerprints, UTC creation time and structured content. Content includes status, description, preconditions, rules, acceptance/validation descriptions, nested expected behavior, environment IDs, inert source references and a required change reason. Decimal numbers preserve large integer values. Validation-rule descriptions are not yet executable rules.
+`WorkspaceCatalog.requirementStore(in:)` opens a scope-bound local administrative store without creating memory files. Each readable requirement ID permits lowercase ASCII letters, digits and internal hyphens, up to 96 bytes. Storage is `Memory/Requirements/<id>/requirement.vN.json` plus `current.json` inside the selected project. Versions hold scope, schema/version identity, publication ancestry/fingerprints, UTC creation time and structured content. Content includes status, description, preconditions, rules, acceptance/validation descriptions, nested expected behavior, environment IDs, inert source references and a required change reason. Decimal numbers preserve large integer values. Validation-rule descriptions remain inert; typed executable rules use the separate field described below.
 
 Preparation returns an exact in-memory proposal and writes no authoritative files. The native caller must review that proposal before calling `publishReviewed`; cancellation, expiry after five minutes, use by a different store, payload substitution, duplicate use and a changed base reject publication. A store retains at most 16 pending reviews. This is a trusted local administrative API, not a model/mobile tool or a replacement for runtime policy authorization. Native review UI is implemented in P2-02; runtime exposure remains separate.
 
@@ -46,3 +46,25 @@ Open Requirements from a project or use Command-K → Manage Requirements. The s
 The editor supports ID, status, description, required change reason and configured project environments. Advanced JSON edits preconditions, rules, acceptance/validation descriptions, expected behavior and references with the same bounded validation. Applying JSON changes only the draft. Review shows exact before/after values for all changed fields; Create vN publishes that exact proposal. Cancel preserves authoritative files. Unavailable storage and configuration diagnostics are distinct from an empty collection.
 
 Native actions remain outside scrolling content; project actions wrap in compact windows. Mac model, layout and UI tests cover cancellation, stale/foreign proposals, JSON errors, history after relaunch, retirement/reactivation and environment retention. See [P2-02 validation](../Development/p2-02-validation.md).
+
+## Deterministic executable rules (P2-03)
+
+`executableValidationRules` is an optional list separate from human-readable `validationRules`. Existing content omits it and retains its canonical fingerprint. Each typed rule has schema version 1, a unique readable ID, at most 16 path components and a supported operation. Add it through Advanced JSON and review the resulting field diff before publication. For example:
+
+```json
+"executableValidationRules": [
+  {
+    "schemaVersion": 1,
+    "id": "closed-state",
+    "path": [{"key": {"_0": "state"}}],
+    "operation": "equals",
+    "expected": "closed"
+  }
+]
+```
+
+A path component is a literal object `key` or zero-based array `index`, encoded by the shared Codable enum; an empty path selects the entire observation. It never resolves a filesystem path. Supported operations are `equals`, `notEquals`, `exists`, `absent`, `minimum`, `maximum`, `contains` and `type`. Numeric bounds require exact Decimal operands. Contains supports array membership and text substrings. Type operands are `null`, `boolean`, `number`, `text`, `array` or `object`. Exists/absent omit `expected`; explicit JSON null is a valid equality operand and differs from an omitted operand. Unknown operations/schema versions, invalid operands, duplicate rule IDs and excessive paths fail validation before publication.
+
+`RequirementValidator` reads the exact scope-bound store and defaults to latest active; `historicalVersion` is an explicit reproduction choice. Observations carry project/environment identity, source and capture time, plus run/agent identity when applicable. The resulting report preserves the resolved requirement version/fingerprint, rule, observed value and deterministic result. It performs no network or company-data collection. Reports remain in memory; future adapters must redact before storing or displaying evidence.
+
+Absent evidence, incompatible traversal/comparison and zero executable rules produce unavailable results. An explicit existence predicate can fail on a missing path in available structured evidence. JSON null remains observed data. Aggregate status is unavailable when any rule is unavailable, otherwise failed when any predicate fails, otherwise passed. Individual failures remain visible even when other evidence is unavailable; these results do not themselves register a defect. See [validation record](../Development/p2-03-validation.md).

@@ -33,7 +33,7 @@ final class NativeRequirementModelTests: XCTestCase {
         let model = RequirementEditorModel(store: f.store, existing: nil)
         model.idText = f.id.rawValue; model.draft = f.draft()
         let unreviewed = await model.publish(); XCTAssertNil(unreviewed)
-        await model.prepare(); XCTAssertNotNil(model.proposal); XCTAssertEqual(model.changes.count, 10)
+        await model.prepare(); XCTAssertNotNil(model.proposal); XCTAssertEqual(model.changes.count, 11)
         let before = try await f.store.resolve(f.id, in: f.project.scope); XCTAssertNil(before)
         await model.cancelReview(); let cancelled = await model.publish(); XCTAssertNil(cancelled)
         let after = try await f.store.resolve(f.id, in: f.project.scope); XCTAssertNil(after)
@@ -96,6 +96,19 @@ final class NativeRequirementModelTests: XCTestCase {
         XCTAssertEqual(model.displayed?.version, 2); XCTAssertEqual(model.active?.version, 1)
         model.selectedVersion = 1; XCTAssertEqual(model.displayed?.content.description, "Reviewed behavior")
         let active = try await f.store.resolve(f.id, in: f.project.scope); XCTAssertEqual(active?.version, 1)
+    }
+
+    func testNativeSelectionChangesSynchronouslyAndCancellationClearsIt() async throws {
+        let f = try await Fixture(); defer { f.remove() }
+        _ = try await f.publish(f.draft())
+        let model = ProjectRequirementsModel(project: f.project, open: { f.services })
+        await model.load()
+        model.selectFromUI(f.id)
+        XCTAssertEqual(model.selectedID, f.id)
+        XCTAssertTrue(model.isSelecting)
+        model.cancel()
+        await Task.yield()
+        XCTAssertNil(model.selectedID); XCTAssertTrue(model.history.isEmpty)
     }
 
     func testCancelledBrowserLoadCannotRestoreLateResults() async throws {

@@ -44,12 +44,14 @@ final class RequirementEditorUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["requirement.json.error"].waitForExistence(timeout: 5))
         document["rules"] = ["A synthetic rule"]
         document["expectedBehavior"] = ["ok": true]
+        document["executableValidationRules"] = [["schemaVersion": 1, "id": "expected-result", "path": [], "operation": "equals", "expected": true]]
         replace(json, with: String(decoding: try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]), as: UTF8.self), in: app, scroll: nil)
         click("requirement.json.apply", in: app)
         XCTAssertTrue(json.waitForNonExistence(timeout: 5))
         click("requirement.review", in: app)
         waitForValue("Proposed version: v2", id: "requirement.proposed.version", in: app)
         XCTAssertTrue((app.staticTexts["requirement.change.Rules"].value as? String)?.contains("A synthetic rule") == true)
+        XCTAssertTrue((app.staticTexts["requirement.change.Executable validation rules"].value as? String)?.contains("expected-result") == true)
         click("requirement.publish", in: app)
         waitForValue("Active version: v1", id: "requirements.active", in: app)
         waitForValue("Viewing v2 · draft", id: "requirements.viewing", in: app)

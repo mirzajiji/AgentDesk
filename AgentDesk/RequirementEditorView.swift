@@ -71,7 +71,7 @@ struct RequirementEditorView: View {
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(8)
                         }
                         Button("Advanced JSON…") { advanced = true }.accessibilityIdentifier("requirement.json.open")
-                        Text("Edit preconditions, rules, acceptance criteria, validation descriptions, structured expected behavior and references in Advanced JSON.")
+                        Text("Edit preconditions, rules, acceptance criteria, validation descriptions, executableValidationRules, structured expected behavior and references in Advanced JSON.")
                             .font(.caption).foregroundStyle(.secondary)
                     }.disabled(model.isBusy)
                 }

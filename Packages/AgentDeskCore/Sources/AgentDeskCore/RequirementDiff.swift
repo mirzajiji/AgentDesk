@@ -25,6 +25,7 @@ extension RequirementDraft {
             ("Status", status.rawValue), ("Description", description),
             ("Preconditions", try lines(preconditions)), ("Rules", try lines(rules)),
             ("Acceptance criteria", try lines(acceptanceCriteria)), ("Validation descriptions", try lines(validationRules)),
+            ("Executable validation rules", String(decoding: try encoder.encode(executableValidationRules ?? []), as: UTF8.self)),
             ("Expected behavior", String(decoding: try encoder.encode(expectedBehavior), as: UTF8.self)),
             ("Environment scope", environmentScope.isEmpty ? "All project environments" : environmentScope.map(\.rawValue).joined(separator: "\n")),
             ("References", try lines(references)), ("Change reason", changeReason)

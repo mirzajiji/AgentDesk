@@ -52,15 +52,15 @@ struct ExecutionRequest: Sendable {
         }
     }
 }
-enum ExecutionProviderError: Error, Equatable, Sendable {
+enum ExecutionProviderError: String, Error, Codable, Equatable, Sendable {
     case invalidRequest, invalidOutput, unsupportedAccess, scopeMismatch, unavailable, unauthenticated, busy, outputLimit, consumerOverflow
     case invalidProtocol, unverifiedPermissions, unexpectedApproval, providerFailed, incompleteResult, processFailed, timedOut
 }
 
 /// Untrusted provider observations held in bounded memory. Redaction is required before persistence or UI.
-struct ExecutionProviderEvent: Sendable, Equatable {
-    enum Activity: String, Sendable { case command, fileChange, planning }
-    enum Payload: Sendable, Equatable {
+struct ExecutionProviderEvent: Codable, Sendable, Equatable {
+    enum Activity: String, Codable, Sendable { case command, fileChange, planning }
+    enum Payload: Codable, Sendable, Equatable {
         case started
         case activity(id: String, kind: Activity, completed: Bool)
         case message(id: String, text: String)

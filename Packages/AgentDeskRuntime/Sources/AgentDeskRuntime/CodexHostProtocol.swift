@@ -3,6 +3,7 @@ import Foundation
 
 @objc public protocol CodexHostXPC {
     func perform(_ request: Data, reply: @escaping @Sendable (Data) -> Void)
+    func execute(_ request: Data, reply: @escaping @Sendable (Data) -> Void)
 }
 
 public struct CodexHostRequest: Codable, Sendable {

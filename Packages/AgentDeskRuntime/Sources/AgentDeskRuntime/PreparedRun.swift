@@ -3,30 +3,30 @@ import AgentDeskPersistence
 import AgentDeskSecurity
 import Foundation
 
-enum RunCoordinatorError: String, Error, Sendable {
+public enum RunCoordinatorError: String, Error, Sendable {
     case busy, closed, invalidPreparation, unsafeStorage, unauthorized, invalidEvents, limitExceeded
     case providerFailed, repositoryFailed, timedOut, cancelled, interrupted, persistenceUnavailable
 }
-struct PreparedRun: Sendable {
+public struct PreparedRun: Sendable {
     let token: UUID
-    let runID: RunID
-    let action: PolicyAction
-    let approval: ApprovalRecord?
-    let maximumActivities: Int
+    public let runID: RunID
+    public let action: PolicyAction
+    public let approval: ApprovalRecord?
+    public let maximumActivities: Int
 }
-struct RunOutcome: Sendable {
-    let runID: RunID
+public struct RunOutcome: Sendable {
+    public let runID: RunID
     /// Nil means the terminal state could not be committed; it must not be displayed as confirmed.
-    let state: RunState?
-    let failure: RunCoordinatorError?
-    let finalArtifactID: UUID?
+    public let state: RunState?
+    public let failure: RunCoordinatorError?
+    public let finalArtifactID: UUID?
 }
-struct RunExecution: Sendable {
-    let runID: RunID
+public struct RunExecution: Sendable {
+    public let runID: RunID
     private let task: Task<RunOutcome, Never>
     init(runID: RunID, task: Task<RunOutcome, Never>) { self.runID = runID; self.task = task }
-    func result() async -> RunOutcome { await task.value }
-    func cancel() { task.cancel() }
+    public func result() async -> RunOutcome { await task.value }
+    public func cancel() { task.cancel() }
 }
 struct PreparedRunData: Sendable {
     let preview: PreparedRun

@@ -35,6 +35,7 @@ public struct MemorySource: Codable, Equatable, Sendable {
 }
 
 public struct MemoryDraft: Codable, Equatable, Sendable {
+    public var knowledgePath: KnowledgePath?
     public var kind: MemoryKind
     public var topic: MemoryTopic
     public var title: String
@@ -48,7 +49,8 @@ public struct MemoryDraft: Codable, Equatable, Sendable {
     public init(kind: MemoryKind, topic: MemoryTopic = .unclassified, title: String, body: String,
                 sources: [MemorySource], structured: [String: KnowledgeValue] = [:],
                 environmentScope: [EnvironmentID] = [], tags: [String] = [], disposition: MemoryDisposition = .active,
-                changeReason: String) {
+                changeReason: String, knowledgePath: KnowledgePath? = nil) {
+        self.knowledgePath = knowledgePath
         self.kind = kind; self.topic = topic; self.title = title; self.body = body; self.sources = sources
         self.structured = structured; self.environmentScope = environmentScope; self.tags = tags
         self.disposition = disposition; self.changeReason = changeReason

@@ -3,7 +3,7 @@ import Foundation
 /// Forward-only, transactional migrations. A failed or future schema is never reset.
 enum OperationalMigrations {
     static let applicationID = 1_095_189_579 // "AGDK"
-    static let currentVersion = 5
+    static let currentVersion = 6
     static let versionOne = [
         """
         CREATE TABLE runs (
@@ -97,6 +97,23 @@ enum OperationalMigrations {
         """
     ]
 
+    static let versionSix = [
+        """
+        CREATE VIRTUAL TABLE knowledge_fts USING fts5(
+            workspace_id UNINDEXED, project_id UNINDEXED, environment_id UNINDEXED,
+            source_id UNINDEXED, path UNINDEXED, kind UNINDEXED, revision UNINDEXED,
+            fingerprint UNINDEXED, title, body, tokenize='unicode61'
+        )
+        """,
+        """
+        CREATE TABLE knowledge_generations (
+            workspace_id TEXT NOT NULL, project_id TEXT NOT NULL, environment_id TEXT NOT NULL,
+            generation INTEGER NOT NULL CHECK(generation > 0),
+            PRIMARY KEY(workspace_id, project_id, environment_id)
+        )
+        """
+    ]
+
     static func apply(to database: SQLiteConnection) throws {
         try database.execute("PRAGMA foreign_keys = ON")
         try database.transaction {
@@ -128,6 +145,12 @@ enum OperationalMigrations {
                 for statement in versionFive { try database.execute(statement) }
                 try database.execute("PRAGMA user_version = 5")
             }
+            if version < 6 {
+                for statement in versionSix { try database.execute(statement) }
+                try database.execute("PRAGMA user_version = 6")
+            }
+            _ = try database.query("SELECT workspace_id,project_id,environment_id,source_id,path,kind,revision,fingerprint,title,body FROM knowledge_fts LIMIT 0") { _ in 0 }
+            _ = try database.query("SELECT workspace_id,project_id,environment_id,generation FROM knowledge_generations LIMIT 0") { _ in 0 }
             // Verify required columns even when the database already claims the latest schema.
             _ = try database.query("SELECT workspace_id, project_id, run_id, state, created_at FROM runs LIMIT 0") { _ in 0 }
             _ = try database.query("SELECT workspace_id, project_id, run_id, sequence, state, recorded_at, event_kind, progress_json FROM run_events LIMIT 0") { _ in 0 }

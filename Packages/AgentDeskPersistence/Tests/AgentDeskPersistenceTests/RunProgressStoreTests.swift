@@ -105,7 +105,7 @@ final class RunProgressStoreTests: XCTestCase {
         let store = try OperationalStore(database: path, workspaceID: scope.workspaceID)
         let history = try await store.events(for: id, in: scope)
         XCTAssertEqual(history.count, 1); XCTAssertEqual(history[0].kind, .runState); XCTAssertNil(history[0].progress)
-        XCTAssertEqual(try connection.integer("PRAGMA user_version"), 5)
+        XCTAssertEqual(try connection.integer("PRAGMA user_version"), 6)
         let stage = WorkItemDefinition(kind: .stage, title: "Migrated")
         _ = try await store.configureProgress(RunWorkPlan(scope: scope, runID: id, mode: .fixedStages, definitions: [stage]), in: scope, expectedSequence: 1)
         let progress = try await store.progressPlan(for: id, in: scope); XCTAssertNotNil(progress)

@@ -4,7 +4,7 @@ This is an implementation plan, not a completion claim. The full source specific
 
 Finish the current task's validation and commit before starting another independent task. A task may be split further when its diff becomes difficult to review; never combine unrelated completed tasks just to reduce commit count. Behavioral tests belong in the feature commit.
 
-Progress after P2-05: **37 documented tasks complete, 0 Phase 1 tasks remaining** (31 foundation tasks including bootstrap and the run-start contention regression; P1-14 is split into command routing, menu bar/run navigation and first-run/layout acceptance; P1-09 is split into transport/provider integration, P1-11 into coordinator/native execution bridge, P1-12 into redaction, evidence storage and Git capture, and P1-13 into repository access, execution setup, native setup screens and the run console). There are **6 Phase 2 tasks remaining**; requirement storage/review/validation/traceability and structured memory/notes/inbox storage are complete. Phases 3–6 and their associated sections 115–159 additions also remain; those phases are not yet decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
+Progress after P2-06a: **38 documented tasks complete, 0 Phase 1 tasks remaining** (31 foundation tasks including bootstrap and the run-start contention regression; P1-14 is split into command routing, menu bar/run navigation and first-run/layout acceptance; P1-09 is split into transport/provider integration, P1-11 into coordinator/native execution bridge, P1-12 into redaction, evidence storage and Git capture, and P1-13 into repository access, execution setup, native setup screens and the run console). There are **6 Phase 2 tasks remaining**; requirement services, structured memory storage and the scoped search index are complete. Run-context integration remains P2-06b. Phases 3–6 and their associated sections 115–159 additions also remain; those phases are not yet decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
 
 ## Bootstrap
 
@@ -55,7 +55,7 @@ The user's 32-inch 4K, 27-inch 2K, 16-inch 4K and 14-inch 4K Mac display targets
 
 ## Phase 2 — Project memory
 
-Phase 2 is decomposed into 11 planned tasks plus the user-reported modal-spacing regression. The first storage task does not claim native editing, executable validation rules, retrieval or Bug Registry behavior; those have their own acceptance gates.
+Phase 2 is decomposed into 11 planned tasks (P2-06 split into index and context integration) plus the user-reported modal-spacing regression. The first storage task does not claim native editing, executable validation rules, retrieval or Bug Registry behavior; those have their own acceptance gates.
 
 | Task | Status and scope | Acceptance |
 | --- | --- | --- |
@@ -65,7 +65,8 @@ Phase 2 is decomposed into 11 planned tasks plus the user-reported modal-spacing
 | P2-03a | Complete: Requirements modal top-spacing regression | Header remains at the standard inset for empty and unselected lists in compact/large native windows; five affected Mac tests pass. See [validation](p2-03a-validation.md). |
 | P2-04 | Complete: requirement traceability and stale links | Reviewed scoped relationships, exact creation references, latest-active reruns, explicit reproduction, stale/unavailable impact counts; 395 Mac and 261 iPhone tests pass. See [validation](p2-04-validation.md). |
 | P2-05 | Complete: structured memory, notes and inbox storage | Separate scoped immutable records, exact source provenance, nonauthoritative intake and reviewed confirmation/edit/archive; 403 Mac and 269 iPhone tests pass. See [validation](p2-05-validation.md). |
-| P2-06 | Pending: selective retrieval and context integration | Rebuildable FTS5 index, scoped metadata/relationship search, include/exclude paths, bounded context with exact references and classification filtering |
+| P2-06a | Complete: scoped rebuildable knowledge index | Redacted FTS5 snapshots, atomic rebuilds, classification/environment/path filters and query-bound paging; 411 Mac and 277 iPhone tests pass. See [validation](p2-06a-validation.md). |
+| P2-06b | Pending: selective context and native run integration | Revalidate current sources, structured relationships, agent include/exclude selection, bounded context with exact references and classification filtering, native preview and dispatch binding |
 | P2-07 | Pending: persistent Bug Registry and manual Jira links | Scoped defect records, external associations, observed root behavior, exact requirements and evidence; no external issue creation |
 | P2-08 | Pending: duplicate detection and evidence preparation | Deterministic fingerprints first, semantic ambiguity behind Codex, latest requirements and blocked-downstream handling; prepare evidence for known tickets |
 | P2-09 | Pending: versioned CityPay bug-report skill | Synthetic skill fixture, expected report structure and evidence references, scoped permissions, duplicate-aware proposal without publishing |

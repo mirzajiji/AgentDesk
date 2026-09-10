@@ -106,6 +106,9 @@ final class SQLiteConnection {
                 // Only validated, encoded operational snapshots use this larger bound.
                 guard !text.utf8.contains(0), text.utf8.count <= 131_072 else { throw OperationalStoreError.invalidInput }
                 bound = sqlite3_bind_text(prepared, position, text, -1, Self.transient)
+            case .document(let text):
+                guard !text.utf8.contains(0), text.utf8.count <= 262_144 else { throw OperationalStoreError.invalidInput }
+                bound = sqlite3_bind_text(prepared, position, text, -1, Self.transient)
             case .integer(let number): bound = sqlite3_bind_int64(prepared, position, number)
             case .real(let number):
                 guard number.isFinite else { throw OperationalStoreError.invalidInput }
@@ -120,7 +123,7 @@ final class SQLiteConnection {
         guard sqlite3_column_type(statement, index) == SQLITE_TEXT,
               let bytes = sqlite3_column_text(statement, index) else { throw OperationalStoreError.invalidDatabase }
         let count = Int(sqlite3_column_bytes(statement, index))
-        guard (1...131_072).contains(maximumBytes), count <= maximumBytes else { throw OperationalStoreError.invalidDatabase }
+        guard (1...262_144).contains(maximumBytes), count <= maximumBytes else { throw OperationalStoreError.invalidDatabase }
         let data = Data(bytes: bytes, count: count)
         guard let string = String(data: data, encoding: .utf8), !string.utf8.contains(0) else {
             throw OperationalStoreError.invalidDatabase
@@ -130,5 +133,5 @@ final class SQLiteConnection {
 }
 
 enum SQLValue {
-    case text(String), json(String), integer(Int64), real(Double)
+    case text(String), json(String), document(String), integer(Int64), real(Double)
 }

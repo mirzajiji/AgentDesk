@@ -1,6 +1,6 @@
 # Project memory, retrieval and knowledge relationships
 
-Status: scoped structured memory/notes/inbox storage implemented; retrieval, timeline projections and native management remain planned. Source: [final architecture](final-architecture.txt), sections 11, 12, 17, 103, 107 and 149–151.
+Status: scoped structured memory/notes/inbox storage and scoped FTS search implemented; run-context integration, timeline projections and native management remain planned. Source: [final architecture](final-architecture.txt), sections 11, 12, 17, 103, 107 and 149–151.
 <!-- Source sections: 11,12,17,103,107,149,150,151 -->
 
 Project Memory holds reusable confirmed knowledge: project descriptions, accepted behavior, rules, API/state/environment semantics, test expectations, architecture, QA decisions, terminology and linked defects. Store separate structured JSON records rather than one growing monolithic document.
@@ -48,3 +48,13 @@ Each record has `Memory/Knowledge/<UUID>/entry.vN.json` versions and a `current.
 Publication exclusively creates a version before advancing the pointer. Partial orphan versions are not adopted or overwritten. Historical chains validate scope, identity, fingerprints and date order; malformed pointers, tampering, symlinks and multiply linked files fail closed. Reads/listings are scope checked and bounded. Listing defaults to active records and can filter kinds/environments; ignored/archived records require explicit inclusion. Administrative listing does not itself authorize model context inclusion.
 
 The [validation record](../Development/p2-05-validation.md) describes limits and tested behavior. Native classification/promotion/attachment screens remain P2-10; selective FTS retrieval and classification-aware context selection remain P2-06. The store does not collect infrastructure data or bypass runtime policy/redaction boundaries.
+
+## Rebuildable search index (P2-06a)
+
+`KnowledgeSearchIndex` uses operational SQLite schema 6 with FTS5 and a generation table. Each instance binds one exact project/environment. It rebuilds from active memory records and latest-active requirements, atomically replacing only its projection. Original JSON is authoritative; the index retains source identity, revision and fingerprint for later revalidation. Indexes are not execution permission or proof that cached behavior is current.
+
+Memory records may include an optional `knowledgePath`, such as `api/paynet/refunds`. Defaults follow the topic. These logical taxonomy paths never access the filesystem. `KnowledgePathFilter` accepts exact paths, a trailing `/**` subtree, or all paths with `**`; exclusion wins. Matching is case-sensitive and respects segment boundaries. Absolute paths, traversal, empty segments and unsupported wildcard forms are rejected. Omitting the optional field preserves older memory encoding/fingerprints.
+
+Titles and JSON bodies pass through the existing scoped redactor before SQLite insertion. A path requiring redaction rejects indexing. Queries default to requirements and confirmed memory; notes/inbox need explicit inclusion. Search uses quoted literal terms joined by AND, with deterministic path/source order. Cursors bind the query/filters, scope, environment and generation; an index rebuild requires a fresh search.
+
+Rebuild limits are 1,000 documents/16 MiB, with 256 KiB per document. Search accepts at most 16 terms/1 KiB and 100 results per page. Failed rebuilds preserve the previous index, while an unbuilt index is distinct from a built empty index. See [index validation](../Development/p2-06a-validation.md). Authoritative revalidation, relationship enrichment and bounded native run-context integration are P2-06b.

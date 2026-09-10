@@ -93,6 +93,7 @@ struct ProjectRunConsoleView: View {
                 await evidence.showResult(outcome, using: service)
             }
         }
+        .background(NativeRunWindowAnchor { session.presentWindow = $0 }.frame(width: 0, height: 0))
         .onDisappear { let owned = session; Task { await owned.close() } }
         .confirmationDialog("Stop this run and close the console?", isPresented: $confirmClose) {
             Button("Stop and Close", role: .destructive) { Task { await session.close(); evidence.clear(); dismiss() } }

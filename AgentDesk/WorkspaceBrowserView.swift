@@ -83,7 +83,8 @@ struct WorkspaceBrowserView: View {
                     switch action {
                     case .agents: selectedProject = project
                     case .setup: setupProject = project
-                    case .run: runProject = project
+                    case .run:
+                        if !NativeRunRegistry.shared.focus(scope) { runProject = project }
                     default: break
                     }
                 }
@@ -163,7 +164,7 @@ struct WorkspaceBrowserView: View {
                                 .accessibilityIdentifier("project.agents.\(project.name)")
                             Button("Setup") { setupProject = project }
                                 .accessibilityIdentifier("project.setup.\(project.name)")
-                            Button("Run") { runProject = project }
+                            Button("Run") { if !NativeRunRegistry.shared.focus(project.scope) { runProject = project } }
                                 .accessibilityIdentifier("project.run.\(project.name)")
                             Button("Rename") { editor = .renameProject(project) }
                                 .accessibilityIdentifier("project.rename.\(project.name)")

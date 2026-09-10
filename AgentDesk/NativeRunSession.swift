@@ -14,7 +14,7 @@ final class NativeRunSession: ObservableObject {
     @Published private(set) var phase = Phase.idle
     @Published private(set) var prepared: PreparedRun?
     @Published private(set) var inputSnapshot: String?
-    @Published private(set) var run: StoredRun?
+    @Published private(set) var run: StoredRun? { didSet { publishStatus() } }
     @Published private(set) var progress: RunWorkPlan?
     @Published private(set) var outcome: RunOutcome?
     @Published private(set) var errorMessage: String?
@@ -30,6 +30,12 @@ final class NativeRunSession: ObservableObject {
     private var generation = 0
     private let open: Open
     private let registry: NativeRunRegistry
+    private var projectName = ""
+    var presentWindow: () -> Bool = { false } { didSet { publishStatus() } }
+    private func publishStatus() {
+        guard let run, let service else { return }
+        registry.update(run, projectName: projectName, owner: service, present: presentWindow)
+    }
 
     init(registry: NativeRunRegistry = .shared, open: Open? = nil) {
         self.registry = registry; self.open = open ?? Self.openNative
@@ -48,6 +54,7 @@ final class NativeRunSession: ObservableObject {
         await close()
         phase = .preparing; errorMessage = nil; outcome = nil; run = nil; progress = nil; inputSnapshot = nil
         let token = generation
+        projectName = model.project.name
         do {
             let context = try await model.contextForPreparation()
             guard let services = model.services else { throw ExecutionSetupError.staleContext }

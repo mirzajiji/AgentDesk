@@ -81,9 +81,13 @@ struct ContentView: View {
             EmptyView()
             #endif
         case .runs:
-            DeskEmptyState("No runs yet", systemImage: "play.rectangle",
-                           message: "Agent activity and results will appear here when you start a run.",
-                           accessibilityIdentifier: "empty.runs")
+            #if os(macOS)
+            NativeRunsView(registry: .shared, catalog: catalog) { action in
+                navigation.select(.workspaces); routedCommand = action
+            }
+            #else
+            EmptyView()
+            #endif
         case .connections:
             DeskEmptyState("No connections configured", systemImage: "point.3.connected.trianglepath.dotted",
                            message: "Project connections will appear here. No external services are connected.",

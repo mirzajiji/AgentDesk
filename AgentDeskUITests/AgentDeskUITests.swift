@@ -290,7 +290,7 @@ final class AgentDeskUITests: XCTestCase {
         #endif
         app.launch()
         app.staticTexts["Runs"].firstMatch.click()
-        XCTAssertTrue(app.staticTexts["No runs yet"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["runs.sessions.empty"].waitForExistence(timeout: 5))
         app.staticTexts["Connections"].firstMatch.click()
         XCTAssertTrue(app.staticTexts["No connections configured"].waitForExistence(timeout: 5))
         app.staticTexts["Workspaces"].firstMatch.click()

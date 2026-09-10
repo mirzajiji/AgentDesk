@@ -65,6 +65,7 @@ final class NativeCommandPaletteUITests: XCTestCase {
 
     @MainActor private func fixture() -> XCUIApplication {
         let app = XCUIApplication()
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
         app.launchEnvironment["AGENTDESK_TEST_RUN_MODE"] = "success"
         return app

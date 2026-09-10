@@ -38,3 +38,5 @@ Supplementary source checks and host XCTest execution are available with `python
 Complete one task at a time: implement, exercise the behavior, add unit/regression tests, run relevant checks (including native iPhone Simulator coverage for shared/mobile changes), review the diff, and make a separate commit. Tests belong with the change they validate.
 
 The first application milestone is the Phase 1 critical path: create a workspace, project, and agent; edit instructions; execute through Codex CLI; watch live steps; inspect results and file changes. Secure LAN/mobile execution follows the staged roadmap; mobile compilation and simulator validation start when the native targets exist.
+
+On Mac, **Get Started** checks local setup and opens recovery/configuration screens without starting a run. **Command-K** searches commands by project/workspace context. The menu bar shows persisted counts for open run sessions, and **Runs** opens existing consoles across windows or scoped project history. Editors adapt to compact and large logical window sizes; physical monitor acceptance is still pending.

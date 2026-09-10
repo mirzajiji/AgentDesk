@@ -11,7 +11,7 @@ Overview shows active/failed runs, pending approvals, recent activity, workspace
 
 The context inspector answers what an agent will know: scope, instructions, skills, requirement versions, selected knowledge/environment, integration/repository access and prior-run context. Cross-workspace data should be absent by enforced scope. Show validation errors and unavailable sources before launch.
 
-First run checks Codex, Git and local runtime readiness, then helps create workspace, project and first agent. Optional remote pairing follows explicit enablement. Setup must remain recoverable if a dependency is missing or the user cancels an optional connection.
+The Mac’s **Get Started** screen checks readable local catalog storage, project presence, a bounded Git version response and Codex/helper authentication status. Recovery actions open the existing workspace/project forms, agent management, project setup and Codex Settings. Checks are cancellable, clear stale observations and never grant execution authority. See [P1-14c validation](../Development/p1-14c-validation.md). Optional remote pairing follows explicit enablement. Setup must remain recoverable if a dependency is missing or the user cancels an optional connection.
 
 ## Commands and persistent controls
 
@@ -29,7 +29,7 @@ Use native labels, focus order, keyboard shortcuts, scalable layout and clear st
 
 The user's additional display requirement (2026-09-10) covers 32-inch 4K, 27-inch 2K, 16-inch 4K and 14-inch 4K screens. Layout follows the available logical window size and macOS scaling. It must not branch on physical diagonal or assume that a 4K screen provides 3840×2160 logical points. The [native display matrix](../Development/testing.md#mac-display-and-window-matrix) defines window, scaling and hardware acceptance, including both common interpretations of the requested 2K target until the exact panel is known.
 
-Scrollable setup forms and JSON editors use a shared native resizable layout with a compact usable content minimum and a suggested opening size. Their content can grow as windows expand. Verify primary actions, focus and text at compact sizes, and use extra space for desktop lists, inspectors, results and diffs as those surfaces arrive. Existing fixed-size editors still need the planned P1-14/P1-15 audit. Offscreen layout measurements alone do not prove interactive or physical display acceptance.
+Scrollable setup forms and JSON editors use a shared native resizable layout with a compact usable content minimum and a suggested opening size. Their content can grow as windows expand. Verify primary actions, focus and text at compact sizes, and use extra space for desktop lists, inspectors, results and diffs as those surfaces arrive. The P1-14c pass replaces fixed outer sizes in the older agent, skill, shared-instruction and Codex Settings editors with the shared resizable layout. Compact project rows put their full action labels below the title; larger rows use horizontal space. P1-15 and final physical display acceptance remain pending. Offscreen layout measurements alone do not prove interactive or physical display acceptance.
 
 ## Initial shell
 

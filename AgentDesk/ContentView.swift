@@ -7,6 +7,8 @@ struct ContentView: View {
     @StateObject private var catalog = WorkspaceBrowserModel()
     @Environment(\.openSettings) private var openSettings
     @State private var paletteVisible = false
+    @State private var readinessVisible = false
+    @State private var readinessCommand: NativeCommandAction?
     @State private var pendingCommand: NativeCommandAction?
     @State private var routedCommand: NativeCommandAction?
     @State private var navigation = ShellNavigation(role: .macHost)
@@ -38,6 +40,8 @@ struct ContentView: View {
         }
         .frame(minWidth: 900, minHeight: 560)
         .toolbar {
+            Button("Get Started", systemImage: "checklist") { readinessVisible = true }
+                .accessibilityIdentifier("readiness.open")
             SettingsLink { Label("Settings", systemImage: "gearshape") }
                 .accessibilityIdentifier("settings.open")
         }
@@ -51,6 +55,16 @@ struct ContentView: View {
             NativeCommandPalette(model: catalog) { command in
                 pendingCommand = command
                 paletteVisible = false
+            }
+        }
+        .sheet(isPresented: $readinessVisible, onDismiss: {
+            guard let command = readinessCommand else { return }
+            readinessCommand = nil
+            if command == .settings { openSettings() }
+            else { navigation.select(.workspaces); routedCommand = command }
+        }) {
+            NativeReadinessView(catalog: catalog) { command in
+                readinessCommand = command; readinessVisible = false
             }
         }
         .task { await catalog.reload() }

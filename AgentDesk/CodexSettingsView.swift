@@ -1,6 +1,7 @@
 #if os(macOS)
 import AgentDeskRuntime
 import AppKit
+import AgentDeskDesign
 import SwiftUI
 
 struct CodexSettingsView: View {
@@ -58,7 +59,7 @@ struct CodexSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 620, height: 420)
+        .macEditorLayout(idealWidth: 620, idealHeight: 480)
         .task { if model.snapshot == nil { model.refresh() } }
         .confirmationDialog("Sign out of Codex on this Mac?", isPresented: $confirmLogout, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) { model.logout() }

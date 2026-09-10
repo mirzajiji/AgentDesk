@@ -128,6 +128,30 @@ struct WorkspaceBrowserView: View {
         }
     }
 
+    private func projectSummary(_ project: ProjectRecord) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "folder.fill").foregroundStyle(.tint).font(.title2)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(project.name).font(.headline)
+                    .accessibilityIdentifier("project.name.\(project.name)")
+                Text("Local project").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func projectActions(_ project: ProjectRecord) -> some View {
+        HStack {
+            Button("Agents") { selectedProject = project }
+                .accessibilityIdentifier("project.agents.\(project.name)")
+            Button("Setup") { setupProject = project }
+                .accessibilityIdentifier("project.setup.\(project.name)")
+            Button("Run") { if !NativeRunRegistry.shared.focus(project.scope) { runProject = project } }
+                .accessibilityIdentifier("project.run.\(project.name)")
+            Button("Rename") { editor = .renameProject(project) }
+                .accessibilityIdentifier("project.rename.\(project.name)")
+        }.fixedSize(horizontal: true, vertical: false)
+    }
+
     private var projectPane: some View {
         VStack(alignment: .leading, spacing: 20) {
             if let workspace = model.currentWorkspace {
@@ -152,22 +176,16 @@ struct WorkspaceBrowserView: View {
                 } else {
                     Text("Projects").font(.headline)
                     List(model.projects) { project in
-                        HStack(spacing: 12) {
-                            Image(systemName: "folder.fill").foregroundStyle(.tint).font(.title2)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(project.name).font(.headline)
-                                    .accessibilityIdentifier("project.name.\(project.name)")
-                                Text("Local project").font(.caption).foregroundStyle(.secondary)
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 12) {
+                                projectSummary(project).fixedSize(horizontal: true, vertical: false)
+                                Spacer()
+                                projectActions(project)
                             }
-                            Spacer()
-                            Button("Agents") { selectedProject = project }
-                                .accessibilityIdentifier("project.agents.\(project.name)")
-                            Button("Setup") { setupProject = project }
-                                .accessibilityIdentifier("project.setup.\(project.name)")
-                            Button("Run") { if !NativeRunRegistry.shared.focus(project.scope) { runProject = project } }
-                                .accessibilityIdentifier("project.run.\(project.name)")
-                            Button("Rename") { editor = .renameProject(project) }
-                                .accessibilityIdentifier("project.rename.\(project.name)")
+                            VStack(alignment: .leading, spacing: 12) {
+                                projectSummary(project)
+                                projectActions(project)
+                            }
                         }
                         .padding(.vertical, 8)
                     }

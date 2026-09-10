@@ -16,6 +16,12 @@ final class MacEditorLayoutTests: XCTestCase {
         .init(width: 3840, height: 2160)
     ]
 
+    func testAgentAndSkillEditorsFitCompactWindowsAndExpandOnLargeDesktops() {
+        let scope = ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID())
+        assertFitsAndExpands(AgentEditorView(existing: nil, skills: [], save: { _ in }))
+        assertFitsAndExpands(SkillEditorView(scope: scope, existing: nil, save: { _, _ in }))
+    }
+
     func testExecutionFormsFitCompactWindowsAndExpandOnLargeDesktops() {
         let scope = ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID())
         let environments = (0..<20).map { index in

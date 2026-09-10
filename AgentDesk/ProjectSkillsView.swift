@@ -1,5 +1,6 @@
 #if os(macOS)
 import AgentDeskCore
+import AgentDeskDesign
 import SwiftUI
 
 struct ProjectSkillsView: View {
@@ -50,7 +51,7 @@ struct ProjectSkillsView: View {
             Text("Permissions listed by a skill are requests. Runtime policy and approvals still control every action. Script attachments are not executed.")
                 .font(.caption).foregroundStyle(.secondary)
         }
-        .padding(24).frame(width: 780, height: 560)
+        .padding(24).macEditorLayout(idealWidth: 780, idealHeight: 560)
         .task { await model.load() }
         .sheet(item: $editor) { request in
             SkillEditorView(scope: model.scope, existing: request.existing) { draft, owner in
@@ -60,7 +61,7 @@ struct ProjectSkillsView: View {
     }
 }
 private struct SkillEditorRequest: Identifiable { let id = UUID(); var existing: SkillSnapshot? = nil }
-private struct SkillEditorView: View {
+struct SkillEditorView: View {
     let scope: ProjectScope
     let existing: SkillSnapshot?
     let save: (SkillDraft, SkillScope) async throws -> Void
@@ -118,7 +119,7 @@ private struct SkillEditorView: View {
                 }.keyboardShortcut(.defaultAction).accessibilityIdentifier("skill.save")
             }
         }
-        .textFieldStyle(.roundedBorder).padding(24).frame(width: 720, height: 590)
+        .textFieldStyle(.roundedBorder).padding(24).macEditorLayout(idealWidth: 720, idealHeight: 590)
         .disabled(saving).interactiveDismissDisabled(saving)
         .onAppear { if let existing { draft = existing.draft; shared = existing.definition.scope.projectID == nil } }
         .sheet(item: $attachmentEditor) { request in
@@ -153,7 +154,7 @@ private struct SkillAttachmentEditorView: View {
                 Button("Keep Attachment") { do { try save(file); dismiss() } catch { self.error = ProjectAgentsModel.message(error) } }
                     .keyboardShortcut(.defaultAction).accessibilityIdentifier("skill.attachment.keep")
             }
-        }.padding(24).frame(width: 640, height: 440).textFieldStyle(.roundedBorder)
+        }.padding(24).macEditorLayout(idealWidth: 640, idealHeight: 480).textFieldStyle(.roundedBorder)
         .onAppear { file = request.file }
     }
 }

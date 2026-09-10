@@ -1,5 +1,6 @@
 #if os(macOS)
 import AgentDeskCore
+import AgentDeskDesign
 import SwiftUI
 
 struct ProjectAgentsView: View {
@@ -109,7 +110,7 @@ private struct AgentEditorRequest: Identifiable {
     var existing: AgentSnapshot? = nil
 }
 
-private struct AgentEditorView: View {
+struct AgentEditorView: View {
     let existing: AgentSnapshot?
     let skills: [SkillSnapshot]
     let save: (AgentDraft) async throws -> Void
@@ -174,7 +175,7 @@ private struct AgentEditorView: View {
             }
         }
         .textFieldStyle(.roundedBorder)
-        .padding(24).frame(width: 700, height: 520)
+        .padding(24).macEditorLayout(idealWidth: 700, idealHeight: 520)
         .disabled(saving).interactiveDismissDisabled(saving)
         .onAppear { draft = existing?.draft ?? template.draft; modelIdentifier = draft.profile.modelIdentifier ?? "" }
     }

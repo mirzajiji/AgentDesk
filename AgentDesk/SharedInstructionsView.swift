@@ -1,5 +1,6 @@
 #if os(macOS)
 import AgentDeskCore
+import AgentDeskDesign
 import SwiftUI
 
 struct SharedInstructionsView: View {
@@ -82,7 +83,7 @@ struct SharedInstructionsView: View {
                     .disabled(!model.canEdit)
             }
         }
-        .padding(24).frame(width: 740, height: 520).textFieldStyle(.roundedBorder)
+        .padding(24).macEditorLayout(idealWidth: 740, idealHeight: 520).textFieldStyle(.roundedBorder)
         .disabled(model.busy).interactiveDismissDisabled(model.busy)
         .task(id: model.level) { await model.reload() }
     }
@@ -127,7 +128,7 @@ struct InstructionPreviewView: View {
             }
             Text("This preview records the selected versions. Saving instructions does not grant tools or permissions.")
                 .font(.caption).foregroundStyle(.secondary)
-        }.padding(24).frame(width: 740, height: 520)
+        }.padding(24).macEditorLayout(idealWidth: 740, idealHeight: 520)
     }
 }
 #endif

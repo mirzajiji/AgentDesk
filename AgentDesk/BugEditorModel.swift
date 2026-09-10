@@ -1,5 +1,6 @@
 #if os(macOS)
 import AgentDeskCore
+import AgentDeskSecurity
 import Combine
 import Foundation
 
@@ -8,6 +9,8 @@ final class BugEditorModel: ObservableObject {
     let store: ProjectBugStore
     let existing: BugRecord?
     @Published var draft: BugDraft
+    @Published var editRequirementLinks = false
+    @Published var requirementLinks: [NativeRequirementLink] = []
     @Published private(set) var proposal: BugProposal? { didSet { pending = proposal } }
     @Published private(set) var fields: [BugReviewField] = []
     @Published private(set) var busy = false
@@ -17,7 +20,11 @@ final class BugEditorModel: ObservableObject {
     private var generation = 0, unavailable = false
 
     init(store: ProjectBugStore, existing: BugRecord?) {
-        self.store = store; self.existing = existing
+        self.store = store; self.existing = existing?.scope == store.scope ? existing : nil
+        requirementLinks = self.existing?.requirements.map {
+            .init(requirement: $0.requirement.id.rawValue, historical: $0.requirement.historical,
+                  version: String($0.requirement.version), role: $0.role)
+        } ?? []
         draft = .init(title: "", sources: [.init(scope: store.scope, origin: .humanStatement, label: "Local user report", capturedAt: Date())], changeReason: "")
         do {
             if let existing {
@@ -37,10 +44,20 @@ final class BugEditorModel: ObservableObject {
             let safe = try BugPresentation.sanitized(draft, scope: store.scope)
             try safe.draft.validate(in: store.scope, id: existing?.id)
             let old = try existing.map { try BugPresentation.sanitized($0.content, scope: store.scope).draft }
-            let fields = try BugPresentation.fields(before: old, after: safe.draft)
+            var fields = try BugPresentation.fields(before: old, after: safe.draft)
+            let requests: [BugRequirementRequest]? = editRequirementLinks ? try requirementLinks.map { link in
+                let request = try link.request()
+                guard try TraceabilityEditorModel.safeText(request.id.rawValue, scope: store.scope,
+                    environment: safe.draft.environment ?? EnvironmentID()).redactionCount == 0 else { throw BugRegistryError.invalidDocument }
+                return .init(role: link.role, requirement: request)
+            } : nil
             // Nil requirement requests preserve exact creation references on an ordinary edit.
-            let proposal = try await store.prepare(safe.draft, id: existing?.id, expectedRevision: existing?.revision, in: store.scope)
+            let proposal = try await store.prepare(safe.draft, requirements: requests, id: existing?.id, expectedRevision: existing?.revision, in: store.scope)
             guard token == generation, !Task.isCancelled else { await store.cancel(proposal); return }
+            if proposal.candidate.requirements != (existing?.requirements ?? []) {
+                fields.append(.init(id: "requirementLinks", title: "Requirement associations", before: existing.map { Self.describe($0.requirements) },
+                    after: Self.describe(proposal.candidate.requirements)))
+            }
             draft = safe.draft; redacted = redacted || safe.changed; self.fields = fields; self.proposal = proposal
         } catch is CancellationError { } catch { if token == generation { self.error = Self.message(error) } }
     }
@@ -81,6 +98,11 @@ final class BugEditorModel: ObservableObject {
         case BugRegistryError.unavailableReference: "A linked bug or requirement is unavailable or changed. Check the references and prepare a fresh review."
         default: "Check the title, reason, ticket and references. Observed findings need observed provenance and root/expected/actual behavior. Blocked findings need a valid blocked-by link."
         }
+    }
+    private static func describe(_ links: [BugRequirementReference]) -> String {
+        links.isEmpty ? "None" : links.map {
+            "\($0.role.rawValue): \($0.requirement.id) · v\($0.requirement.version) · \($0.requirement.historical ? "explicitly historical" : "active at review")"
+        }.joined(separator: "\n")
     }
 }
 #endif

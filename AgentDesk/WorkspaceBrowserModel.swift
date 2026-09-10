@@ -187,6 +187,13 @@ final class WorkspaceBrowserModel: ObservableObject {
         }
     }
 
+    func traceabilityServices(for project: ProjectRecord) async throws -> NativeTraceabilityServices {
+        let requirements = try await requirementServices(for: project)
+        guard let catalog else { throw CatalogError.invalidConfiguration }
+        return NativeTraceabilityServices(store: requirements.store, bugs: try await catalog.bugStore(in: project.scope),
+            environments: requirements.environments, environmentIssue: requirements.environmentIssue)
+    }
+
     func agentStore(for project: ProjectRecord) async throws -> ProjectAgentStore {
         guard let catalog else { throw CatalogError.invalidConfiguration }
         return try await catalog.agentStore(in: project.scope)

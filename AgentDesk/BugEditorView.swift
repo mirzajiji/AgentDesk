@@ -16,6 +16,8 @@ struct BugEditorView: View {
     @State private var fieldError: String?
     @State private var advanced = false
     @State private var availableHeight: CGFloat = 640
+    @State private var coverageKind = TraceabilitySubject.Kind.automatedTest
+    @State private var coverageIdentifier = ""
     @Environment(\.dismiss) private var dismiss
     init(store: ProjectBugStore, existing: BugRecord?, environments: [ProjectEnvironment], onPublish: @escaping (BugRecord) -> Void) {
         _model = StateObject(wrappedValue: BugEditorModel(store: store, existing: existing))
@@ -137,6 +139,32 @@ struct BugEditorView: View {
                     Text("\(reference.role.rawValue): \(reference.requirement.id) · v\(reference.requirement.version)")
                 }
             }
+            Toggle("Edit requirement associations", isOn: $model.editRequirementLinks).accessibilityIdentifier("bug.requirements.edit")
+            if model.editRequirementLinks {
+                RequirementLinksEditor(links: $model.requirementLinks, showsRole: true)
+                Text("Review resolves the selected versions. Removing every link explicitly clears the associations.").font(.caption).foregroundStyle(.secondary)
+            } else { Text("Existing requirement references remain unchanged.").font(.caption).foregroundStyle(.secondary) }
+            Divider(); Text("Coverage subjects").font(.headline)
+            ForEach(model.draft.coveredBy, id: \.self) { subject in
+                HStack {
+                    Text("\(subject.kind.traceTitle): \(subject.id)")
+                    Spacer(); Button("Remove Coverage") { model.draft.coveredBy.removeAll { $0 == subject } }
+                }
+            }
+            Picker("Test kind", selection: $coverageKind) {
+                Text("Automated test").tag(TraceabilitySubject.Kind.automatedTest)
+                Text("Manual test").tag(TraceabilitySubject.Kind.manualTest)
+            }
+            TextField("Test identifier", text: $coverageIdentifier).accessibilityIdentifier("bug.coverage.id")
+            Button("Add Coverage Subject") {
+                guard let id = RequirementID(rawValue: coverageIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+                    fieldError = "Enter a valid test identifier."; return
+                }
+                let subject = TraceabilitySubject(kind: coverageKind, id: id)
+                guard !model.draft.coveredBy.contains(subject), model.draft.coveredBy.count < 64 else { fieldError = "This test is already linked or the limit was reached."; return }
+                model.draft.coveredBy.append(subject); coverageIdentifier = ""; fieldError = nil
+            }.accessibilityIdentifier("bug.coverage.add")
+            Text("Coverage subjects are references to tests. Linking one does not claim it ran or passed.").font(.caption).foregroundStyle(.secondary)
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
     private var sources: some View {

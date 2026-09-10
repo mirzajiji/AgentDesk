@@ -44,6 +44,36 @@ final class NativeBugModelTests: XCTestCase {
         let history = try await f.store.history(saved.id, in: f.project.scope)
         XCTAssertEqual(history.map(\.revision), [2, 1]); XCTAssertEqual(history.last?.content.ticket?.key, "SYN-42")
     }
+    func testReviewedRequirementAssociationsPreserveOrExplicitlyRefreshVersions() async throws {
+        let f = try await Fixture(); defer { f.remove() }
+        let requirements = try await f.catalog.requirementStore(in: f.project.scope)
+        let id = RequirementID(rawValue: "synthetic-rule")!
+        let first = try await requirements.prepare(.init(description: "Version one", changeReason: "Review", status: .active), id: id, expectedVersion: nil, in: f.project.scope)
+        _ = try await requirements.publishReviewed(first, in: f.project.scope)
+        let editor = BugEditorModel(store: f.store, existing: nil)
+        editor.draft.title = "Linked bug"; editor.draft.changeReason = "Review associations"
+        editor.editRequirementLinks = true; editor.requirementLinks = [.init(requirement: id.rawValue)]
+        await editor.prepare()
+        XCTAssertNotNil(editor.fields.first { $0.id == "requirementLinks" })
+        let result = await editor.publish(), saved = try XCTUnwrap(result)
+        let second = try await requirements.prepare(.init(description: "Version two", changeReason: "Review", status: .active), id: id, expectedVersion: 1, in: f.project.scope)
+        _ = try await requirements.publishReviewed(second, in: f.project.scope)
+        let preserved = BugEditorModel(store: f.store, existing: saved)
+        preserved.draft.changeReason = "Ordinary edit"; await preserved.prepare()
+        XCTAssertEqual(preserved.proposal?.candidate.requirements.first?.requirement.version, 1)
+        await preserved.cancelReview()
+        preserved.editRequirementLinks = true; await preserved.prepare()
+        XCTAssertEqual(preserved.proposal?.candidate.requirements.first?.requirement.version, 2)
+        await preserved.cancelReview()
+        preserved.requirementLinks = [.init(requirement: id.rawValue, historical: true, version: "1")]
+        await preserved.prepare()
+        XCTAssertEqual(preserved.proposal?.candidate.requirements.first?.requirement.version, 1)
+        XCTAssertEqual(preserved.proposal?.candidate.requirements.first?.requirement.historical, true)
+        await preserved.cancelReview()
+        preserved.requirementLinks = []; await preserved.prepare()
+        XCTAssertEqual(preserved.proposal?.candidate.requirements.count, 0)
+        await preserved.cancelReview()
+    }
     func testBrowserFiltersAndIncomingLinksNavigateWithinProject() async throws {
         let f = try await Fixture(); defer { f.remove() }
         let target = try await f.create("Synthetic upstream")

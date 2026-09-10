@@ -100,6 +100,9 @@ public actor ProjectBugStore {
     public func history(_ id: BugID, in requested: ProjectScope) throws -> [BugRecord] {
         try files.root.withLock { try files.validate(requested); return try files.read(id) }
     }
+    public func requirementImpact(of id: RequirementID, in requested: ProjectScope) async throws -> BugRequirementImpactReport {
+        try await requirements.bugRequirementImpact(files: files, of: id, in: requested)
+    }
     /// Includes archived records so an existing ticket cannot disappear from duplicate checks.
     /// Exceeding the bound fails rather than silently presenting a partial search as exhaustive.
     public func comparisonSnapshot(in requested: ProjectScope, environment: EnvironmentID) async throws -> BugComparisonSnapshot {

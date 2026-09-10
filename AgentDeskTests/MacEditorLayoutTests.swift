@@ -41,6 +41,19 @@ final class MacEditorLayoutTests: XCTestCase {
         assertFitsAndExpands(KnowledgeContextInspector(snapshot: String(repeating: "Synthetic reviewed source with version and provenance.\n", count: 500)))
     }
 
+    func testTraceabilityEditorsFitCompactAndLargeLogicalWindows() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let catalog = try WorkspaceCatalog(container: root)
+        let workspace = try await catalog.createWorkspace(name: "Synthetic trace layout")
+        let project = try await catalog.createProject(in: workspace.id, name: "Trace layout")
+        let services = NativeTraceabilityServices(store: try await catalog.requirementStore(in: project.scope),
+            bugs: try await catalog.bugStore(in: project.scope), environments: [], environmentIssue: nil)
+        assertFitsAndExpands(TraceabilityEditorView(services: services, onPublish: { _ in }))
+        assertFitsAndExpands(ProjectTraceabilityView(project: project, open: { services }))
+    }
+
     func testBugEditorsFitCompactAndLargeLogicalWindows() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

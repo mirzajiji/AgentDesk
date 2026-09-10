@@ -6,6 +6,7 @@ enum NativeCommandAction: Hashable {
     case settings, createWorkspace
     case switchWorkspace(WorkspaceID), createProject(WorkspaceID)
     case agents(ProjectScope), setup(ProjectScope), run(ProjectScope), requirements(ProjectScope), memory(ProjectScope), bugs(ProjectScope)
+    case traceability(ProjectScope)
 }
 
 struct NativeCommand: Identifiable, Equatable {
@@ -38,6 +39,7 @@ struct NativeCommandCatalog {
                     .init(action: .requirements(project.scope), title: "Manage Requirements", context: context, symbol: "doc.text"),
                     .init(action: .memory(project.scope), title: "Project Memory, Notes and Inbox", context: context, symbol: "brain"),
                     .init(action: .bugs(project.scope), title: "Bug Registry", context: context, symbol: "ladybug"),
+                    .init(action: .traceability(project.scope), title: "Traceability and Requirement Impact", context: context, symbol: "point.3.connected.trianglepath.dotted"),
                     .init(action: .setup(project.scope), title: "Project Setup", context: context, symbol: "slider.horizontal.3")
                 ]
             }

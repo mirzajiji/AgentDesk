@@ -33,6 +33,41 @@ final class ProjectBugStoreTests: XCTestCase {
         }
     }
 
+    func testRequirementImpactTracksCurrentStaleAndArchivedBugs() async throws {
+        let f = try await Fixture(); defer { f.remove() }
+        let v1 = try await f.requirement(1)
+        let proposal = try await f.store.prepare(f.draft(), requirements: [.init(requirement: .init(id: v1.id))], in: f.scope)
+        let bug = try await f.store.publishReviewed(proposal, in: f.scope)
+        let current = try await f.store.requirementImpact(of: v1.id, in: f.scope)
+        XCTAssertEqual(current.links.map(\.record.id), [bug.id])
+        XCTAssertEqual(current.links.map(\.status), [.current])
+        _ = try await f.requirement(2)
+        let stale = try await f.store.requirementImpact(of: v1.id, in: f.scope)
+        XCTAssertEqual(stale.links.map(\.status), [.potentiallyStale])
+        XCTAssertEqual(stale.links.first?.linked.requirement.version, 1)
+        XCTAssertEqual(stale.links.first?.activeVersion, 2)
+        let retirement = try await f.requirements.prepare(.init(description: "Retired rule", changeReason: "Review", status: .retired), id: v1.id, expectedVersion: 2, in: f.scope)
+        _ = try await f.requirements.publishReviewed(retirement, in: f.scope)
+        let unavailable = try await f.store.requirementImpact(of: v1.id, in: f.scope)
+        XCTAssertEqual(unavailable.links.map(\.status), [.unavailable])
+        XCTAssertNil(unavailable.links.first?.activeVersion)
+        do {
+            _ = try await f.store.requirementImpact(of: v1.id, in: .init(workspaceID: f.scope.workspaceID, projectID: ProjectID()))
+            XCTFail("Foreign project accepted")
+        } catch { }
+        var draft = bug.content; draft.status = .archived
+        let archive = try await f.store.prepare(draft, id: bug.id, expectedRevision: bug.revision, in: f.scope)
+        _ = try await f.store.publishReviewed(archive, in: f.scope)
+        let hidden = try await f.store.requirementImpact(of: v1.id, in: f.scope)
+        XCTAssertTrue(hidden.links.isEmpty)
+        let cancelled = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await f.store.requirementImpact(of: v1.id, in: f.scope)
+        }
+        do { _ = try await cancelled.value; XCTFail("Cancelled impact query accepted") }
+        catch { XCTAssertTrue(error is CancellationError) }
+    }
+
     func testComparisonSnapshotIncludesArchivedAndRejectsChangesAfterCollection() async throws {
         let f = try await Fixture(); defer { f.remove() }
         let environment = EnvironmentID(); var value = f.draft(); value.environment = environment

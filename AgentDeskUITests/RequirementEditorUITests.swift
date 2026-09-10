@@ -26,6 +26,54 @@ final class RequirementEditorUITests: XCTestCase {
         click("requirements.done", in: app); resizeLarge(in: app); openRequirements(in: app)
         assertHeaderAtTop(in: app, name: "Unselected requirements modal")
     }
+    @MainActor
+    func testTraceabilityReviewCurrentHistoricalAndArchive() {
+        let app = application(); app.launch(); createProject(in: app)
+        click("project.setup.Requirement project", in: app)
+        for level in ["workspace", "project"] {
+            click("execution.edit.\(level)", in: app); click("execution.save", in: app)
+            XCTAssertTrue(app.staticTexts["execution.saved.\(level)"].waitForExistence(timeout: 5))
+        }
+        click("project.setup.done", in: app)
+        openRequirements(in: app); click("requirements.create", in: app); fillNew(in: app)
+        click("requirement.review", in: app); click("requirement.publish", in: app)
+        waitForValue("Active version: v1", id: "requirements.active", in: app)
+        click("requirements.done", in: app)
+        click("project.traceability.Requirement project", in: app); click("trace.create", in: app)
+        replace(app.textFields["trace.subject"], with: "synthetic-test", in: app, scroll: "trace.editor.scroll")
+        replace(app.textFields["trace.title"], with: "Synthetic coverage", in: app, scroll: "trace.editor.scroll")
+        replace(app.textFields["trace.link.id"], with: "synthetic-rule", in: app, scroll: "trace.editor.scroll")
+        replace(app.textFields["trace.reason"], with: "Reviewed coverage", in: app, scroll: "trace.editor.scroll")
+        click("trace.review", in: app)
+        XCTAssertTrue(app.staticTexts["trace.proposed.revision"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["trace.publish"].isHittable)
+        attach(app, name: "Native traceability publication review")
+        click("trace.publish", in: app)
+        waitForValue("Recorded v1 · Current", id: "trace.status.synthetic-rule", in: app)
+        click("trace.done", in: app); openRequirements(in: app)
+        app.descendants(matching: .any)["requirement.row.synthetic-rule"].firstMatch.click()
+        click("requirement.edit.latest", in: app, scroll: "requirements.detail.scroll")
+        replace(app.textViews["requirement.description"], with: "Updated synthetic behavior", in: app)
+        replace(app.textViews["requirement.reason"], with: "Updated requirement", in: app)
+        click("requirement.review", in: app); click("requirement.publish", in: app)
+        waitForValue("Active version: v2", id: "requirements.active", in: app)
+        click("requirements.done", in: app); click("project.traceability.Requirement project", in: app)
+        let row = app.descendants(matching: .any)["trace.row.automatedTest.synthetic-test"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5)); row.click()
+        waitForValue("Recorded v1 · Potentially stale", id: "trace.status.synthetic-rule", in: app)
+        waitForValue("Viewing requirement v2", id: "trace.viewing.synthetic-rule", in: app)
+        app.checkBoxes["trace.inspect.historical"].click()
+        waitForValue("Viewing requirement v1", id: "trace.viewing.synthetic-rule", in: app)
+        attach(app, name: "Native traceability historical inspection with stale status")
+        click("trace.edit", in: app, scroll: "trace.detail.scroll")
+        let archive = app.checkBoxes["trace.archived"]
+        reveal(archive, in: app, scroll: "trace.editor.scroll"); archive.click()
+        replace(app.textFields["trace.reason"], with: "Archive coverage", in: app, scroll: "trace.editor.scroll")
+        click("trace.review", in: app); click("trace.publish", in: app)
+        XCTAssertTrue(app.staticTexts["No matching links"].waitForExistence(timeout: 5))
+        app.checkBoxes["trace.filter.archived"].click()
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+    }
     @MainActor private func assertHeaderAtTop(in app: XCUIApplication, name: String) {
         let title = app.staticTexts["requirements.title"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))

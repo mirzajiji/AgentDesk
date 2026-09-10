@@ -67,3 +67,15 @@ public struct RequirementImpactReport: Equatable, Sendable {
         Dictionary(grouping: links.filter { $0.status != .current }, by: { $0.record.subject.kind }).mapValues(\.count)
     }
 }
+
+public struct BugRequirementImpact: Equatable, Sendable {
+    public let record: BugRecord
+    public let linked: BugRequirementReference
+    public let activeVersion: Int?
+    public let status: RequirementImpact.Status
+}
+public struct BugRequirementImpactReport: Equatable, Sendable {
+    public let scope: ProjectScope
+    public let requirement: RequirementID
+    public let links: [BugRequirementImpact]
+}

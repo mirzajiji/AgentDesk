@@ -209,6 +209,37 @@ public actor ProjectRequirementStore {
 }
 
 extension ProjectRequirementStore {
+    /// Resolves bug associations and requirement heads under the same catalog lock.
+    func bugRequirementImpact(files: BugRegistryFiles, of id: RequirementID, in requested: ProjectScope) throws -> BugRequirementImpactReport {
+        try root.withLock {
+            try Task.checkCancellation()
+            try validate(requested); try files.validate(requested)
+            let history = try read(id), decision = history.first { $0.content.status != .draft }
+            let active = decision?.content.status == .active ? decision : nil
+            let directory: ConfigurationDirectory
+            do { directory = try files.project.child("Memory").child("Bugs") }
+            catch ScopedFileError.notFound { return .init(scope: scope, requirement: id, links: []) }
+            var links: [BugRequirementImpact] = [], scanned = 0, bytes = 0
+            for name in try directory.names() where !name.hasPrefix(".") {
+                try Task.checkCancellation(); scanned += 1
+                guard scanned <= 1_000 else { throw BugRegistryError.limitExceeded }
+                guard let bugID = BugID(rawValue: name), bugID.rawValue == name, let record = try files.read(bugID).first else { throw BugRegistryError.invalidDocument }
+                bytes += try JSONEncoder().encode(record).count
+                guard bytes <= 16_777_216 else { throw BugRegistryError.limitExceeded }
+                guard record.content.status != .archived else { continue }
+                for link in record.requirements where link.requirement.id == id {
+                    guard let pinned = history.first(where: { $0.version == link.requirement.version }),
+                          try pinned.fingerprint == link.requirement.fingerprint else { throw RequirementError.invalidDocument }
+                    let applicable = active.map { version in
+                        version.content.environmentScope.isEmpty || record.content.environment.map { version.content.environmentScope.contains($0) } == true
+                    } ?? false
+                    let status: RequirementImpact.Status = !applicable ? .unavailable : active?.version == link.requirement.version ? .current : .potentiallyStale
+                    links.append(.init(record: record, linked: link, activeVersion: active?.version, status: status))
+                }
+            }
+            return .init(scope: scope, requirement: id, links: links)
+        }
+    }
     /// Uses the same descriptor lock for bug heads and active requirements, avoiding mixed snapshots
     /// and keyset-pagination gaps while another local writer publishes a record.
     func bugComparisonSnapshot(files: BugRegistryFiles, in requested: ProjectScope,
@@ -299,6 +330,38 @@ extension ProjectRequirementStore {
     }
     public func trace(_ subject: TraceabilitySubject, in requested: ProjectScope) throws -> RequirementTraceRecord? {
         try root.withLock { try validate(requested); return try readTrace(subject) }
+    }
+    /// Native administrative browsing. The cursor is ordered by kind/id, independent of display titles.
+    /// Reopens and validates authoritative references rather than trusting cached graph metadata.
+    public func traces(in requested: ProjectScope, kinds: Set<TraceabilitySubject.Kind> = Set(TraceabilitySubject.Kind.allCases),
+                       environment: EnvironmentID? = nil, includeArchived: Bool = false,
+                       after: TraceabilitySubject? = nil, limit: Int = 50, query: String = "") throws -> [RequirementTraceRecord] {
+        try root.withLock {
+            try validate(requested)
+            guard (1...100).contains(limit) else { throw RequirementError.limitExceeded }
+            try RequirementDraft.checkText(query, maximum: 1_024, empty: true)
+            let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            let cursor = after.map { "\($0.kind.rawValue)/\($0.id)" }
+            var result: [RequirementTraceRecord] = [], scanned = 0
+            for kind in kinds.sorted(by: { $0.rawValue < $1.rawValue }) {
+                let directory: ConfigurationDirectory
+                do { directory = try traceDirectory(kind) } catch ScopedFileError.notFound { continue }
+                for name in try directory.names() where !name.hasPrefix(".") {
+                    try Task.checkCancellation()
+                    guard name.hasSuffix(".json"), let id = RequirementID(rawValue: String(name.dropLast(5))) else { throw RequirementError.invalidDocument }
+                    let subject = TraceabilitySubject(kind: kind, id: id)
+                    if let cursor, "\(kind.rawValue)/\(id)" <= cursor { continue }
+                    scanned += 1; guard scanned <= 1_000 else { throw RequirementError.limitExceeded }
+                    guard let record = try readTrace(subject) else { throw RequirementError.invalidDocument }
+                    guard includeArchived || !record.archived, environment == nil || record.environment == environment else { continue }
+                    let fields = [record.title, id.rawValue] + record.requirements.map { $0.id.rawValue }
+                    guard search.isEmpty || fields.contains(where: { $0.range(of: search, options: [.caseInsensitive, .diacriticInsensitive],
+                        locale: Locale(identifier: "en_US_POSIX")) != nil }) else { continue }
+                    result.append(record); if result.count == limit { return result }
+                }
+            }
+            return result
+        }
     }
     /// A saved creation link never silently pins an ordinary rerun to old behavior.
     public func resolveTrace(_ subject: TraceabilitySubject, in requested: ProjectScope,

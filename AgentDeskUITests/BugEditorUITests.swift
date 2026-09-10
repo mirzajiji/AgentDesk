@@ -75,6 +75,50 @@ final class BugEditorUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Cancelled draft"].exists)
     }
 
+    @MainActor func testCoverageSubjectReviewPersistsWithoutClaimingExecution() {
+        let app = application(); app.launch(); createProject(app)
+        click("project.requirements.Bug project", app); click("requirements.create", app)
+        replace(app.textFields["requirement.id"], "synthetic-rule", app, scroll: "requirement.editor.scroll")
+        choose("requirement.status", "Active", app, scroll: "requirement.editor.scroll")
+        replace(app.textViews["requirement.description"], "Synthetic required behavior", app, scroll: "requirement.editor.scroll")
+        replace(app.textViews["requirement.reason"], "Reviewed requirement", app, scroll: "requirement.editor.scroll")
+        click("requirement.review", app); click("requirement.publish", app)
+        waitValue("Active version: v1", id: "requirements.active", app); click("requirements.done", app)
+        click("project.bugs.Bug project", app)
+        click("bugs.create", app); replace(app.textFields["bug.title"], "Coverage association", app)
+        replace(app.textFields["bug.reason"], "Reviewed coverage subject", app)
+        tab("Ticket & Links", app)
+        let editLinks = app.checkBoxes["bug.requirements.edit"]
+        reveal(editLinks, app, "bug.links.scroll"); editLinks.click()
+        click("trace.link.add", app, scroll: "bug.links.scroll")
+        replace(app.textFields["trace.link.id"], "synthetic-rule", app, scroll: "bug.links.scroll")
+        replace(app.textFields["bug.coverage.id"], "synthetic-test", app, scroll: "bug.links.scroll")
+        click("bug.coverage.add", app, scroll: "bug.links.scroll")
+        click("bug.review", app)
+        let change = app.staticTexts["bug.change.coveredBy"]
+        XCTAssertTrue(change.waitForExistence(timeout: 5))
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", "synthetic-test"), object: change)], timeout: 5), .completed)
+        click("bug.publish", app); waitValue("Coverage association", id: "bug.detail.title", app)
+        app.terminate(); app.launch(); click("project.bugs.Bug project", app)
+        let row = app.staticTexts["Coverage association"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5)); row.click(); click("bug.edit", app)
+        tab("Ticket & Links", app)
+        let stored = app.scrollViews["bug.links.scroll"].staticTexts.containing(NSPredicate(format: "value CONTAINS %@", "synthetic-test")).firstMatch
+        XCTAssertTrue(stored.waitForExistence(timeout: 5)); reveal(stored, app, "bug.links.scroll")
+        let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        shot.name = "Persisted native bug coverage association"; shot.lifetime = .keepAlways; add(shot)
+        click("bug.cancel", app); click("bugs.done", app)
+        click("project.traceability.Bug project", app)
+        replace(app.textFields["trace.impact.requirement"], "synthetic-rule", app)
+        click("trace.impact.inspect", app)
+        let review = app.buttons["Review Bug"].firstMatch
+        XCTAssertTrue(review.waitForExistence(timeout: 5)); review.click()
+        XCTAssertTrue(app.staticTexts["bug.editor.title"].waitForExistence(timeout: 5))
+        tab("Ticket & Links", app)
+        XCTAssertTrue(app.checkBoxes["bug.requirements.edit"].exists)
+        click("bug.cancel", app)
+    }
+
     @MainActor private func application() -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
         app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]; return app

@@ -59,6 +59,38 @@ final class RequirementTraceabilityTests: XCTestCase {
         XCTAssertTrue(String(decoding: try Data(contentsOf: f.tracePath), as: UTF8.self).contains("synthetic-test"))
     }
 
+    func testNativeBrowsePagesByIdentityAndFiltersCurrentAuthoritativeLinks() async throws {
+        let f = try await Fixture(); defer { f.remove() }
+        _ = try await f.requirement()
+        let first = try await f.publish()
+        let document = TraceabilitySubject(kind: .documentation, id: RequirementID(rawValue: "api-guide")!)
+        let proposal = try await f.store.prepareTrace(subject: document, title: "Café API guide", environment: f.environment,
+            requirements: [.init(id: f.id)], changeReason: "Reviewed guide", in: f.scope)
+        _ = try await f.store.publishReviewedTrace(proposal, in: f.scope)
+        let page = try await f.store.traces(in: f.scope, limit: 1)
+        XCTAssertEqual(page.map(\.subject), [first.subject])
+        let next = try await f.store.traces(in: f.scope, after: first.subject, limit: 1)
+        XCTAssertEqual(next.map(\.subject), [document])
+        let accent = try await f.store.traces(in: f.scope, query: "CAFE")
+        XCTAssertEqual(accent.map(\.subject), [document])
+        let byRequirement = try await f.store.traces(in: f.scope, query: f.id.rawValue)
+        XCTAssertEqual(byRequirement.count, 2)
+        let foreignEnvironment = try await f.store.traces(in: f.scope, environment: EnvironmentID()); XCTAssertTrue(foreignEnvironment.isEmpty)
+        _ = try await f.publish(expected: 1, archived: true)
+        let active = try await f.store.traces(in: f.scope); XCTAssertEqual(active.map(\.subject), [document])
+        let archived = try await f.store.traces(in: f.scope, kinds: [.automatedTest], includeArchived: true)
+        XCTAssertEqual(archived.first?.revision, 2)
+        do { _ = try await f.store.traces(in: .init(workspaceID: f.scope.workspaceID, projectID: ProjectID())); XCTFail() } catch { }
+        do { _ = try await f.store.traces(in: f.scope, query: String(repeating: "x", count: 1_025)); XCTFail() } catch { }
+    }
+
+    func testNativeBrowseDoesNotTreatTamperedLinksAsAnEmptyGraph() async throws {
+        let f = try await Fixture(); defer { f.remove() }
+        _ = try await f.requirement(); _ = try await f.publish()
+        try Data("{}".utf8).write(to: f.tracePath)
+        do { _ = try await f.store.traces(in: f.scope); XCTFail("Corrupt metadata must remain distinguishable from an empty graph") } catch { }
+    }
+
     func testStaleLinksKeepProvenanceWhileNormalRerunsUseLatestActive() async throws {
         let f = try await Fixture(); defer { f.remove() }
         _ = try await f.requirement(); let initial = try await f.publish()

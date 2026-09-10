@@ -67,6 +67,41 @@ public actor OperationalStore {
                                   [.text(workspaceID.rawValue), .text(scope.projectID.rawValue), .integer(Int64(limit))], map: Self.decodeRun)
     }
 
+    /// Bound evidence history for one agent/environment. Cursor ownership is verified before use;
+    /// ordering is newest creation time first, with run identity as a stable tie-breaker.
+    public func boundRuns(in scope: ProjectScope, environmentID: EnvironmentID, agentID: AgentID,
+                          before cursor: RunID? = nil, limit: Int = 50) throws -> [StoredRun] {
+        try validate(scope)
+        guard (1...100).contains(limit) else { throw OperationalStoreError.invalidInput }
+        return try database.transaction {
+            var suffix = """
+                 JOIN evidence_runs b ON b.workspace_id=r.workspace_id AND b.project_id=r.project_id AND b.run_id=r.run_id
+                 WHERE r.workspace_id=? AND r.project_id=? AND b.environment_id=? AND json_extract(b.binding_json,'$.agentID')=?
+                """
+            var values: [SQLValue] = [.text(workspaceID.rawValue), .text(scope.projectID.rawValue),
+                .text(environmentID.rawValue), .text(agentID.rawValue)]
+            if let cursor {
+                guard let run = try loadRun(cursor, in: scope),
+                      let binding = try evidenceBinding(for: cursor, in: scope),
+                      binding.context.environmentID == environmentID, binding.agentID == agentID else {
+                    throw OperationalStoreError.invalidInput
+                }
+                suffix += " AND (r.created_at<? OR (r.created_at=? AND r.run_id>?))"
+                values += [.real(run.createdAt.timeIntervalSince1970), .real(run.createdAt.timeIntervalSince1970), .text(cursor.rawValue)]
+            }
+            suffix += " ORDER BY r.created_at DESC,r.run_id ASC LIMIT ?"
+            values.append(.integer(Int64(limit)))
+            let runs = try database.query(Self.runSelect + suffix, values, map: Self.decodeRun)
+            for run in runs {
+                guard let binding = try evidenceBinding(for: run.id, in: scope),
+                      binding.context.environmentID == environmentID, binding.agentID == agentID else {
+                    throw OperationalStoreError.invalidDatabase
+                }
+            }
+            return runs
+        }
+    }
+
     /// Stable keyset pagination for the local project owner recovering interrupted runs.
     public func unfinishedRuns(in scope: ProjectScope, afterRunID: RunID? = nil, limit: Int = 256) throws -> [StoredRun] {
         try validate(scope)

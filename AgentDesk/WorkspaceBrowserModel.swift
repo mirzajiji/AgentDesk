@@ -57,6 +57,9 @@ final class WorkspaceBrowserModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         do {
+            #if DEBUG
+            if let applicationRoot { try await NativeRunUITestSupport.seed(catalog: catalog, applicationRoot: applicationRoot) }
+            #endif
             let records = try await catalog.workspaces()
             try Task.checkCancellation()
             workspaces = records

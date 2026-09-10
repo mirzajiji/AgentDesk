@@ -8,6 +8,7 @@ struct WorkspaceBrowserView: View {
     @State private var editor: CatalogEditor?
     @State private var selectedProject: ProjectRecord?
     @State private var setupProject: ProjectRecord?
+    @State private var runProject: ProjectRecord?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -73,6 +74,9 @@ struct WorkspaceBrowserView: View {
         .sheet(item: $setupProject) { project in
             ProjectSetupView(project: project, open: { try await model.executionServices(for: project) })
         }
+        .sheet(item: $runProject) { project in
+            ProjectRunConsoleView(project: project, open: { try await model.executionServices(for: project) })
+        }
         .sheet(item: $editor) { item in
             CatalogNameEditor(editor: item) { name in
                 switch item {
@@ -121,6 +125,8 @@ struct WorkspaceBrowserView: View {
                                 .accessibilityIdentifier("project.agents.\(project.name)")
                             Button("Setup") { setupProject = project }
                                 .accessibilityIdentifier("project.setup.\(project.name)")
+                            Button("Run") { runProject = project }
+                                .accessibilityIdentifier("project.run.\(project.name)")
                             Button("Rename") { editor = .renameProject(project) }
                                 .accessibilityIdentifier("project.rename.\(project.name)")
                         }

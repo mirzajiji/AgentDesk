@@ -6,6 +6,21 @@ import XCTest
 
 @MainActor
 final class MacPlainTextEditorTests: XCTestCase {
+    func testSwiftUIDisabledStateReachesNativeTextEditor() throws {
+        func editor(in view: NSView) -> NSTextView? {
+            if let text = view as? NSTextView { return text }
+            return view.subviews.lazy.compactMap { editor(in: $0) }.first
+        }
+        for disabled in [true, false] {
+            let host = NSHostingView(rootView: MacPlainTextEditor(text: .constant("Synthetic task"), label: "Task", identifier: "task")
+                .disabled(disabled))
+            host.frame = NSRect(x: 0, y: 0, width: 400, height: 120)
+            host.layoutSubtreeIfNeeded()
+            let native = try XCTUnwrap(editor(in: host))
+            XCTAssertEqual(native.isEditable, !disabled)
+            XCTAssertEqual(native.string, "Synthetic task")
+        }
+    }
     func testNativeStructuredTextPreservesQuotesDashesAndUpdatesBinding() throws {
         let editor = NSTextView()
         MacPlainTextEditor.configure(editor)

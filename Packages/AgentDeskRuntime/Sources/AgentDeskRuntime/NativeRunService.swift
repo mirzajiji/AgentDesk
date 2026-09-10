@@ -6,7 +6,7 @@ import Foundation
 
 /// Trusted native application boundary. Do not expose its review/policy methods to model or mobile tools.
 /// A service binds one agent/environment and retains the project owner until explicit shutdown.
-public actor NativeRunService {
+public actor NativeRunService: RunEvidenceReading {
     public nonisolated let scope: ProjectScope
     public nonisolated let agentID: AgentID
     public nonisolated let environmentID: EnvironmentID
@@ -111,6 +111,20 @@ public actor NativeRunService {
         _ = try await evidence(for: id)
         return try await coordinator.lifecycle.run(id, in: scope)
     }
+    /// Native local-user browsing, restricted to this service's exact agent/environment.
+    public func runs(before cursor: RunID? = nil, limit: Int = 50) async throws -> [StoredRun] {
+        try checkOpen()
+        struct Query: Encodable { let agentID: AgentID; let before: RunID?; let limit: Int }
+        let action = try PolicyAction(scope: scope, environmentID: environmentID, operation: .readEvidence,
+            resource: resource.fingerprint, payload: .canonical(Query(agentID: agentID, before: cursor, limit: limit)))
+        try await gate.authorizePreparationRead(action, requesterID: reviewerID)
+        let store = try OperationalStore(database: database, workspaceID: scope.workspaceID)
+        let runs = try await store.boundRuns(in: scope, environmentID: environmentID, agentID: agentID, before: cursor, limit: limit)
+        for run in runs { _ = try await evidence(for: run.id) }
+        try checkOpen()
+        try await gate.authorizePreparationRead(action, requesterID: reviewerID)
+        return runs
+    }
     public func progress(for id: RunID) async throws -> RunWorkPlan? {
         _ = try await evidence(for: id)
         return try await coordinator.lifecycle.progress(for: id, in: scope)
@@ -119,8 +133,49 @@ public actor NativeRunService {
         _ = try await evidence(for: id)
         return try await coordinator.lifecycle.history(for: id, in: scope, after: sequence, limit: limit)
     }
+    /// Authorized replay/live progress for the native console. Every forwarded event rechecks
+    /// the current read policy and exact evidence binding. Overflow requires durable replay.
+    public func subscribe(to id: RunID, after sequence: Int64 = 0, capacity: Int = 256) async throws -> RunEventSubscription {
+        _ = try await evidence(for: id)
+        let source = try await coordinator.lifecycle.subscribe(to: id, in: scope, after: sequence, capacity: capacity)
+        let (events, continuation) = AsyncThrowingStream<StoredRunEvent, any Error>.makeStream(bufferingPolicy: .bufferingOldest(capacity))
+        let forwarding = Task { [weak self] in
+            defer { source.cancel() }
+            do {
+                for try await event in source.events {
+                    try Task.checkCancellation()
+                    guard let self else { throw RunCoordinatorError.closed }
+                    _ = try await self.evidence(for: id)
+                    switch continuation.yield(event) {
+                    case .enqueued: break
+                    case .dropped: throw RunLifecycleError.replayRequired
+                    case .terminated: return
+                    @unknown default: throw RunLifecycleError.replayRequired
+                    }
+                }
+                continuation.finish()
+            } catch { continuation.finish(throwing: error) }
+        }
+        continuation.onTermination = { _ in forwarding.cancel(); source.cancel() }
+        return RunEventSubscription(events: events, finish: {
+            forwarding.cancel(); source.cancel(); continuation.finish()
+        })
+    }
     public func evidenceRecords(for id: RunID, after sequence: Int64 = 0, limit: Int = 100) async throws -> [EvidenceRecord] {
         try await evidence(for: id).records(after: sequence, limit: limit)
+    }
+    public func inputSnapshot(for id: RunID) async throws -> StoredEvidenceContent {
+        let store = try await evidence(for: id)
+        guard let binding = try await store.binding(),
+              let record = try await store.records(limit: 1).first,
+              record.sequence == 1, record.kind == .command, record.source == .runtime,
+              record.basis == .observed, record.format == .json,
+              let content = try await store.artifact(record.id),
+              try ActionFingerprint(bytes: Data(content.text.utf8)) == binding.configurationFingerprint else {
+            throw RunCoordinatorError.invalidPreparation
+        }
+        _ = try await evidence(for: id)
+        return content
     }
     public func artifact(_ artifactID: UUID, for id: RunID) async throws -> StoredEvidenceContent? {
         try await evidence(for: id).artifact(artifactID)

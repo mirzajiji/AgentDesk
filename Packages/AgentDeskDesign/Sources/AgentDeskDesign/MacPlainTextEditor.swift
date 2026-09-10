@@ -17,6 +17,7 @@ public struct MacPlainTextEditor: NSViewRepresentable {
         let scroll = NSTextView.scrollableTextView()
         guard let editor = scroll.documentView as? NSTextView else { return scroll }
         Self.configure(editor)
+        editor.isEditable = context.environment.isEnabled
         editor.string = text
         editor.delegate = context.coordinator
         editor.setAccessibilityLabel(label)
@@ -31,6 +32,7 @@ public struct MacPlainTextEditor: NSViewRepresentable {
     public func updateNSView(_ scroll: NSScrollView, context: Context) {
         context.coordinator.text = $text
         guard let editor = scroll.documentView as? NSTextView else { return }
+        editor.isEditable = context.environment.isEnabled
         if editor.string != text {
             let selection = editor.selectedRange()
             editor.string = text

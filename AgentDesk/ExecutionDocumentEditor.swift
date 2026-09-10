@@ -59,6 +59,8 @@ struct ExecutionDocumentEditor: View {
                     }
                 }
                 Section {
+                    Text("Saving stops active runs affected by these workspace or project settings.")
+                        .font(.callout).foregroundStyle(.secondary)
                     Text("Blank limits inherit. Effective limits use the strictest saved value. Additional saved constraints remain in effect.")
                         .font(.callout).foregroundStyle(.secondary)
                 }

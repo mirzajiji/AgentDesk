@@ -21,9 +21,10 @@ final class ProjectSetupModel: ObservableObject {
     @Published private(set) var errorMessage: String?
     private(set) var services: ProjectNativeServices?
     private let open: () async throws -> ProjectNativeServices
+    private let runs: NativeRunRegistry
 
-    init(project: ProjectRecord, open: @escaping () async throws -> ProjectNativeServices) {
-        self.project = project; self.open = open
+    init(project: ProjectRecord, runs: NativeRunRegistry = .shared, open: @escaping () async throws -> ProjectNativeServices) {
+        self.project = project; self.runs = runs; self.open = open
     }
     func load() async {
         guard !isBusy else { return }
@@ -52,7 +53,9 @@ final class ProjectSetupModel: ObservableObject {
     func save(_ draft: ExecutionConfigurationDraft, at level: ExecutionConfigurationLevel, expectedRevision: Int?) async throws {
         guard let services, !isBusy else { throw CatalogError.busy }
         isBusy = true; defer { isBusy = false }
-        _ = try await services.setup.save(draft, at: level, expectedRevision: expectedRevision)
+        try await runs.changeConfiguration(in: project.scope, level: level) {
+            _ = try await services.setup.save(draft, at: level, expectedRevision: expectedRevision)
+        }
         settings = try await services.setup.settings(); errorMessage = nil
     }
     func register(_ selected: URL) async {

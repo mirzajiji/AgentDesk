@@ -7,6 +7,7 @@ struct WorkspaceBrowserView: View {
     @ObservedObject var model: WorkspaceBrowserModel
     @State private var editor: CatalogEditor?
     @State private var selectedProject: ProjectRecord?
+    @State private var setupProject: ProjectRecord?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -69,6 +70,9 @@ struct WorkspaceBrowserView: View {
                               openInstructions: { try await model.instructionStore(for: project) },
                               openSkills: { try await model.skillStore(for: project) })
         }
+        .sheet(item: $setupProject) { project in
+            ProjectSetupView(project: project, open: { try await model.executionServices(for: project) })
+        }
         .sheet(item: $editor) { item in
             CatalogNameEditor(editor: item) { name in
                 switch item {
@@ -115,13 +119,15 @@ struct WorkspaceBrowserView: View {
                             Spacer()
                             Button("Agents") { selectedProject = project }
                                 .accessibilityIdentifier("project.agents.\(project.name)")
+                            Button("Setup") { setupProject = project }
+                                .accessibilityIdentifier("project.setup.\(project.name)")
                             Button("Rename") { editor = .renameProject(project) }
                                 .accessibilityIdentifier("project.rename.\(project.name)")
                         }
                         .padding(.vertical, 8)
                     }
                     .listStyle(.inset)
-                    Text("Repository registration and agent execution are coming next.")
+                    Text("Set up a repository and execution permissions for each project.")
                         .font(.callout).foregroundStyle(.secondary)
                 }
             }

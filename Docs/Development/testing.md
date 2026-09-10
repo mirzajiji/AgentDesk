@@ -1,4 +1,4 @@
-# Validation and iPhone Simulator coverage
+# Native validation and display coverage
 
 ## Per-task gate
 
@@ -22,6 +22,25 @@ Documentation-only changes use document integrity/link checks instead of artific
 | LAN integration tests | Pairing, unpaired/revoked rejection, scoped event streaming, replay/reconnect, duplicate events, permission denial, Mac sleep/wake |
 
 Ordinary automated tests must use synthetic data, fake providers, and temporary stores. Do not require a paid/live Codex run or company services merely to test the code. Add explicit opt-in integration checks when real supported CLI behavior is being validated.
+
+## Mac display and window matrix
+
+User update, 2026-09-10: AgentDesk must work as a native Mac app across these display targets. Diagonal size does not determine a SwiftUI layout. Use the available content area in logical points, respect macOS scaling and system typography, and preserve readable content and reachable controls while resizing.
+
+| User display target | Pixel profile to include at acceptance | Window/scaling coverage |
+| --- | --- | --- |
+| 32-inch 4K | 3840×2160 | Default and available scaled modes; small floating, split-screen and maximized windows |
+| 27-inch 2K | 2048×1080 and 2560×1440 until the exact panel resolution is known | Default scaling; small floating, split-screen and maximized windows |
+| 16-inch 4K | 3840×2160 | Default and available scaled modes, including less logical space with larger UI |
+| 14-inch 4K | 3840×2160 | Default and available scaled modes, including less logical space with larger UI |
+
+These are requested acceptance profiles, not claims about a particular MacBook model or connected hardware. Record the actual resolution, logical visible frame, backing scale, chosen scaling mode and app window content size for each physical check. Respect safe areas, menu bar and Dock space; move windows between displays with different scaling and verify that text and controls stay crisp and usable.
+
+For each new Mac surface, verify its minimum usable window size, normal and large windows, scrolling, long names/paths/JSON, text enlargement, light/dark appearance, keyboard focus and primary actions. Sheets must fit the available window/display height and keep save/cancel controls reachable. Desktop lists, inspectors, run results and diffs must use extra room without forcing excessively wide prose or overlapping columns. Revisit existing fixed-size editors during P1-14/P1-15 acceptance.
+
+Native offscreen layout regression tests propose logical content sizes from 600×480 through 3840×2160 to the actual setup editors, at display-scale values 1 and 2 and normal/enlarged text settings. They detect fixed-frame regressions and check root sizing, but do not establish internal clipping, scrolling, focus, physical rendering, actual scaling changes or multi-monitor behavior. Those require interactive native UI and physical display checks. Record unavailable hardware explicitly; do not claim a display passed from an offscreen test or screenshot at a matching pixel size.
+
+The iPhone development-device choice below is unchanged. Mac display support applies throughout implementation; the complete hardware matrix remains part of full-project acceptance.
 
 ## Development device and final iPhone matrix
 

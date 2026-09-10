@@ -4,7 +4,7 @@ This is an implementation plan, not a completion claim. The full source specific
 
 Finish the current task's validation and commit before starting another independent task. A task may be split further when its diff becomes difficult to review; never combine unrelated completed tasks just to reduce commit count. Behavioral tests belong in the feature commit.
 
-Progress after P1-13b: **24 documented tasks complete, 3 Phase 1 tasks remaining** (27 detailed tasks including bootstrap; P1-09 is split into transport/provider integration, P1-11 into coordinator/native execution bridge, P1-12 into redaction, evidence storage and Git capture, and P1-13 into repository access, execution setup and native UI). Phases 2–6 and sections 115–159 are also remaining; they have not yet been decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
+Progress after P1-13c1: **25 documented tasks complete, 3 Phase 1 tasks remaining** (28 detailed tasks including bootstrap; P1-09 is split into transport/provider integration, P1-11 into coordinator/native execution bridge, P1-12 into redaction, evidence storage and Git capture, and P1-13 into repository access, execution setup, native setup screens and the run console). Phases 2–6 and sections 115–159 are also remaining; they have not yet been decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
 
 ## Bootstrap
 
@@ -39,13 +39,16 @@ Progress after P1-13b: **24 documented tasks complete, 3 Phase 1 tasks remaining
 | P1-12c | Complete: internal read-only Git snapshots, dirty-baseline comparison and sanitized staged/working/baseline diff previews | 82 Runtime, 252 affected native Mac unit and 200 iPhone tests pass. See [capture validation](p1-12c-validation.md) for supported repositories and unavailable unchanged Mac Keychain/UI checks. |
 | P1-13a | Complete: scoped native repository registration, durable selected-folder access and run-location provenance; UI assembly follows in P1-13c | 100 Core, 112 Runtime, 288 affected Mac and 218 iPhone tests pass; real native bookmark round-trip passes. External picker/relaunch acceptance remains P1-13c. See [registration validation](p1-13a-validation.md). |
 | P1-13b | Complete: native execution setup service, explicit environment/policy proposals and current-context preparation | 106 Core, 113 Runtime, 295 affected Mac and 224 iPhone tests pass. Stale context cannot create a run; refreshed context still requires review. See [setup validation](p1-13b-validation.md). |
-| P1-13c | Native repository/settings forms, context inspector and live run/result console | Mac UI critical path, keyboard/accessibility, errors, exact approvals and result/diff review; shared/mobile regressions |
-| P1-14 | Command palette, basic menu bar, Settings and first-run checks | Command routing, stale selection handling, no duplicate execution, menu status updates and UI tests |
-| P1-15 | Complete Phase 1 acceptance and architecture documentation for implemented systems | Fresh app: workspace → project → agent → instructions → Codex → live steps → results/files; all affected suites |
+| P1-13c1 | Complete: native repository/execution setup screens, full JSON editing and resizable Mac editors | 310 Mac unit/integration, four Mac UI and 224 iPhone tests pass; external picker/relaunch, smart-quote regression and compact keyboard/action checks pass. See [validation](p1-13c1-validation.md). |
+| P1-13c2 | Native context inspector and live run/result console | Mac UI critical path, keyboard/accessibility, errors, exact approvals and result/diff review; shared/mobile regressions |
+| P1-14 | Command palette, basic menu bar, Settings and first-run checks | Command routing, stale selection handling, no duplicate execution, menu status updates and UI tests; audit existing fixed-size editor/window layouts against the Mac display requirement |
+| P1-15 | Complete Phase 1 acceptance and architecture documentation for implemented systems | Fresh app: workspace → project → agent → instructions → Codex → live steps → results/files; all affected suites; compact/large native windows, scaling, accessible controls and explicit unavailable physical display coverage |
 
 After P1-06a/b1, implementation follows the runtime critical path through P1-07a/b and Codex discovery/provider setup. P1-06b2 configuration constraints and P1-06b3 scoped skills are complete. Capabilities must be validated and policy-gated before being made executable. P1-12a/b/c evidence safety and capture precede coordinator P1-11 so real provider output has a tested storage boundary. All six phases and the additions below remain in scope.
 
 The iOS target introduced in P1-01 is a truthful companion shell with an unpaired/connection-unavailable state. Do not fabricate active runs or working pairing before Phase 5 exists. Keep testing it whenever shared types or design code change.
+
+The user's 32-inch 4K, 27-inch 2K, 16-inch 4K and 14-inch 4K Mac display targets apply to every phase. Follow the [display/window acceptance matrix](testing.md#mac-display-and-window-matrix); complete the full physical display matrix at final product acceptance, recording unavailable hardware rather than implying coverage. This is an acceptance requirement across existing tasks, not an additional completed task.
 
 ## Later phases
 

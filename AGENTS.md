@@ -17,6 +17,7 @@
 The supplied product specification is preserved in `Docs/Architecture/final-architecture.txt`. It defines 159 sections and six development phases. `Docs/Development/tasks.md` breaks initial implementation into commit-sized tasks. The specification describes the target product, not already implemented behavior.
 
 - Native Swift and SwiftUI macOS application plus a native iPhone companion; Swift Package Manager for modules.
+- Support native Mac windows on the user's 32-inch 4K, 27-inch 2K, 16-inch 4K and 14-inch 4K display targets. Adapt to available logical window space and macOS display scaling, never physical inches or hard-coded monitor names. Keep forms scrollable and primary actions reachable in smaller windows; let desktop surfaces use larger windows. See the display acceptance matrix in `Docs/Development/testing.md`.
 - The Mac is the execution authority. The iPhone observes, reviews, approves, and invokes explicitly allowed predefined operations.
 - Planned modules: `AgentDeskCore`, `AgentDeskRuntime`, `AgentDeskProtocol`, `AgentDeskClient`, `AgentDeskPersistence`, `AgentDeskSecurity`, `AgentDeskMCP`, `AgentDeskPlugins`, `AgentDeskDatabases`, and `AgentDeskDesign` under `Packages/`.
 - Use small domain types and services, dependency injection at subsystem boundaries, and deterministic code for known operations. Keep business logic out of SwiftUI views.

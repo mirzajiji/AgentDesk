@@ -1,5 +1,6 @@
 #if os(macOS)
 import AgentDeskCore
+import AgentDeskRuntime
 import Combine
 import Foundation
 import SwiftUI
@@ -12,12 +13,13 @@ final class WorkspaceBrowserModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     private var catalog: WorkspaceCatalog?
+    private var applicationRoot: URL?
     private let preferences: UserDefaults
     private var selectionGeneration = 0
 
-    init(catalog: WorkspaceCatalog? = nil, preferences: UserDefaults? = nil) {
+    init(catalog: WorkspaceCatalog? = nil, preferences: UserDefaults? = nil, applicationRoot: URL? = nil) {
         self.preferences = preferences ?? Self.applicationPreferences()
-        self.catalog = catalog
+        self.catalog = catalog; self.applicationRoot = applicationRoot
         if catalog == nil {
             do {
                 let support = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
@@ -30,6 +32,7 @@ final class WorkspaceBrowserModel: ObservableObject {
                     container = support.appendingPathComponent("AgentDesk/UITesting/\(id.uuidString)/Workspaces", isDirectory: true)
                 }
                 #endif
+                self.applicationRoot = container.deletingLastPathComponent()
                 try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true,
                                                         attributes: [.posixPermissions: 0o700])
                 self.catalog = try WorkspaceCatalog(container: container)
@@ -120,6 +123,16 @@ final class WorkspaceBrowserModel: ObservableObject {
     func skillStore(for project: ProjectRecord) async throws -> ProjectSkillStore {
         guard let catalog else { throw CatalogError.invalidConfiguration }
         return try await catalog.skillStore(in: project.scope)
+    }
+
+    func executionServices(for project: ProjectRecord) async throws -> ProjectNativeServices {
+        guard let catalog, let applicationRoot else { throw CatalogError.invalidConfiguration }
+        _ = try await catalog.project(project.scope)
+        let directories = try NativeProjectStorage.prepare(root: applicationRoot, workspaceID: project.workspaceID)
+        let access = directories.access, data = directories.data
+        return ProjectNativeServices(setup: ProjectExecutionSetupService(catalog: catalog, scope: project.scope),
+            repositories: try ProjectRepositoryRegistry(catalog: catalog, container: access), catalog: catalog,
+            database: data.appendingPathComponent("operations.sqlite"))
     }
 
     static func message(for error: any Error) -> String {

@@ -25,6 +25,19 @@ Stable `agentdesk://` links address authorized workspace/project resources such 
 
 Use native labels, focus order, keyboard shortcuts, scalable layout and clear status text beyond color alone. Test empty/loading/error/offline states, long names, large text, light/dark appearance, split-view resizing, command routing, invalid/deleted deep-link targets and context switching during active work. UI success must reflect persisted/authoritative state, not optimistic placeholder data.
 
+### Mac window and display adaptation
+
+The user's additional display requirement (2026-09-10) covers 32-inch 4K, 27-inch 2K, 16-inch 4K and 14-inch 4K screens. Layout follows the available logical window size and macOS scaling. It must not branch on physical diagonal or assume that a 4K screen provides 3840×2160 logical points. The [native display matrix](../Development/testing.md#mac-display-and-window-matrix) defines window, scaling and hardware acceptance, including both common interpretations of the requested 2K target until the exact panel is known.
+
+Scrollable setup forms and JSON editors use a shared native resizable layout with a compact usable content minimum and a suggested opening size. Their content can grow as windows expand. Verify primary actions, focus and text at compact sizes, and use extra space for desktop lists, inspectors, results and diffs as those surfaces arrive. Existing fixed-size editors still need the planned P1-14/P1-15 audit. Offscreen layout measurements alone do not prove interactive or physical display acceptance.
+
 ## Initial shell
 
 P1-01 introduces a native Mac split-view sidebar with empty Workspaces, Runs and Connections destinations and an unpaired iPhone screen. These surfaces do not yet create resources, execute agents or pair devices. Selection is a small Core value type; views own only presentation state. Native XCTest covers selection, launch, Mac sidebar navigation, appearance, iPhone rotation and largest accessibility text. Mac and primary iPhone runs pass. See [foundation validation](../Development/p1-01-validation.md).
+
+
+## Project setup screens (P1-13c1)
+
+The app provides **Workspaces → project → Setup** with native folder selection, registration/access status and versioned workspace/project execution forms. The UI uses the scoped registration and setup services described in [repositories](repositories.md) and [configuration](configuration.md). Repository access is checked on reload; registration removal preserves the actual folder. Forms preserve advanced saved constraints and make starting settings explicit review/save actions. Advanced JSON exposes the complete configuration, validates scope/limits before applying to the form and still requires an explicit Save Settings action.
+
+Native acceptance passes: 310 Mac unit/integration tests, four Mac UI scenarios and 224 iPhone tests. External folder access survives relaunch; configuration save/cancel, advanced schema edits and compact-window keyboard actions are verified. The JSON field uses a native plain-text editor with automatic substitutions disabled so macOS smart quotes cannot corrupt the document. Physical display matrix coverage remains pending. The context inspector/live run console remains P1-13c2. See [validation](../Development/p1-13c1-validation.md).

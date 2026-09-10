@@ -82,7 +82,7 @@ struct ProjectAgentsView: View {
                 }
                 .listStyle(.inset)
             }
-            Text("Review the shared and agent instructions before execution. Codex execution is being added next.")
+            Text("Review the shared and agent instructions, then open the project’s Run console to prepare and approve execution.")
                 .font(.callout).foregroundStyle(.secondary)
         }
         .padding(24).frame(minWidth: 820, idealWidth: 880, minHeight: 520, idealHeight: 620)

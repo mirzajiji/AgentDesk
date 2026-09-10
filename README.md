@@ -2,7 +2,7 @@
 
 A local-first, native Apple platform for engineering agents, QA workflows, project knowledge, and execution review. The Mac executes; an iPhone companion monitors and controls explicitly permitted operations over the local network.
 
-**Status:** Phase 1 is underway on `codex/native-foundation`. The Mac creates, renames and reopens local workspaces and projects. Project agent templates, instruction editing and immutable revisions are implemented, alongside scoped configuration, SQLite run storage, persisted run lifecycle/events, native Keychain support, Codex Settings through a signed Mac helper, an internal read-only Codex execution adapter, a durable policy/approval gate, and immutable environment settings with effective configuration and output-schema validation, and native versioned skill editing with pinned agent references. Native validation is recorded per task. Personal GitHub push succeeds. See the [implementation tasks](Docs/Development/tasks.md).
+**Status:** Phase 1 native Mac foundation passes acceptance on `codex/native-foundation`. The Mac creates, renames and reopens local workspaces and projects. Project agent templates, instruction editing and immutable revisions are implemented, alongside scoped configuration, SQLite run storage, persisted run lifecycle/events, native Keychain support, Codex Settings through a signed Mac helper, an internal read-only Codex execution adapter, a durable policy/approval gate, and immutable environment settings with effective configuration and output-schema validation, and native versioned skill editing with pinned agent references. Native validation is recorded per task. Phases 2–6 remain pending; the iPhone is still an unpaired companion shell. Personal GitHub push succeeds. See the [implementation tasks](Docs/Development/tasks.md).
 
 ## Product and development references
 
@@ -20,18 +20,18 @@ Swift, SwiftUI, Swift Package Manager, SQLite, macOS Keychain, and the officiall
 
 Configuration stays human-readable; operational data stays local. Workspace and project isolation is enforced in code. Company data, credentials, and generated evidence must not be committed to this source repository.
 
-## Native foundation in progress
+## Native foundation
 
 Open `AgentDesk.xcodeproj` and select the shared `AgentDesk` scheme. It includes app, unit-test and UI-test targets. The Mac has an initial workspace/run/connection sidebar; the iPhone shows that no Mac is connected. On Mac, choose **Create Workspace**, name it, then choose **Create Project**. Names and selected workspace persist across launches. Rename controls preserve identities and project membership. Each project has an **Agents** panel for templates, editable instructions and saved versions. **Shared Instructions** edits guidance at workspace or project scope; **Review Instructions** shows the exact composed files, versions and fingerprints. **Skills** creates reusable instruction bundles and example/script attachments; an agent’s **Skills** tab pins exact versions for preview. Mac **Settings → AI · Codex** checks the installed CLI and manages its supported account flow. A read-only provider has passed a real synthetic CLI task; stored configuration now resolves environment limits and validates structured Codex results. Redaction, persisted evidence/Git capture, policy-gated run coordination and the signed native execution service are implemented. Repository registration and current-context setup services are also tested. The native **Setup** screens select repositories and edit versioned execution settings, including complete advanced JSON. Folder access and saved settings survive relaunch. The project’s **Run** console supports current-context review, explicit preparation/approval, live state, cancellation and saved evidence/diff inspection. **Browse Saved Runs** needs no Codex login or new execution. Mac console acceptance and primary iPhone regressions pass; see [the record](Docs/Development/p1-13c2-validation.md). Secure pairing remains planned.
 
-Local Swift packages are under `Packages/AgentDeskCore`, `Packages/AgentDeskDesign`, `Packages/AgentDeskPersistence`, `Packages/AgentDeskSecurity` and `Packages/AgentDeskRuntime`. The app uses Swift 6, targeting macOS 15 and iOS 18 or newer. Native Mac and iPhone 16 Pro/iOS 26 unit/integration suites pass. Current setup acceptance passes 310 Mac unit/integration tests, four native Mac UI scenarios and 224 iPhone tests, as detailed in [setup validation](Docs/Development/p1-13c1-validation.md). Broader device/OS coverage is reserved for final project acceptance.
+Local Swift packages are under `Packages/AgentDeskCore`, `Packages/AgentDeskDesign`, `Packages/AgentDeskPersistence`, `Packages/AgentDeskSecurity` and `Packages/AgentDeskRuntime`. The app uses Swift 6, targeting macOS 15 and iOS 18 or newer. Native Mac and iPhone 16 Pro/iOS 26 unit/integration suites pass. Current acceptance includes 351 Mac unit/integration tests, eight affected native UI scenarios, 228 iPhone tests and a separate real Codex critical-slice run, as detailed in [Phase 1 acceptance](Docs/Development/p1-15-acceptance.md). Broader device/OS coverage is reserved for final project acceptance.
 
 ```sh
 python3 Scripts/validate-documentation.py
 swift test --package-path Packages/AgentDeskCore
 ```
 
-Supplementary source checks and host XCTest execution are available with `python3 Scripts/check-foundation-sources.py`; they do not replace Xcode build or Simulator testing. Exact commands and current limitations are in [validation](Docs/Development/p1-01-validation.md).
+Use the shared Xcode scheme for native validation: `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' test`. The old manual Core/Design compiler checker has been retired because it does not build the app's current package graph. Its original evidence remains in [foundation validation](Docs/Development/p1-01-validation.md). Current acceptance and the explicit opt-in real Codex scenario are recorded in [Phase 1 acceptance](Docs/Development/p1-15-acceptance.md).
 
 ## Development workflow
 

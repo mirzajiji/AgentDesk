@@ -9,7 +9,7 @@ import Foundation
 enum NativeRunUITestSupport {
     static func mode() -> String? {
         guard let id = ProcessInfo.processInfo.environment["AGENTDESK_TEST_CONTAINER_ID"], UUID(uuidString: id) != nil,
-              let mode = ProcessInfo.processInfo.environment["AGENTDESK_TEST_RUN_MODE"], ["success", "quiet", "diff"].contains(mode) else { return nil }
+              let mode = ProcessInfo.processInfo.environment["AGENTDESK_TEST_RUN_MODE"], ["success", "quiet", "diff", "stream"].contains(mode) else { return nil }
         return mode
     }
     static func root() throws -> URL {
@@ -37,7 +37,7 @@ enum NativeRunUITestSupport {
         let expected = try root().appendingPathComponent("Data/\(context.scope.workspaceID)/operations.sqlite")
         guard services.database.standardizedFileURL == expected.standardizedFileURL,
               services.setup.scope == context.scope else { throw CatalogError.invalidConfiguration }
-        let provider = try UITestExecutionProvider(scope: context.scope, quiet: mode == "quiet",
+        let provider = try UITestExecutionProvider(scope: context.scope, quiet: mode == "quiet", streaming: mode == "stream",
             diffDatabase: mode == "diff" ? services.database : nil)
         return try await NativeRunService.open(database: services.database, directory: services.database.deletingLastPathComponent(),
             configuration: context.configuration, captureRepository: false, provider: provider)
@@ -47,9 +47,10 @@ enum NativeRunUITestSupport {
 private actor UITestExecutionProvider: ExecutionProvider {
     nonisolated let resource: ExecutionResource
     private let quiet: Bool
+    private let streaming: Bool
     private let diffDatabase: URL?
-    init(scope: ProjectScope, quiet: Bool, diffDatabase: URL?) throws {
-        resource = try .directory(in: scope, device: 1, inode: 2); self.quiet = quiet; self.diffDatabase = diffDatabase
+    init(scope: ProjectScope, quiet: Bool, streaming: Bool, diffDatabase: URL?) throws {
+        resource = try .directory(in: scope, device: 1, inode: 2); self.quiet = quiet; self.streaming = streaming; self.diffDatabase = diffDatabase
     }
     func start(_ request: ExecutionRequest) async throws -> ProviderExecution {
         if let database = diffDatabase {
@@ -67,8 +68,10 @@ private actor UITestExecutionProvider: ExecutionProvider {
         if !quiet {
             let text = "Synthetic result: reviewed files.\npassword=synthetic-ui-result-secret"
             output.yield(.init(identity: request.identity, sequence: 2, payload: .message(id: "result", text: text)))
-            output.yield(.init(identity: request.identity, sequence: 3, payload: .completed(text: text)))
-            output.finish()
+            if !streaming {
+                output.yield(.init(identity: request.identity, sequence: 3, payload: .completed(text: text)))
+                output.finish()
+            }
         }
         return ProviderExecution(events: events) { output.finish(throwing: CancellationError()) }
     }

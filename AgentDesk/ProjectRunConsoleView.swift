@@ -3,12 +3,14 @@ import AgentDeskCore
 import AgentDeskDesign
 import AgentDeskPersistence
 import AgentDeskRuntime
+import AgentDeskSecurity
 import SwiftUI
 
 struct ProjectRunConsoleView: View {
     @StateObject private var context: ProjectRunContextModel
     @StateObject private var session = NativeRunSession()
     @StateObject private var evidence = RunEvidenceModel()
+    @StateObject private var liveOutput = NativeLiveOutputModel()
     @State private var taskText = ""
     @State private var confirmClose = false
     @State private var historyError: String?
@@ -79,6 +81,18 @@ struct ProjectRunConsoleView: View {
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(8)
                         }
                     }
+                    if !liveOutput.entries.isEmpty || liveOutput.errorMessage != nil {
+                        GroupBox("Live Codex output") {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Provider response · interpretation").font(.caption).foregroundStyle(.secondary)
+                                if liveOutput.abbreviated { Text("Live preview abbreviated. Full text remains in saved evidence.").font(.caption) }
+                                ForEach(liveOutput.entries) { entry in
+                                    plain(entry.text).accessibilityIdentifier("run.live.output.\(entry.record.sequence)")
+                                }
+                                if let error = liveOutput.errorMessage { Text(error).foregroundStyle(.orange) }
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                        }
+                    }
                     if evidence.isOpen || session.service != nil { results }
                 }.padding(.trailing, 4)
             }.accessibilityIdentifier("run.console.scroll")
@@ -86,6 +100,19 @@ struct ProjectRunConsoleView: View {
         .padding(20).macEditorLayout(idealWidth: 960, idealHeight: 640)
         .interactiveDismissDisabled()
         .task { await context.load() }
+        .task(id: session.prepared?.runID) {
+            liveOutput.clear()
+            guard let id = session.prepared?.runID, let service = session.service else { return }
+            let token = liveOutput.bind(service,
+                context: RedactionContext(scope: service.scope, environmentID: service.environmentID, runID: id),
+                agentID: service.agentID)
+            while !Task.isCancelled {
+                guard await liveOutput.refresh(token) else { break }
+                if session.outcome != nil && !liveOutput.hasMore { break }
+                do { try await Task.sleep(for: .milliseconds(250)) } catch { break }
+            }
+            if Task.isCancelled { liveOutput.clear(if: token) }
+        }
         .onChange(of: context.selectedAgentID) { evidence.clear(); historyError = nil }
         .onChange(of: context.selectedEnvironmentID) { evidence.clear(); historyError = nil }
         .task(id: session.outcome?.runID) {

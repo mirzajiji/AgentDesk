@@ -4,6 +4,27 @@ import XCTest
 
 final class ProjectRunConsoleUITests: XCTestCase {
     @MainActor
+    func testLiveProviderTextAppearsRedactedBeforeCompletion() throws {
+        continueAfterFailure = false
+        let app = fixture("stream"); app.launch(); openFixture(in: app); prepare(in: app)
+        click("run.start", in: app)
+        let live = app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@", "run.live.output.")).firstMatch
+        XCTAssertTrue(live.waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["run.state"].value as? String, "running")
+        let text = try XCTUnwrap(live.value as? String)
+        XCTAssertTrue(text.contains("Synthetic result: reviewed files."))
+        XCTAssertTrue(text.contains("[REDACTED]")); XCTAssertFalse(text.contains("synthetic-ui-result-secret"))
+        XCTAssertFalse(app.staticTexts["run.evidence.content"].exists)
+        reveal(live, in: app)
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "Redacted live output before completion"; attachment.lifetime = .keepAlways; add(attachment)
+        click("run.cancel", in: app); waitForState("cancelled", in: app)
+        app.buttons["run.console.done"].click()
+        openFixture(in: app)
+        XCTAssertFalse(live.exists, "A new console must not retain the previous run's output")
+    }
+
+    @MainActor
     func testSavedDiffPreservesLinesInLargeNativeWindow() throws {
         continueAfterFailure = false
         let app = fixture("diff"); app.launch()

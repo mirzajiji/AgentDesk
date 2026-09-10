@@ -4,7 +4,7 @@ This is an implementation plan, not a completion claim. The full source specific
 
 Finish the current task's validation and commit before starting another independent task. A task may be split further when its diff becomes difficult to review; never combine unrelated completed tasks just to reduce commit count. Behavioral tests belong in the feature commit.
 
-Progress after P1-14c: **30 documented tasks complete, 1 Phase 1 task remaining** (31 detailed tasks including bootstrap and the run-start contention regression; P1-14 is split into command routing, menu bar/run navigation and first-run/layout acceptance; P1-09 is split into transport/provider integration, P1-11 into coordinator/native execution bridge, P1-12 into redaction, evidence storage and Git capture, and P1-13 into repository access, execution setup, native setup screens and the run console). Phases 2–6 and sections 115–159 are also remaining; they have not yet been decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
+Progress after P1-15: **31 documented tasks complete, 0 Phase 1 tasks remaining** (31 detailed tasks including bootstrap and the run-start contention regression; P1-14 is split into command routing, menu bar/run navigation and first-run/layout acceptance; P1-09 is split into transport/provider integration, P1-11 into coordinator/native execution bridge, P1-12 into redaction, evidence storage and Git capture, and P1-13 into repository access, execution setup, native setup screens and the run console). Phases 2–6 and sections 115–159 are also remaining; they have not yet been decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
 
 ## Bootstrap
 
@@ -45,7 +45,7 @@ Progress after P1-14c: **30 documented tasks complete, 1 Phase 1 task remaining*
 | P1-14a | Complete: command palette and scoped native routing | Command-K search, existing-capability routing, stale selection rejection, single dispatch, model and native UI tests; [validation](p1-14a-validation.md) |
 | P1-14b | Complete: basic menu bar status and run navigation | Persisted open-session counts, scoped cross-window focus, lifecycle cleanup, native UI tests, 341 Mac unit/integration and 228 iPhone tests; [validation](p1-14b-validation.md) |
 | P1-14c | Complete: readiness, Settings routing and native layout pass | Cancellable local health checks, recovery routes, resizable editors and compact project actions; affected native tests, 346 Mac unit/integration and 228 iPhone tests. See [validation](p1-14c-validation.md). Physical display/final acceptance remains pending. |
-| P1-15 | Complete Phase 1 acceptance and architecture documentation for implemented systems | Fresh app: workspace → project → agent → instructions → Codex → live steps → results/files; all affected suites; compact/large native windows, scaling, accessible controls and explicit unavailable physical display coverage |
+| P1-15 | Complete: Phase 1 acceptance and live output | Real fresh-app Codex workflow, bounded redacted live text, 351 Mac unit/integration and eight affected UI tests, 228 iPhone tests, Release signing and docs checks. Full baseline scheme also passes; [acceptance record](p1-15-acceptance.md). Physical display/full-device acceptance remains final-product work. |
 
 After P1-06a/b1, implementation follows the runtime critical path through P1-07a/b and Codex discovery/provider setup. P1-06b2 configuration constraints and P1-06b3 scoped skills are complete. Capabilities must be validated and policy-gated before being made executable. P1-12a/b/c evidence safety and capture precede coordinator P1-11 so real provider output has a tested storage boundary. All six phases and the additions below remain in scope.
 
@@ -71,4 +71,6 @@ Sections 115–159 add deterministic Postman/scenario execution, project analyti
 
 These additions must be scheduled explicitly into later tasks; they are not omitted or silently considered implemented by the Phase 1 scaffold. Calendar starts with provider abstraction, a compact upcoming-event widget and daily timeline, with privacy/permission and offline-cache tests.
 
-The P1-14a intermittent approval/start follow-up is addressed by [P1-13c3](run-start-contention-validation.md), including a failing-before/passing-after real-lock regression and repeated native UI checks. The original failed run remains recorded in [P1-14a validation](p1-14a-validation.md); full P1-15 acceptance is still pending.
+The P1-14a intermittent approval/start follow-up is addressed by [P1-13c3](run-start-contention-validation.md), including a failing-before/passing-after real-lock regression and repeated native UI checks. The original failed run remains recorded in [P1-14a validation](p1-14a-validation.md); P1-15 acceptance now passes as recorded below.
+
+The current [Phase 1 acceptance audit](p1-15-acceptance.md) maps section 110 requirements and records the verified integrated native critical slice and explicitly deferred final-product validation.

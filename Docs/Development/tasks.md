@@ -4,7 +4,7 @@ This is an implementation plan, not a completion claim. The full source specific
 
 Finish the current task's validation and commit before starting another independent task. A task may be split further when its diff becomes difficult to review; never combine unrelated completed tasks just to reduce commit count. Behavioral tests belong in the feature commit.
 
-Progress after P2-01: **32 documented tasks complete, 0 Phase 1 tasks remaining** (31 foundation tasks including bootstrap and the run-start contention regression; P1-14 is split into command routing, menu bar/run navigation and first-run/layout acceptance; P1-09 is split into transport/provider integration, P1-11 into coordinator/native execution bridge, P1-12 into redaction, evidence storage and Git capture, and P1-13 into repository access, execution setup, native setup screens and the run console). There are **10 Phase 2 tasks remaining**; the immutable requirement store/resolver is complete. Phases 3–6 and their associated sections 115–159 additions also remain; those phases are not yet decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
+Progress after P2-02: **33 documented tasks complete, 0 Phase 1 tasks remaining** (31 foundation tasks including bootstrap and the run-start contention regression; P1-14 is split into command routing, menu bar/run navigation and first-run/layout acceptance; P1-09 is split into transport/provider integration, P1-11 into coordinator/native execution bridge, P1-12 into redaction, evidence storage and Git capture, and P1-13 into repository access, execution setup, native setup screens and the run console). There are **9 Phase 2 tasks remaining**; immutable requirement storage/resolution and native editing/review are complete. Phases 3–6 and their associated sections 115–159 additions also remain; those phases are not yet decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
 
 ## Bootstrap
 
@@ -60,7 +60,7 @@ Phase 2 is decomposed into 11 focused tasks. The first storage task does not cla
 | Task | Status and scope | Acceptance |
 | --- | --- | --- |
 | P2-01 | Complete: immutable requirement store and active resolver | Exact reviewed proposals, immutable JSON/history, active resolution, conflicts, orphan recovery and scoped paging; 14 store regressions, 365 Mac and 242 iPhone tests. See [validation](p2-01-validation.md). |
-| P2-02 | Pending: native requirement editing and review | Project list/detail, current/proposed version diff, explicit create-version/cancel, draft/retire/activate, history and environment selection, compact/large native UI |
+| P2-02 | Complete: native requirement editing and review | Exact field review/publication, immutable history, status/environment editing and scoped commands; 383 Mac and 245 iPhone tests, plus 16 focused Mac tests. See [validation](p2-02-validation.md). |
 | P2-03 | Pending: deterministic requirement validation | Typed executable validation rules, observed/expected results and exact resolved versions; malformed/unsupported inputs fail explicitly |
 | P2-04 | Pending: requirement traceability and stale links | Manual/automated test links, exact versions, latest-active defaults, historical reproduction and impact links to bugs/docs/workflows |
 | P2-05 | Pending: structured memory, notes and inbox | Separate scoped JSON records, provenance/classification, reviewed authoritative changes, uncertain findings remain nonauthoritative |

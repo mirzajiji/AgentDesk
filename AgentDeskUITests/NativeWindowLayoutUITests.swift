@@ -16,7 +16,7 @@ final class NativeWindowLayoutUITests: XCTestCase {
         let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -2, dy: -2))
         corner.press(forDuration: 0.2, thenDragTo: window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 908, dy: 718)))
         XCTAssertLessThanOrEqual(window.frame.width, 950)
-        for action in ["agents", "setup", "run", "rename"] {
+        for action in ["agents", "requirements", "setup", "run", "rename"] {
             let button = app.buttons["project.\(action).Synthetic run project"]
             XCTAssertTrue(button.isHittable)
             XCTAssertGreaterThan(button.frame.width, 35)

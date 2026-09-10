@@ -56,3 +56,7 @@ Final results are selected from persisted evidence with their source and observe
 The sheet keeps Done outside its scroll area. Native UI checks cover explicit approval, redacted output, saved-result reopening after relaunch, rejection, cancellation, closing an active run, and compact-window fit. The console prefers 640 logical points in height; the compact parent is 910×720. Larger-window diff acceptance uses 1400×900. These checks do not establish the physical-display matrix. Final acceptance passed 333 Mac unit/integration tests, ten native UI tests and 226 primary iPhone regressions; see [the validation record](../Development/p1-13c2-validation.md).
 
 UI tests use a Debug-only provider in a UUID-scoped synthetic application-support container. Normal launches use the signed native Codex helper; Release excludes this fixture. The iPhone companion's pairing and remote run UI remain later-phase work.
+
+## Implemented requirement workspace
+
+Projects expose Requirements directly and through the scoped Manage Requirements command. Native list selection opens immutable history; the detail view distinguishes active and latest published versions. Editing uses a separate review step with exact field changes and fixed publication/cancel actions. Forms scroll within compact sheets and expand in larger windows; project actions wrap across rows. See [requirement behavior](requirements.md) and [native validation](../Development/p2-02-validation.md).

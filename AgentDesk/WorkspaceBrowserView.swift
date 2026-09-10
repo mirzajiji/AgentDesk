@@ -11,6 +11,7 @@ struct WorkspaceBrowserView: View {
     @State private var selectedProject: ProjectRecord?
     @State private var setupProject: ProjectRecord?
     @State private var runProject: ProjectRecord?
+    @State private var requirementsProject: ProjectRecord?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -71,7 +72,7 @@ struct WorkspaceBrowserView: View {
                     try Task.checkCancellation()
                     guard model.selectedWorkspace == id else { return }
                     if case .createProject = action { editor = .newProject(workspace) }
-                case .agents(let scope), .setup(let scope), .run(let scope):
+                case .agents(let scope), .setup(let scope), .run(let scope), .requirements(let scope):
                     _ = try await model.resolveProject(scope)
                     try Task.checkCancellation()
                     try await model.selectCommandWorkspace(scope.workspaceID)
@@ -83,6 +84,7 @@ struct WorkspaceBrowserView: View {
                     switch action {
                     case .agents: selectedProject = project
                     case .setup: setupProject = project
+                    case .requirements: requirementsProject = project
                     case .run:
                         if !NativeRunRegistry.shared.focus(scope) { runProject = project }
                     default: break
@@ -113,6 +115,9 @@ struct WorkspaceBrowserView: View {
         .sheet(item: $setupProject) { project in
             ProjectSetupView(project: project, open: { try await model.executionServices(for: project) })
         }
+        .sheet(item: $requirementsProject) { project in
+            ProjectRequirementsView(project: project, open: { try await model.requirementServices(for: project) })
+        }
         .sheet(item: $runProject) { project in
             ProjectRunConsoleView(project: project, open: { try await model.executionServices(for: project) })
         }
@@ -141,15 +146,43 @@ struct WorkspaceBrowserView: View {
 
     private func projectActions(_ project: ProjectRecord) -> some View {
         HStack {
+            projectKnowledgeActions(project)
+            projectExecutionActions(project)
+        }.fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func compactProjectActions(_ project: ProjectRecord) -> some View {
+        ViewThatFits(in: .horizontal) {
+            projectActions(project)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack { projectKnowledgeActions(project) }
+                HStack { projectExecutionActions(project) }
+            }.fixedSize(horizontal: true, vertical: false)
+            VStack(alignment: .leading, spacing: 8) {
+                projectKnowledgeActions(project)
+                projectExecutionActions(project)
+            }
+        }
+    }
+
+    private func projectKnowledgeActions(_ project: ProjectRecord) -> some View {
+        Group {
             Button("Agents") { selectedProject = project }
                 .accessibilityIdentifier("project.agents.\(project.name)")
+            Button("Requirements") { requirementsProject = project }
+                .accessibilityIdentifier("project.requirements.\(project.name)")
+        }
+    }
+
+    private func projectExecutionActions(_ project: ProjectRecord) -> some View {
+        Group {
             Button("Setup") { setupProject = project }
                 .accessibilityIdentifier("project.setup.\(project.name)")
             Button("Run") { if !NativeRunRegistry.shared.focus(project.scope) { runProject = project } }
                 .accessibilityIdentifier("project.run.\(project.name)")
             Button("Rename") { editor = .renameProject(project) }
                 .accessibilityIdentifier("project.rename.\(project.name)")
-        }.fixedSize(horizontal: true, vertical: false)
+        }
     }
 
     private var projectPane: some View {
@@ -184,7 +217,7 @@ struct WorkspaceBrowserView: View {
                             }
                             VStack(alignment: .leading, spacing: 12) {
                                 projectSummary(project)
-                                projectActions(project)
+                                compactProjectActions(project)
                             }
                         }
                         .padding(.vertical, 8)

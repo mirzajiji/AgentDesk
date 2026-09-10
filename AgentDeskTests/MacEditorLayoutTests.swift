@@ -22,6 +22,21 @@ final class MacEditorLayoutTests: XCTestCase {
         assertFitsAndExpands(SkillEditorView(scope: scope, existing: nil, save: { _, _ in }))
     }
 
+    func testRequirementEditorsFitCompactAndLargeLogicalWindows() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let catalog = try WorkspaceCatalog(container: root)
+        let workspace = try await catalog.createWorkspace(name: "Synthetic layout")
+        let project = try await catalog.createProject(in: workspace.id, name: "Requirement layout")
+        let store = try await catalog.requirementStore(in: project.scope)
+        assertFitsAndExpands(RequirementEditorView(store: store, existing: nil, environments: [], onPublish: { _ in }))
+        assertFitsAndExpands(RequirementJSONEditor(model: RequirementEditorModel(store: store, existing: nil)))
+        assertFitsAndExpands(ProjectRequirementsView(project: project, open: {
+            NativeRequirementServices(store: store, environments: [], environmentIssue: nil)
+        }))
+    }
+
     func testExecutionFormsFitCompactWindowsAndExpandOnLargeDesktops() {
         let scope = ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID())
         let environments = (0..<20).map { index in

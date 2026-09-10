@@ -16,12 +16,14 @@ final class NativeCommandCatalogTests: XCTestCase {
         let catalog = NativeCommandCatalog(workspaces: [alpha, beta], projects: [first, second])
         XCTAssertEqual(catalog.search("RUN cafe").map(\.action), [.run(first.scope), .run(second.scope)])
         XCTAssertEqual(catalog.search("beta cafe run").map(\.action), [.run(second.scope)])
+        XCTAssertEqual(catalog.search("beta requirements").map(\.action), [.requirements(second.scope)])
         XCTAssertTrue(catalog.search("not a capability").isEmpty)
         XCTAssertEqual(catalog.search("", limit: 1).map(\.action), [.settings])
         XCTAssertTrue(catalog.search("", limit: 0).isEmpty)
         XCTAssertEqual(Set(catalog.commands.map(\.id)).count, catalog.commands.count)
         let scoped = NativeCommandCatalog(workspaces: [alpha], projects: [first, second])
         XCTAssertFalse(scoped.commands.contains { $0.action == .run(second.scope) })
+        XCTAssertFalse(scoped.commands.contains { $0.action == .requirements(second.scope) })
     }
 
     func testCommandDiscoveryCreatesNoRunStorageAndRoutingResolvesCurrentProject() async throws {

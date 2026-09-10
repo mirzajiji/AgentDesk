@@ -148,6 +148,19 @@ final class WorkspaceBrowserModel: ObservableObject {
         if selectedWorkspace == scope.workspaceID { await select(scope.workspaceID) }
     }
 
+    func requirementServices(for project: ProjectRecord) async throws -> NativeRequirementServices {
+        guard let catalog else { throw CatalogError.invalidConfiguration }
+        let store = try await catalog.requirementStore(in: project.scope)
+        do {
+            let settings = try await ProjectExecutionSetupService(catalog: catalog, scope: project.scope).settings()
+            return NativeRequirementServices(store: store, environments: settings.project?.draft.environments ?? [], environmentIssue: nil)
+        } catch is CancellationError { throw CancellationError() }
+        catch {
+            return NativeRequirementServices(store: store, environments: [],
+                environmentIssue: "Execution environments could not be read. Check project Setup; stored requirement selections are preserved.")
+        }
+    }
+
     func agentStore(for project: ProjectRecord) async throws -> ProjectAgentStore {
         guard let catalog else { throw CatalogError.invalidConfiguration }
         return try await catalog.agentStore(in: project.scope)

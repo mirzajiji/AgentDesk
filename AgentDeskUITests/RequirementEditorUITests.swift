@@ -6,6 +6,36 @@ final class RequirementEditorUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     @MainActor
+    func testRequirementBrowserHeaderStaysAtTopInEmptyAndUnselectedStates() {
+        let app = application(); app.launch(); createProject(in: app)
+        resizeLarge(in: app)
+        openRequirements(in: app)
+        assertHeaderAtTop(in: app, name: "Empty requirements modal")
+        click("requirements.done", in: app)
+        let window = app.windows.firstMatch
+        let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -2, dy: -2))
+        corner.press(forDuration: 0.2, thenDragTo: window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 908, dy: 718)))
+        openRequirements(in: app)
+        assertHeaderAtTop(in: app, name: "Compact empty requirements modal")
+        click("requirements.create", in: app); fillNew(in: app)
+        click("requirement.review", in: app); click("requirement.publish", in: app)
+        waitForValue("Active version: v1", id: "requirements.active", in: app)
+        click("requirements.done", in: app); openRequirements(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["requirement.row.synthetic-rule"].firstMatch.waitForExistence(timeout: 5))
+        assertHeaderAtTop(in: app, name: "Compact unselected requirements modal")
+        click("requirements.done", in: app); resizeLarge(in: app); openRequirements(in: app)
+        assertHeaderAtTop(in: app, name: "Unselected requirements modal")
+    }
+    @MainActor private func assertHeaderAtTop(in app: XCUIApplication, name: String) {
+        let title = app.staticTexts["requirements.title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        attach(app, name: name)
+        let gap = title.frame.minY - app.sheets.firstMatch.frame.minY
+        XCTAssertGreaterThanOrEqual(gap, 12)
+        XCTAssertLessThanOrEqual(gap, 36, "Requirements header should keep standard top inset, actual: \(gap)")
+    }
+
+    @MainActor
     func testCommandRouteAndCancelledReviewCreateNoRequirement() {
         let app = application(); app.launch(); createProject(in: app)
         app.typeKey("k", modifierFlags: .command)

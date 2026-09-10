@@ -4,7 +4,7 @@ This is an implementation plan, not a completion claim. The full source specific
 
 Finish the current task's validation and commit before starting another independent task. A task may be split further when its diff becomes difficult to review; never combine unrelated completed tasks just to reduce commit count. Behavioral tests belong in the feature commit.
 
-Progress after P2-03: **34 documented tasks complete, 0 Phase 1 tasks remaining** (31 foundation tasks including bootstrap and the run-start contention regression; P1-14 is split into command routing, menu bar/run navigation and first-run/layout acceptance; P1-09 is split into transport/provider integration, P1-11 into coordinator/native execution bridge, P1-12 into redaction, evidence storage and Git capture, and P1-13 into repository access, execution setup, native setup screens and the run console). There are **8 Phase 2 tasks remaining**; immutable requirement storage/resolution, native editing/review and deterministic validation are complete. Phases 3–6 and their associated sections 115–159 additions also remain; those phases are not yet decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
+Progress after P2-03a: **35 documented tasks complete, 0 Phase 1 tasks remaining** (31 foundation tasks including bootstrap and the run-start contention regression; P1-14 is split into command routing, menu bar/run navigation and first-run/layout acceptance; P1-09 is split into transport/provider integration, P1-11 into coordinator/native execution bridge, P1-12 into redaction, evidence storage and Git capture, and P1-13 into repository access, execution setup, native setup screens and the run console). There are **8 Phase 2 tasks remaining**; immutable requirement storage/resolution, native editing/review and deterministic validation are complete. Phases 3–6 and their associated sections 115–159 additions also remain; those phases are not yet decomposed into commit-sized task counts. These counts are tasks, not a percentage of the full product.
 
 ## Bootstrap
 
@@ -55,13 +55,14 @@ The user's 32-inch 4K, 27-inch 2K, 16-inch 4K and 14-inch 4K Mac display targets
 
 ## Phase 2 — Project memory
 
-Phase 2 is decomposed into 11 focused tasks. The first storage task does not claim native editing, executable validation rules, retrieval or Bug Registry behavior; those have their own acceptance gates.
+Phase 2 is decomposed into 11 planned tasks plus the user-reported modal-spacing regression. The first storage task does not claim native editing, executable validation rules, retrieval or Bug Registry behavior; those have their own acceptance gates.
 
 | Task | Status and scope | Acceptance |
 | --- | --- | --- |
 | P2-01 | Complete: immutable requirement store and active resolver | Exact reviewed proposals, immutable JSON/history, active resolution, conflicts, orphan recovery and scoped paging; 14 store regressions, 365 Mac and 242 iPhone tests. See [validation](p2-01-validation.md). |
 | P2-02 | Complete: native requirement editing and review | Exact field review/publication, immutable history, status/environment editing and scoped commands; 383 Mac and 245 iPhone tests, plus 16 focused Mac tests. See [validation](p2-02-validation.md). |
 | P2-03 | Complete: deterministic requirement validation | Typed bounded predicates, exact observed/expected values and resolved versions, explicit unavailable evidence, scope/environment checks and native rule review; 388 Mac and 253 iPhone tests pass. See [validation](p2-03-validation.md). |
+| P2-03a | Complete: Requirements modal top-spacing regression | Header remains at the standard inset for empty and unselected lists in compact/large native windows; five affected Mac tests pass. See [validation](p2-03a-validation.md). |
 | P2-04 | Pending: requirement traceability and stale links | Manual/automated test links, exact versions, latest-active defaults, historical reproduction and impact links to bugs/docs/workflows |
 | P2-05 | Pending: structured memory, notes and inbox | Separate scoped JSON records, provenance/classification, reviewed authoritative changes, uncertain findings remain nonauthoritative |
 | P2-06 | Pending: selective retrieval and context integration | Rebuildable FTS5 index, scoped metadata/relationship search, include/exclude paths, bounded context with exact references and classification filtering |

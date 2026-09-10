@@ -14,7 +14,7 @@ struct ProjectRequirementsView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading) {
-                    Text("Requirements").font(.title2).bold()
+                    Text("Requirements").font(.title2).bold().accessibilityIdentifier("requirements.title")
                     Text(model.project.name).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -37,9 +37,11 @@ struct ProjectRequirementsView: View {
             } else if model.records.isEmpty && model.errorMessage != nil {
                 ContentUnavailableView("Requirements unavailable", systemImage: "exclamationmark.triangle",
                                        description: Text("Check project storage and refresh to try again."))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if model.records.isEmpty {
                 ContentUnavailableView("No requirements yet", systemImage: "doc.text", description: Text("Create a requirement and review its first version. Later changes preserve this history."))
                     .accessibilityIdentifier("requirements.empty")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(selection: Binding(get: { model.selectedID }, set: { id in
                     if let id { model.selectFromUI(id) }
@@ -81,9 +83,11 @@ struct ProjectRequirementsView: View {
                 } else {
                     ContentUnavailableView("Select a requirement", systemImage: "doc.text.magnifyingglass",
                                            description: Text("Inspect current behavior and earlier versions."))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(20).macEditorLayout(idealWidth: 960, idealHeight: 640)
         .task { await model.load() }
         .onDisappear { model.cancel() }

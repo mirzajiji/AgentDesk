@@ -60,3 +60,5 @@ UI tests use a Debug-only provider in a UUID-scoped synthetic application-suppor
 ## Implemented requirement workspace
 
 Projects expose Requirements directly and through the scoped Manage Requirements command. Native list selection opens immutable history; the detail view distinguishes active and latest published versions. Editing uses a separate review step with exact field changes and fixed publication/cancel actions. Forms scroll within compact sheets and expand in larger windows; project actions wrap across rows. See [requirement behavior](requirements.md) and [native validation](../Development/p2-02-validation.md).
+
+The Requirements browser pins its header to the standard top inset in all content states. Empty/unavailable/selection guidance fills the body below the controls, avoiding vertical centering of the entire modal. See [modal spacing regression](../Development/p2-03a-validation.md).

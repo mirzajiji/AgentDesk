@@ -21,3 +21,11 @@ xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform
 python3 Scripts/validate-documentation.py
 git diff --check
 ```
+
+## Current-branch recheck — 2026-09-11
+
+The existing padding fix remains correct. `TestResults/p2-10c/requirements-padding-available.xcresult` passed six tests (five traceability model tests plus the four-state Requirements UI regression), zero failures/skips. App-window screenshots of empty and compact unselected states were exported and visually inspected. Header assertions remain 12–36 logical points.
+
+The first two reruns stopped at the test's assumed 1,300-point window width; the actual window reached 1,070 points. The test now records the attained window size and checks the app minimum, retaining strict header-inset checks. This is available-window coverage, not new physical-display acceptance. The original large-display evidence above remains separate. The test-only follow-up does not alter app behavior or shared/iPhone code.
+
+Command: same native test command above, with result bundle `TestResults/p2-10c/requirements-padding-available.xcresult` and `-only-testing:AgentDeskTests/NativeTraceabilityModelTests` replacing the layout-test selector. Documentation and diff checks were rerun.

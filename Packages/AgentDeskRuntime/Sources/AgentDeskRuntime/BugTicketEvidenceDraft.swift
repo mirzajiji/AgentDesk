@@ -22,9 +22,9 @@ extension BugReviewService {
               let match = review.matches.first(where: { $0.existingID == existingID }),
               let ticket = existing.record.content.ticket, !existing.staleRequirements,
               existing.record.content.assessment == .observed else { throw BugRegistryError.invalidReview }
-        let decision = incoming.record.content.comparisonReview
+        let decision = review.decisions.first { $0.existingID == existingID }
         let reviewedDuplicate = decision?.resolution == .duplicate && decision?.existingID == existingID &&
-            decision?.existingRevision == existing.record.revision && decision?.sourceRevision == incoming.record.supersedes
+            decision?.existingRevision == existing.record.revision
         guard match.result.classification == .duplicate || reviewedDuplicate else { throw BugRegistryError.invalidReview }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
         let ticketText = String(decoding: try encoder.encode(ticket), as: UTF8.self)

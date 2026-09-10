@@ -74,6 +74,10 @@ struct SkillEditorView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(existing == nil ? "Create Skill" : "Edit Skill").font(.title2).bold()
+            if existing == nil && draft.name.isEmpty && draft.instructions.isEmpty {
+                Button("Use CityPay Bug Template") { draft = CityPayBugSkill.draft }
+                    .accessibilityIdentifier("skill.template.citypay")
+            }
             TextField("Name", text: $draft.name).accessibilityIdentifier("skill.name")
             TextField("Description", text: $draft.summary).accessibilityIdentifier("skill.summary")
             Picker("Scope", selection: $shared) { Text("This project").tag(false); Text("This workspace").tag(true) }

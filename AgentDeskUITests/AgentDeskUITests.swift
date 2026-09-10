@@ -160,6 +160,39 @@ final class AgentDeskUITests: XCTestCase {
     }
 
     @MainActor
+    func testCityPayTemplateCreatesVersionedSkillAndReopensWithExamples() {
+        let app = XCUIApplication()
+        app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
+        app.launch()
+        XCTAssertTrue(app.buttons["workspace.create.empty"].waitForExistence(timeout: 5))
+        app.buttons["workspace.create.empty"].click(); saveName("Synthetic workspace", in: app)
+        XCTAssertTrue(app.buttons["project.create.empty"].waitForExistence(timeout: 5))
+        app.buttons["project.create.empty"].click(); saveName("Report Project", in: app)
+        XCTAssertTrue(app.buttons["project.agents.Report Project"].waitForExistence(timeout: 5))
+        app.buttons["project.agents.Report Project"].click()
+        XCTAssertTrue(app.buttons["skills.open"].waitForExistence(timeout: 5)); app.buttons["skills.open"].click()
+        XCTAssertTrue(app.buttons["skill.create"].waitForExistence(timeout: 5)); app.buttons["skill.create"].click()
+        XCTAssertTrue(app.buttons["skill.template.citypay"].waitForExistence(timeout: 5)); app.buttons["skill.template.citypay"].click()
+        XCTAssertEqual(app.textFields["skill.name"].value as? String, "citypay-jira-bug")
+        XCTAssertFalse(app.buttons["skill.template.citypay"].exists)
+        XCTAssertTrue((app.textViews["skill.instructions"].value as? String)?.contains("Never guess") == true)
+        app.tabs["Attachments"].click()
+        XCTAssertTrue(app.staticTexts["examples/synthetic-refund.json"].exists)
+        app.buttons["skill.save"].click()
+        XCTAssertTrue(app.buttons["skill.edit.citypay-jira-bug"].waitForExistence(timeout: 5))
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["project.agents.Report Project"].waitForExistence(timeout: 5)); app.buttons["project.agents.Report Project"].click()
+        XCTAssertTrue(app.buttons["skills.open"].waitForExistence(timeout: 5)); app.buttons["skills.open"].click()
+        XCTAssertTrue(app.buttons["skill.edit.citypay-jira-bug"].waitForExistence(timeout: 5)); app.buttons["skill.edit.citypay-jira-bug"].click()
+        XCTAssertTrue(app.textViews["skill.instructions"].waitForExistence(timeout: 5))
+        XCTAssertTrue((app.textViews["skill.instructions"].value as? String)?.contains("template version 1") == true)
+        XCTAssertFalse(app.buttons["skill.template.citypay"].exists)
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "CityPay skill template reopened in native editor"; attachment.lifetime = .keepAlways; add(attachment)
+    }
+
+    @MainActor
     func testSkillCreationPinningPreviewAndReopen() {
         let app = XCUIApplication()
         app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString

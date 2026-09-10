@@ -110,6 +110,36 @@ public actor ProjectBugStore {
         let current = try await comparisonSnapshot(in: requested, environment: snapshot.environment)
         guard current.fingerprint == snapshot.fingerprint else { throw BugRegistryError.staleRevision }
     }
+    /// Resolves consecutive explicit decisions on the same unchanged finding. An ordinary edit ends
+    /// the chain; an old decision cannot silently revive after evidence changes and later reverts.
+    public func comparisonDecisions(for incomingID: BugID, snapshot: BugComparisonSnapshot,
+                                    in requested: ProjectScope) async throws -> [BugReviewDecision] {
+        try await validate(snapshot, in: requested)
+        return try files.root.withLock {
+            try files.validate(requested)
+            guard let incoming = snapshot.records.first(where: { $0.record.id == incomingID }) else { throw BugRegistryError.unavailableReference }
+            let history = try files.read(incomingID)
+            guard try history.first?.fingerprint == incoming.record.fingerprint else { throw BugRegistryError.staleRevision }
+            var result: [BugReviewDecision] = [], seen = Set<BugID>()
+            for record in history {
+                guard let decision = record.content.comparisonReview, decision.sourceRevision == record.supersedes,
+                      let source = history.first(where: { $0.revision == decision.sourceRevision }),
+                      decision != source.content.comparisonReview else { break }
+                guard try Self.decisionBasis(source) == Self.decisionBasis(incoming.record) else { break }
+                if seen.insert(decision.existingID).inserted,
+                   snapshot.records.contains(where: { $0.record.id == decision.existingID && $0.record.revision == decision.existingRevision }) {
+                    result.append(decision)
+                }
+            }
+            return result
+        }
+    }
+    private nonisolated static func decisionBasis(_ record: BugRecord) throws -> ActionFingerprint {
+        struct Basis: Encodable { let content: BugDraft; let requirements: [BugRequirementReference] }
+        var content = record.content; content.comparisonReview = nil; content.changeReason = "Comparison basis"
+        content.relationships.removeAll { [.duplicateOf, .relatedTo].contains($0.kind) }
+        return try .canonical(Basis(content: content, requirements: record.requirements))
+    }
     public func list(in requested: ProjectScope, statuses: Set<BugStatus> = [.open, .resolved, .closed],
                      environment: EnvironmentID? = nil, registered: Bool? = nil,
                      after: BugID? = nil, limit: Int = 50) throws -> [BugRecord] {

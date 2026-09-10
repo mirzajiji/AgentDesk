@@ -256,6 +256,20 @@ public actor NativeRunService: RunEvidenceReading {
         guard draft.owner == requesterID else { throw BugRegistryError.scopeMismatch }
         try await draft.validate()
     }
+    /// Draft preparation only. Known duplicates use prepareBugTicketEvidence instead.
+    public func prepareCityPayReport(_ review: PreparedBugReview, context: CityPayReportContext,
+                                    groupedIDs: [BugID] = [], problem: String? = nil) async throws -> PreparedCityPayReport {
+        try checkOpen()
+        guard review.owner == requesterID, review.scope == scope, review.environment == environmentID else { throw BugRegistryError.scopeMismatch }
+        try await review.validate()
+        let redactor = try await makeRedactor(review.content.context)
+        return try await CityPayReportService.prepare(review, context: context, redactor: redactor, groupedIDs: groupedIDs, problem: problem)
+    }
+    public func validateCityPayReport(_ report: PreparedCityPayReport) async throws {
+        try checkOpen()
+        guard report.owner == requesterID else { throw BugRegistryError.scopeMismatch }
+        try await report.validate()
+    }
     public func verifyBugEvidence(_ reference: BugEvidenceReference) async throws -> VerifiedBugEvidence {
         try checkOpen()
         guard reference.scope == scope, reference.environment == environmentID, reference.agent == agentID else {

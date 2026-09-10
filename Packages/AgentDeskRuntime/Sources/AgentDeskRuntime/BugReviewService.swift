@@ -25,6 +25,7 @@ public struct PreparedBugReview: Sendable {
     public let expiresAt: Date
     let owner: UUID
     let snapshot: BugComparisonSnapshot
+    let decisions: [BugReviewDecision]
     let validate: @Sendable () async throws -> Void
 }
 
@@ -36,6 +37,7 @@ struct BugReviewService {
         try await authorize()
         let snapshot = try await store.comparisonSnapshot(in: store.scope, environment: environment)
         guard let incoming = snapshot.records.first(where: { $0.record.id == incomingID }) else { throw BugRegistryError.unavailableReference }
+        let decisions = try await store.comparisonDecisions(for: incomingID, snapshot: snapshot, in: store.scope)
         let matches = try snapshot.records.filter { $0.record.id != incomingID }.map {
             BugReviewMatch(existingID: $0.record.id, result: try BugComparison.compare(incoming, with: $0))
         }
@@ -74,7 +76,8 @@ struct BugReviewService {
         }
         try await validation()
         return PreparedBugReview(incomingID: incomingID, scope: store.scope, environment: environment,
-            matches: matches, readiness: BugComparison.readiness(incoming), content: safe, expiresAt: expires, owner: owner, snapshot: snapshot, validate: validation)
+            matches: matches, readiness: BugComparison.readiness(incoming), content: safe, expiresAt: expires, owner: owner,
+            snapshot: snapshot, decisions: decisions, validate: validation)
     }
     private struct Packet: Encodable {
         let schemaVersion = 1

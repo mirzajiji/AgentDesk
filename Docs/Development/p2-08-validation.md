@@ -47,3 +47,5 @@ git diff --check
 ```
 
 Native decision-management UI and its administrative publication wiring belong to P2-10; the runtime must not gain write authority merely by enabling read-only Codex runs. The unrelated Xcode normalization, user scheme metadata and handoff wording changes are excluded from this task's commit. P2-11 acceptance must revisit the native Keychain access failures alongside the full Phase 2 scenarios.
+
+Follow-up, 2026-09-11: both native Keychain integration tests passed after unlocking the Mac during the [P2-09 recheck](p2-09-validation.md). The original failures above remain recorded; their access blocker is resolved.

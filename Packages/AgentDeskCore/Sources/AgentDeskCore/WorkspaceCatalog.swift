@@ -162,6 +162,15 @@ public actor WorkspaceCatalog {
         }
     }
 
+    public func requirementStore(in scope: ProjectScope) throws -> ProjectRequirementStore {
+        try root.withLock {
+            _ = try loadWorkspace(scope.workspaceID); _ = try loadProject(scope)
+            let workspace = try root.child(scope.workspaceID.rawValue)
+            return ProjectRequirementStore(scope: scope, root: root, workspace: workspace,
+                project: try workspace.child("Projects").child(scope.projectID.rawValue))
+        }
+    }
+
     public func skillStore(in scope: ProjectScope) throws -> ProjectSkillStore {
         try root.withLock {
             _ = try loadWorkspace(scope.workspaceID); _ = try loadProject(scope)

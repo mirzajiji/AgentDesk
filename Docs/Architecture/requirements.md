@@ -1,6 +1,6 @@
 # Immutable requirements and traceability
 
-Status: planned design. Source: [final architecture](final-architecture.txt), sections 13–16.
+Status: requirement storage/resolution implemented and validated; native editing, executable validation and traceability remain planned. Source: [final architecture](final-architecture.txt), sections 13–16.
 <!-- Source sections: 13,14,15,16 -->
 
 Requirement content is immutable after creation. A behavior change creates a new version and advances a current pointer; it never rewrites a prior version.
@@ -26,3 +26,15 @@ Tests and scenarios record exact requirement IDs and versions. When v5 replaces 
 ## Verification
 
 Create v1 and v2; byte-compare v1 after publication; verify version allocation, active/draft/retired resolution, pointer corruption handling, cross-scope denial, concurrent-edit conflict, historical reproduction, stale-link detection and impact counts. Test interrupted saves and reload behavior without overwriting prior versions.
+
+## Initial store contract (P2-01)
+
+`WorkspaceCatalog.requirementStore(in:)` opens a scope-bound local administrative store without creating memory files. Each readable requirement ID permits lowercase ASCII letters, digits and internal hyphens, up to 96 bytes. Storage is `Memory/Requirements/<id>/requirement.vN.json` plus `current.json` inside the selected project. Versions hold scope, schema/version identity, publication ancestry/fingerprints, UTC creation time and structured content. Content includes status, description, preconditions, rules, acceptance/validation descriptions, nested expected behavior, environment IDs, inert source references and a required change reason. Decimal numbers preserve large integer values. Validation-rule descriptions are not yet executable rules.
+
+Preparation returns an exact in-memory proposal and writes no authoritative files. The native caller must review that proposal before calling `publishReviewed`; cancellation, expiry after five minutes, use by a different store, payload substitution, duplicate use and a changed base reject publication. A store retains at most 16 pending reviews. This is a trusted local administrative API, not a model/mobile tool or a replacement for runtime policy authorization. Native review UI is P2-02; runtime exposure is not part of this task.
+
+Publication exclusively creates a new version before atomically replacing the pointer. A version left behind by an interrupted pointer update remains an orphan: later publication skips its number and links to the last committed version. Ordinary resolution and explicit history never silently adopt it. Fingerprints link the typed historical content, detecting inconsistent edits along the committed chain; they are consistency checks, not signatures authenticating files against the local machine owner.
+
+The pointer identifies the latest published version and the active version. Draft publication retains the prior active decision; retirement clears it, including when later drafts exist. A later active publication reactivates the requirement. `resolve` defaults to latest active; latest published and historical versions require explicit selections. An optional environment filter excludes requirements that do not apply to that environment. Native administrative `list` includes draft/retired heads and pages by stable ID, with up to 100 results per call.
+
+Boundaries: each version fits 256 KiB; committed history is bounded to 1,024 versions and 16 MiB, with capacity checked before publication. Expected JSON behavior has bounded depth/nodes/collection sizes; strings and lists have explicit limits. Duplicate JSON keys, invalid pointers, missing committed versions, wrong scope/ownership, symlinks and multiply linked files fail closed. Existing file-descriptor storage and catalog locking provide the filesystem and concurrent-edit boundary. See [validation](../Development/p2-01-validation.md).

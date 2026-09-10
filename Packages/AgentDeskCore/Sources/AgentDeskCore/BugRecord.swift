@@ -90,6 +90,8 @@ public struct BugDraft: Codable, Equatable, Sendable {
     public var relationships: [BugRelationship]
     public var coveredBy: [TraceabilitySubject]
     public var changeReason: String
+    /// Optional for compatibility with existing immutable versions. Earlier decisions remain in history.
+    public internal(set) var comparisonReview: BugReviewDecision?
 
     public init(title: String, sources: [MemorySource], changeReason: String, origin: BugOrigin = .manual,
                 assessment: BugAssessment = .reported, status: BugStatus = .open, environment: EnvironmentID? = nil,
@@ -130,6 +132,7 @@ public struct BugDraft: Codable, Equatable, Sendable {
         }
         var nodes = 0; try KnowledgeValue.object(details).validate(nodes: &nodes)
         try ticket?.validate()
+        try comparisonReview?.validate(sourceID: id)
     }
 }
 

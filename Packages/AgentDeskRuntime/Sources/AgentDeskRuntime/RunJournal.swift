@@ -33,7 +33,7 @@ actor RunJournal {
         try await change(.transition(prepared.stages[0].id, to: .completed))
         try await change(.transition(prepared.stages[1].id, to: .running))
         try Task.checkCancellation()
-        do { try await prepared.knowledge?.validate() }
+        do { try await prepared.knowledge?.validate(); try await prepared.bugReview?.validate() }
         catch is CancellationError { throw CancellationError() }
         catch { throw RunCoordinatorError.invalidPreparation }
         try await beforeDispatch()

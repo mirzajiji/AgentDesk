@@ -33,6 +33,122 @@ final class ProjectBugStoreTests: XCTestCase {
         }
     }
 
+    func testComparisonSnapshotIncludesArchivedAndRejectsChangesAfterCollection() async throws {
+        let f = try await Fixture(); defer { f.remove() }
+        let environment = EnvironmentID(); var value = f.draft(); value.environment = environment
+        value.status = .archived; value.ticket = try .init(key: "SYN-42")
+        let archived = try await f.create(value)
+        var other = value; other.environment = EnvironmentID(); _ = try await f.create(other)
+        let snapshot = try await f.store.comparisonSnapshot(in: f.scope, environment: environment)
+        XCTAssertEqual(snapshot.records.map { $0.record.id }, [archived.id])
+        try await f.store.validate(snapshot, in: f.scope)
+        _ = try await f.create(value)
+        do { try await f.store.validate(snapshot, in: f.scope); XCTFail("New bugs must invalidate a prepared comparison") }
+        catch { XCTAssertEqual(error as? BugRegistryError, .staleRevision) }
+    }
+
+    func testComparisonSnapshotResolvesLatestRequirementsAndDetectsRetirement() async throws {
+        let f = try await Fixture(); defer { f.remove() }
+        let environment = EnvironmentID(), v1 = try await f.requirement(1)
+        var value = f.draft(); value.environment = environment
+        let proposal = try await f.store.prepare(value, requirements: [.init(requirement: .init(id: v1.id))], in: f.scope)
+        _ = try await f.store.publishReviewed(proposal, in: f.scope)
+        let initial = try await f.store.comparisonSnapshot(in: f.scope, environment: environment)
+        XCTAssertFalse(try XCTUnwrap(initial.records.first).staleRequirements)
+        _ = try await f.requirement(2)
+        do { try await f.store.validate(initial, in: f.scope); XCTFail() } catch { XCTAssertEqual(error as? BugRegistryError, .staleRevision) }
+        let updated = try await f.store.comparisonSnapshot(in: f.scope, environment: environment)
+        XCTAssertTrue(try XCTUnwrap(updated.records.first).staleRequirements)
+        XCTAssertEqual(updated.records.first?.activeRequirements.first?.version, 2)
+        let retire = try await f.requirements.prepare(.init(description: "Retired", changeReason: "Synthetic", status: .retired),
+            id: v1.id, expectedVersion: 2, in: f.scope)
+        _ = try await f.requirements.publishReviewed(retire, in: f.scope)
+        let retired = try await f.store.comparisonSnapshot(in: f.scope, environment: environment)
+        XCTAssertTrue(try XCTUnwrap(retired.records.first).staleRequirements)
+        XCTAssertTrue(try XCTUnwrap(retired.records.first).activeRequirements.isEmpty)
+    }
+
+    func testComparisonSnapshotRejectsForeignScopeAndCancelledReads() async throws {
+        let f = try await Fixture(); defer { f.remove() }
+        let environment = EnvironmentID(), foreign = ProjectScope(workspaceID: f.scope.workspaceID, projectID: ProjectID())
+        do { _ = try await f.store.comparisonSnapshot(in: foreign, environment: environment); XCTFail() } catch { }
+        let task = Task { @MainActor in
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await f.store.comparisonSnapshot(in: f.scope, environment: environment)
+        }
+        do { _ = try await task.value; XCTFail() } catch { XCTAssertTrue(error is CancellationError) }
+    }
+
+    func testReviewedComparisonDecisionPersistsOverrideAndPreservesEarlierHistory() async throws {
+        let f = try await Fixture(); defer { f.remove() }
+        let environment = EnvironmentID()
+        let content = BugDraft(title: "Synthetic observed bug", sources: [.init(scope: f.scope, origin: .observed, label: "Synthetic", capturedAt: Date())],
+            changeReason: "Reviewed", assessment: .observed, environment: environment,
+            rootBehavior: "Root", expectedBehavior: "Expected", actualBehavior: "Actual", details: ["endpoint": .text("POST /synthetic")])
+        let incoming = try await f.create(content), existing = try await f.create(content)
+        let snapshot = try await f.store.comparisonSnapshot(in: f.scope, environment: environment)
+        let decision = try await f.store.prepareComparisonDecision(snapshot, incomingID: incoming.id, existingID: existing.id,
+            resolution: .distinct, reason: "Reviewed: separate incidents", in: f.scope)
+        XCTAssertEqual(decision.candidate.content.comparisonReview?.suggested, .duplicate)
+        XCTAssertEqual(decision.candidate.content.comparisonReview?.isOverride, true)
+        let before = try await f.store.record(incoming.id, in: f.scope); XCTAssertEqual(before?.revision, 1)
+        let saved = try await f.store.publishReviewed(decision, in: f.scope)
+        XCTAssertEqual(saved.revision, 2); XCTAssertEqual(saved.content.comparisonReview?.existingRevision, 1)
+        let reopened = try await f.catalog.bugStore(in: f.scope), history = try await reopened.history(incoming.id, in: f.scope)
+        XCTAssertEqual(history.first?.content.comparisonReview?.resolution, .distinct)
+        XCTAssertNil(history.last?.content.comparisonReview)
+        var edit = saved.content; edit.title = "Updated title"
+        let proposal = try await reopened.prepare(edit, id: incoming.id, expectedRevision: 2, in: f.scope)
+        let edited = try await reopened.publishReviewed(proposal, in: f.scope)
+        XCTAssertEqual(edited.content.comparisonReview, saved.content.comparisonReview)
+    }
+
+    func testPreparedComparisonDecisionRejectsChangedRegistryAtPublication() async throws {
+        let f = try await Fixture(); defer { f.remove() }
+        let environment = EnvironmentID()
+        let content = BugDraft(title: "Synthetic", sources: [.init(scope: f.scope, origin: .observed, label: "Synthetic", capturedAt: Date())],
+            changeReason: "Reviewed", assessment: .observed, environment: environment,
+            rootBehavior: "Root", expectedBehavior: "Expected", actualBehavior: "Actual", details: ["module": .text("Synthetic")])
+        let incoming = try await f.create(content), existing = try await f.create(content)
+        let snapshot = try await f.store.comparisonSnapshot(in: f.scope, environment: environment)
+        let proposal = try await f.store.prepareComparisonDecision(snapshot, incomingID: incoming.id, existingID: existing.id,
+            resolution: .duplicate, reason: "Reviewed same defect", in: f.scope)
+        XCTAssertTrue(proposal.candidate.content.relationships.contains(.init(kind: .duplicateOf, target: existing.id)))
+        _ = try await f.create(content)
+        do { _ = try await f.store.publishReviewed(proposal, in: f.scope); XCTFail("Stale comparison published") }
+        catch { XCTAssertEqual(error as? BugRegistryError, .staleRevision) }
+        let retained = try await f.store.record(incoming.id, in: f.scope); XCTAssertEqual(retained?.revision, 1)
+    }
+
+    func testRequirementChangeInvalidatesDecisionAtPublicationWithoutChangingBugs() async throws {
+        let f = try await Fixture(); defer { f.remove() }
+        let environment = EnvironmentID(), requirement = try await f.requirement(1)
+        let content = BugDraft(title: "Synthetic", sources: [.init(scope: f.scope, origin: .observed, label: "Synthetic", capturedAt: Date())],
+            changeReason: "Reviewed", assessment: .observed, environment: environment,
+            rootBehavior: "Root", expectedBehavior: "Expected", actualBehavior: "Actual")
+        let first = try await f.store.prepare(content, requirements: [.init(requirement: .init(id: requirement.id))], in: f.scope)
+        let incoming = try await f.store.publishReviewed(first, in: f.scope)
+        let second = try await f.store.prepare(content, requirements: [.init(requirement: .init(id: requirement.id))], in: f.scope)
+        let existing = try await f.store.publishReviewed(second, in: f.scope)
+        let snapshot = try await f.store.comparisonSnapshot(in: f.scope, environment: environment)
+        let decision = try await f.store.prepareComparisonDecision(snapshot, incomingID: incoming.id, existingID: existing.id,
+            resolution: .duplicate, reason: "Reviewed", in: f.scope)
+        _ = try await f.requirement(2)
+        do { _ = try await f.store.publishReviewed(decision, in: f.scope); XCTFail() }
+        catch { XCTAssertEqual(error as? BugRegistryError, .staleRevision) }
+        let retained = try await f.store.record(incoming.id, in: f.scope); XCTAssertEqual(retained?.revision, 1)
+    }
+
+    func testReportedFindingCannotBeOverriddenIntoVerifiedDuplicate() async throws {
+        let f = try await Fixture(); defer { f.remove() }
+        let environment = EnvironmentID(); var value = f.draft(); value.environment = environment
+        let incoming = try await f.create(value), existing = try await f.create(value)
+        let snapshot = try await f.store.comparisonSnapshot(in: f.scope, environment: environment)
+        do { _ = try await f.store.prepareComparisonDecision(snapshot, incomingID: incoming.id, existingID: existing.id,
+            resolution: .duplicate, reason: "Override", in: f.scope); XCTFail() }
+        catch { XCTAssertEqual(error as? BugRegistryError, .invalidReview) }
+    }
+
     func testReviewCancelAndTicketRelinkingPreserveImmutableHistoryAcrossReopen() async throws {
         let f = try await Fixture(); defer { f.remove() }
         let cancelled = try await f.store.prepare(f.draft(), in: f.scope)

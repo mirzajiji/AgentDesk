@@ -209,6 +209,41 @@ public actor ProjectRequirementStore {
 }
 
 extension ProjectRequirementStore {
+    /// Uses the same descriptor lock for bug heads and active requirements, avoiding mixed snapshots
+    /// and keyset-pagination gaps while another local writer publishes a record.
+    func bugComparisonSnapshot(files: BugRegistryFiles, in requested: ProjectScope,
+                               environment: EnvironmentID) throws -> BugComparisonSnapshot {
+        try root.withLock { try bugComparisonSnapshotLocked(files: files, in: requested, environment: environment) }
+    }
+    private func bugComparisonSnapshotLocked(files: BugRegistryFiles, in requested: ProjectScope,
+                                            environment: EnvironmentID) throws -> BugComparisonSnapshot {
+            try validate(requested); try files.validate(requested)
+            let parent: ConfigurationDirectory
+            do { parent = try files.project.child("Memory").child("Bugs") }
+            catch ScopedFileError.notFound { return try .init(scope: scope, environment: environment, records: []) }
+            var inputs: [BugComparisonInput] = [], bytes = 0
+            var current: [RequirementID: RequirementVersion] = [:], resolved = Set<RequirementID>()
+            for name in try parent.names() where !name.hasPrefix(".") {
+                try Task.checkCancellation()
+                guard let id = BugID(rawValue: name), id.rawValue == name else { throw BugRegistryError.invalidDocument }
+                guard let record = try files.read(id).first, record.content.environment == environment else { continue }
+                guard inputs.count < 256 else { throw BugRegistryError.limitExceeded }
+                bytes += try JSONEncoder().encode(record).count
+                guard bytes <= 16_777_216 else { throw BugRegistryError.limitExceeded }
+                let ids = Set(record.requirements.map { $0.requirement.id }).sorted { $0.rawValue < $1.rawValue }
+                for id in ids where resolved.insert(id).inserted {
+                    guard resolved.count <= 1_024 else { throw BugRegistryError.limitExceeded }
+                    let decision = try read(id).first { $0.content.status != .draft }
+                    if let decision, decision.content.status == .active,
+                       decision.content.environmentScope.isEmpty || decision.content.environmentScope.contains(environment) {
+                        current[id] = decision
+                    }
+                }
+                inputs.append(try .init(record: record, activeRequirements: ids.compactMap { current[$0] }))
+            }
+            return try .init(scope: scope, environment: environment, records: inputs)
+    }
+
     /// No files are changed until this exact link proposal is reviewed and published.
     public func prepareTrace(subject: TraceabilitySubject, title: String, environment: EnvironmentID,
                              requirements: [RequirementLinkRequest], changeReason: String, archived: Bool = false,
@@ -354,9 +389,15 @@ extension ProjectRequirementStore {
     /// Bug publication and requirement validation share the root descriptor lock: a requirement edit
     /// cannot slip between reference validation and the immutable bug-version write.
     func withBugReferences(_ requests: [BugRequirementRequest], in requested: ProjectScope,
-                           environment: EnvironmentID?, body: @Sendable ([BugRequirementReference]) throws -> BugRecord) throws -> BugRecord {
+                           environment: EnvironmentID?, comparison: (BugRegistryFiles, BugComparisonSnapshot)? = nil,
+                           body: @Sendable ([BugRequirementReference]) throws -> BugRecord) throws -> BugRecord {
         try root.withLock {
             try validate(requested)
+            if let (files, expected) = comparison {
+                guard expected.scope == requested, expected.environment == environment else { throw BugRegistryError.scopeMismatch }
+                let current = try bugComparisonSnapshotLocked(files: files, in: requested, environment: expected.environment)
+                guard current.fingerprint == expected.fingerprint else { throw BugRegistryError.staleRevision }
+            }
             guard requests.count <= 64 else { throw BugRegistryError.limitExceeded }
             var identities = Set<String>()
             let references = try requests.map { request -> BugRequirementReference in

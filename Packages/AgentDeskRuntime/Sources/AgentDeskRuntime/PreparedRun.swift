@@ -14,6 +14,7 @@ public struct PreparedRun: Sendable {
     public let approval: ApprovalRecord?
     public let maximumActivities: Int
     public let knowledgeSnapshot: String?
+    public let bugReviewSnapshot: String?
 }
 public struct RunOutcome: Sendable {
     public let runID: RunID
@@ -40,6 +41,7 @@ struct PreparedRunData: Sendable {
     let repository: (any RunRepositoryCapturing)?
     let stages: [WorkItemDefinition]
     let knowledge: PreparedKnowledgeContext?
+    let bugReview: PreparedBugContext?
     var context: RedactionContext { evidence.context }
 }
 

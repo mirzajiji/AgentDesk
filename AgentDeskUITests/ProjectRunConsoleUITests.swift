@@ -15,7 +15,7 @@ final class ProjectRunConsoleUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(window.frame.width, 1300); XCTAssertGreaterThanOrEqual(window.frame.height, 850)
         openFixture(in: app); prepare(in: app); click("run.start", in: app)
         let content = app.staticTexts["run.evidence.content"]
-        XCTAssertTrue(content.waitForExistence(timeout: 10))
+        XCTAssertTrue(content.waitForExistence(timeout: 10), "State: \(String(describing: app.staticTexts["run.state"].value)); error: \(String(describing: app.staticTexts["run.console.error"].value))")
         let diff = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "run.evidence.diff.")).firstMatch
         XCTAssertTrue(diff.waitForExistence(timeout: 5)); reveal(diff, in: app); diff.click()
         let expected = "diff --git a/synthetic.txt b/synthetic.txt\n--- a/synthetic.txt\n+++ b/synthetic.txt\n@@ -1 +1 @@\n-old synthetic line\n+new synthetic line\n"

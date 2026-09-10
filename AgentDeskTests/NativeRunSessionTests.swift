@@ -10,6 +10,27 @@ import XCTest
 
 @MainActor
 final class NativeRunSessionTests: XCTestCase {
+    func testCatalogContentionHasDistinctRecoveryGuidance() {
+        XCTAssertTrue(NativeRunSession.message(CatalogError.busy).contains("configuration is busy"))
+    }
+
+    func testRepeatedReviewedStartsWithLiveObservationComplete() async throws {
+        for attempt in 0..<25 {
+            let f = try await RunCoordinatorTests.Fixture.make(disposition: .approval)
+            await f.coordinator.shutdown()
+            let model = try await contextModel(f), session = session(f)
+            await session.prepare(using: model, task: "Inspect synthetic attempt \(attempt)")
+            XCTAssertEqual(session.phase, .prepared, "Attempt \(attempt): \(session.errorMessage ?? "no error")")
+            await session.start()
+            let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+            while session.phase == .running, ContinuousClock.now < deadline {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            XCTAssertEqual(session.outcome?.state, .completed, "Attempt \(attempt): \(session.errorMessage ?? "no error")")
+            await session.close(); await f.remove()
+        }
+    }
+
     func testSuccessfulExecutionPublishesConfirmedResultAndOpenEndedProgress() async throws {
         let f = try await RunCoordinatorTests.Fixture.make(disposition: .approval)
         await f.coordinator.shutdown()

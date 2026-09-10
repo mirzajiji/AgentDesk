@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import XCTest
 @testable import AgentDeskCore
@@ -27,6 +28,37 @@ final class ProjectExecutionSetupTests: XCTestCase {
         }
         func remove() { try? FileManager.default.removeItem(at: root) }
     }
+    func testPersistentCatalogLockFailsClosedAndRetrySleepIsCancellable() async throws {
+        let f = try await Fixture.make(); defer { f.remove() }; try await f.configure()
+        let context = try await f.service.preview(agentID: f.agent.id)
+        let descriptor = Darwin.open(f.root.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        XCTAssertGreaterThanOrEqual(descriptor, 0)
+        defer { flock(descriptor, LOCK_UN); Darwin.close(descriptor) }
+        XCTAssertEqual(flock(descriptor, LOCK_EX | LOCK_NB), 0)
+        let start = ContinuousClock.now
+        do { try await f.service.validate(context); XCTFail("Unverified context accepted") }
+        catch { XCTAssertEqual(error as? CatalogError, .busy) }
+        XCTAssertLessThan(start.duration(to: .now), .seconds(2))
+        let validation = Task { try await f.service.validate(context) }
+        try await Task.sleep(for: .milliseconds(10))
+        validation.cancel()
+        do { try await validation.value; XCTFail("Cancelled validation completed") }
+        catch { XCTAssertTrue(error is CancellationError) }
+    }
+
+    func testTransientCatalogLockDoesNotInvalidateUnchangedReviewedContext() async throws {
+        let f = try await Fixture.make(); defer { f.remove() }; try await f.configure()
+        let context = try await f.service.preview(agentID: f.agent.id)
+        let descriptor = Darwin.open(f.root.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        XCTAssertGreaterThanOrEqual(descriptor, 0)
+        defer { Darwin.close(descriptor) }
+        XCTAssertEqual(flock(descriptor, LOCK_EX | LOCK_NB), 0)
+        let validation = Task { try await f.service.validate(context) }
+        try await Task.sleep(for: .milliseconds(40))
+        XCTAssertEqual(flock(descriptor, LOCK_UN), 0)
+        try await validation.value
+    }
+
     func testReadingAndProposingDefaultsDoNotWriteAndExplicitSaveRequiresReview() async throws {
         let f = try await Fixture.make(); defer { f.remove() }
         let before = try FileManager.default.subpathsOfDirectory(atPath: f.root.path).sorted()

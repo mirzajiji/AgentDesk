@@ -61,10 +61,19 @@ public actor ProjectExecutionSetupService {
     /// there is no unbounded retry or silent use of a mixed agent/configuration/instruction revision.
     public func preview(agentID: AgentID, environmentID: EnvironmentID? = nil,
                         run: ExecutionSettings? = nil) async throws -> ProjectRunContext {
-        let first = try await observe(agentID: agentID, environmentID: environmentID, run: run)
-        let second = try await observe(agentID: agentID, environmentID: environmentID, run: run)
-        guard first == second else { throw ExecutionSetupError.staleContext }
-        return first
+        for attempt in 0..<5 {
+            do {
+                let first = try await observe(agentID: agentID, environmentID: environmentID, run: run)
+                let second = try await observe(agentID: agentID, environmentID: environmentID, run: run)
+                guard first == second else { throw ExecutionSetupError.staleContext }
+                return first
+            } catch CatalogError.busy where attempt < 4 {
+                // Independent native readers share a nonblocking catalog lock. Restart the
+                // entire observation; never reuse a partial snapshot or retry a changed source.
+                try await Task.sleep(for: .milliseconds(20))
+            }
+        }
+        throw CatalogError.busy
     }
 
     /// Call immediately before native run preparation. Later edits do not rewrite this frozen context;

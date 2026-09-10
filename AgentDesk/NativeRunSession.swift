@@ -170,7 +170,9 @@ final class NativeRunSession: ObservableObject {
             } catch is CancellationError {} catch {
                 guard !Task.isCancelled, let self, self.generation == token else { return }
                 await self.close()
-                self.errorMessage = "The reviewed configuration or sources changed. Review the current context before another run."
+                self.errorMessage = error as? CatalogError == .busy
+                    ? Self.message(error)
+                    : "The reviewed configuration or sources changed or could not be verified. Review the current context before another run."
             }
         }
     }
@@ -190,6 +192,9 @@ final class NativeRunSession: ObservableObject {
             executable: installation.executable, configuration: context.configuration)
     }
     static func message(_ error: any Error) -> String {
+        if error as? CatalogError == .busy {
+            return "Project configuration is busy. Wait for current activity to finish, then review the context and retry."
+        }
         if error is CancellationError { return "The operation was cancelled." }
         if error is AuthorizationError { return "This operation is not authorized by the current policy or approval. Review the current settings." }
         if error is ExecutionSetupError { return "The reviewed context is no longer current. Reload and review it before preparing a run." }

@@ -171,6 +171,7 @@ public struct EffectiveExecutionConfiguration: Encodable, Equatable, Sendable {
     public let timeoutSeconds: Int
     public let maximumOutputBytes: Int
     public let outputSchema: OutputSchema?
+    public let knowledge: AgentKnowledgeSelection?
     public let sources: [ExecutionConfigurationSource]
     /// Winning scalar or limiting budget source. All allowlist constraints remain visible in sources.
     public let origins: [String: ExecutionLayer]
@@ -237,7 +238,7 @@ public enum ExecutionConfigurationComposer {
             environmentKind: environment.kind, workspaceLocked: workspace?.draft.workspaceLocked ?? false)
         return EffectiveExecutionConfiguration(scope: scope, agentID: agent.id, agentRevision: agent.definition.revision,
             environment: environment, policy: policy, modelIdentifier: model, requestedAccess: profile.requestedAccess,
-            maximumSteps: steps, timeoutSeconds: timeout, maximumOutputBytes: bytes, outputSchema: schema, sources: sources, origins: origins)
+            maximumSteps: steps, timeoutSeconds: timeout, maximumOutputBytes: bytes, outputSchema: schema, knowledge: profile.knowledge, sources: sources, origins: origins)
     }
 }
 

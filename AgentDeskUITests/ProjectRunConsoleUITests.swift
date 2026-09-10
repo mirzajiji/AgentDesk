@@ -4,6 +4,58 @@ import XCTest
 
 final class ProjectRunConsoleUITests: XCTestCase {
     @MainActor
+    func testKnowledgeEditorPersistsAndPreparedContextShowsCurrentRequirement() throws {
+        continueAfterFailure = false
+        let app = fixture("success"); app.launch()
+        func button(_ id: String) {
+            let value = app.buttons[id]; XCTAssertTrue(value.waitForExistence(timeout: 10)); value.click()
+        }
+        func replace(_ element: XCUIElement, _ text: String) {
+            XCTAssertTrue(element.waitForExistence(timeout: 5)); element.click()
+            element.typeKey("a", modifierFlags: .command); element.typeText(text)
+        }
+        button("project.requirements.Synthetic run project"); button("requirements.create")
+        replace(app.textFields["requirement.id"], "synthetic-refund")
+        app.popUpButtons["requirement.status"].click(); app.menuItems["Active"].click()
+        replace(app.textViews["requirement.description"], "Refunds require synthetic review.")
+        replace(app.textViews["requirement.reason"], "Initial synthetic requirement")
+        button("requirement.review"); button("requirement.publish")
+        XCTAssertTrue(app.buttons["requirement.publish"].waitForNonExistence(timeout: 5))
+        button("requirements.done")
+        button("project.agents.Synthetic run project"); button("agent.edit.Synthetic reviewer")
+        app.tabs["Knowledge"].click()
+        let enabled = app.checkBoxes["agent.knowledge.enabled"]
+        XCTAssertTrue(enabled.waitForExistence(timeout: 5)); enabled.click()
+        replace(app.textViews["agent.knowledge.include"], "requirements/**")
+        replace(app.textViews["agent.knowledge.exclude"], "requirements/private")
+        XCTAssertTrue(app.buttons["agent.save"].isHittable)
+        button("agent.save")
+        XCTAssertTrue(app.buttons["agent.save"].waitForNonExistence(timeout: 5))
+        app.typeKey(.escape, modifierFlags: [])
+        app.terminate(); app.launch()
+        button("project.agents.Synthetic run project"); button("agent.edit.Synthetic reviewer")
+        app.tabs["Knowledge"].click()
+        XCTAssertEqual(app.textViews["agent.knowledge.include"].value as? String, "requirements/**")
+        XCTAssertEqual(app.textViews["agent.knowledge.exclude"].value as? String, "requirements/private")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(app.buttons["agent.save"].waitForNonExistence(timeout: 5))
+        app.typeKey(.escape, modifierFlags: [])
+        openFixture(in: app); prepare(in: app)
+        click("run.knowledge", in: app)
+        let content = app.staticTexts["run.knowledge.content"]
+        XCTAssertTrue(content.waitForExistence(timeout: 5))
+        let text = try XCTUnwrap(content.value as? String)
+        XCTAssertTrue(text.contains("synthetic-refund")); XCTAssertTrue(text.contains("Refunds require synthetic review."))
+        XCTAssertTrue(text.contains("Sanitized fingerprint")); XCTAssertTrue(text.contains("Requirement"))
+        XCTAssertFalse(app.staticTexts["run.evidence.content"].exists)
+        XCTAssertTrue(app.buttons["run.knowledge.done"].isHittable)
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "Selected current requirement before approval"; attachment.lifetime = .keepAlways; add(attachment)
+        app.buttons["run.knowledge.done"].click()
+        click("run.start", in: app); waitForState("completed", in: app)
+    }
+
+    @MainActor
     func testLiveProviderTextAppearsRedactedBeforeCompletion() throws {
         continueAfterFailure = false
         let app = fixture("stream"); app.launch(); openFixture(in: app); prepare(in: app)

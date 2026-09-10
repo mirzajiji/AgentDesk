@@ -117,6 +117,7 @@ struct AgentEditorView: View {
     @State private var draft = AgentTemplate.general.draft
     @State private var template = AgentTemplate.general
     @State private var modelIdentifier = ""
+    @State private var knowledge = AgentKnowledgeEditing()
     @State private var error: String?
     @State private var saving = false
     @Environment(\.dismiss) private var dismiss
@@ -128,7 +129,7 @@ struct AgentEditorView: View {
                 Picker("Template", selection: $template) {
                     ForEach(AgentTemplate.allCases) { template in Text(template.title).tag(template) }
                 }
-                .onChange(of: template) { _, value in draft = value.draft; modelIdentifier = "" }
+                .onChange(of: template) { _, value in draft = value.draft; modelIdentifier = ""; knowledge = AgentKnowledgeEditing(value.draft.profile.knowledge) }
             }
             TextField("Name", text: $draft.name).accessibilityIdentifier("agent.name")
             TextField("Description", text: $draft.summary).accessibilityIdentifier("agent.summary")
@@ -155,6 +156,8 @@ struct AgentEditorView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 .padding().tabItem { Text("Execution") }
+                AgentKnowledgeSelectionView(editing: $knowledge)
+                    .padding().tabItem { Text("Knowledge") }
                 AgentSkillSelectionView(skills: skills, references: $draft.skillReferences)
                     .padding().tabItem { Text("Skills") }
             }
@@ -166,7 +169,7 @@ struct AgentEditorView: View {
                     saving = true
                     draft.profile.modelIdentifier = modelIdentifier.isEmpty ? nil : modelIdentifier
                     Task {
-                        do { try await save(draft); dismiss() }
+                        do { draft.profile.knowledge = try knowledge.selection(); try await save(draft); dismiss() }
                         catch { self.error = ProjectAgentsModel.message(error); saving = false }
                     }
                 }
@@ -177,7 +180,7 @@ struct AgentEditorView: View {
         .textFieldStyle(.roundedBorder)
         .padding(24).macEditorLayout(idealWidth: 700, idealHeight: 520)
         .disabled(saving).interactiveDismissDisabled(saving)
-        .onAppear { draft = existing?.draft ?? template.draft; modelIdentifier = draft.profile.modelIdentifier ?? "" }
+        .onAppear { draft = existing?.draft ?? template.draft; modelIdentifier = draft.profile.modelIdentifier ?? ""; knowledge = AgentKnowledgeEditing(draft.profile.knowledge) }
     }
 }
 private struct AgentSkillSelectionView: View {

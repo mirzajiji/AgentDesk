@@ -60,17 +60,18 @@ final class RunCoordinatorTests: XCTestCase {
         let coordinator: RunCoordinator
         var database: URL { root.appendingPathComponent("operations.sqlite") }
         static func make(mode: CoordinatorFakeProvider.Mode = .success, disposition: PolicyDisposition = .allow,
-                         timeout: Int = 30, schema: OutputSchema? = nil, maximumSteps: Int = 30) async throws -> Self {
+                         timeout: Int = 30, schema: OutputSchema? = nil, maximumSteps: Int = 30,
+                         knowledge: AgentKnowledgeSelection? = nil, readDisposition: PolicyDisposition = .allow) async throws -> Self {
             let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
             let catalog = try WorkspaceCatalog(container: root)
             let workspace = try await catalog.createWorkspace(name: "Synthetic")
             let project = try await catalog.createProject(in: workspace.id, name: "Synthetic project"), scope = project.scope
             let agents = try await catalog.agentStore(in: scope)
-            var draft = AgentTemplate.general.draft; draft.profile.maximumSteps = maximumSteps
+            var draft = AgentTemplate.general.draft; draft.profile.maximumSteps = maximumSteps; draft.profile.knowledge = knowledge
             let agent = try await agents.create(draft, in: scope)
             let configurations = try await catalog.executionConfigurationStore(in: scope)
-            let rules = [PolicyRule(.readEvidence, .allow), PolicyRule(.runReadOnlyAgent, disposition)]
+            let rules = [PolicyRule(.readEvidence, readDisposition), PolicyRule(.runReadOnlyAgent, disposition)]
             let envID = EnvironmentID()
             let environment = ProjectEnvironment(id: envID, scope: scope, name: "Test", kind: .test,
                 policy: try PolicyDocument(level: .environment, workspaceID: scope.workspaceID, projectID: scope.projectID, environmentID: envID, rules: rules))

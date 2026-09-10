@@ -1,6 +1,6 @@
 # Project memory, retrieval and knowledge relationships
 
-Status: scoped structured memory/notes/inbox storage and scoped FTS search implemented; run-context integration, timeline projections and native management remain planned. Source: [final architecture](final-architecture.txt), sections 11, 12, 17, 103, 107 and 149–151.
+Status: scoped structured memory/notes/inbox storage, FTS search and selective run-context integration implemented; timeline projections and native memory management remain planned. Run-context acceptance is tracked in P2-06b. Source: [final architecture](final-architecture.txt), sections 11, 12, 17, 103, 107 and 149–151.
 <!-- Source sections: 11,12,17,103,107,149,150,151 -->
 
 Project Memory holds reusable confirmed knowledge: project descriptions, accepted behavior, rules, API/state/environment semantics, test expectations, architecture, QA decisions, terminology and linked defects. Store separate structured JSON records rather than one growing monolithic document.
@@ -47,7 +47,7 @@ Each record has `Memory/Knowledge/<UUID>/entry.vN.json` versions and a `current.
 
 Publication exclusively creates a version before advancing the pointer. Partial orphan versions are not adopted or overwritten. Historical chains validate scope, identity, fingerprints and date order; malformed pointers, tampering, symlinks and multiply linked files fail closed. Reads/listings are scope checked and bounded. Listing defaults to active records and can filter kinds/environments; ignored/archived records require explicit inclusion. Administrative listing does not itself authorize model context inclusion.
 
-The [validation record](../Development/p2-05-validation.md) describes limits and tested behavior. Native classification/promotion/attachment screens remain P2-10; selective FTS retrieval and classification-aware context selection remain P2-06. The store does not collect infrastructure data or bypass runtime policy/redaction boundaries.
+The [validation record](../Development/p2-05-validation.md) describes limits and tested behavior. Native classification/promotion/attachment screens remain P2-10; selective FTS retrieval and classification-aware context selection are covered by P2-06a/b. The store does not collect infrastructure data or bypass runtime policy/redaction boundaries.
 
 ## Rebuildable search index (P2-06a)
 
@@ -57,4 +57,18 @@ Memory records may include an optional `knowledgePath`, such as `api/paynet/refu
 
 Titles and JSON bodies pass through the existing scoped redactor before SQLite insertion. A path requiring redaction rejects indexing. Queries default to requirements and confirmed memory; notes/inbox need explicit inclusion. Search uses quoted literal terms joined by AND, with deterministic path/source order. Cursors bind the query/filters, scope, environment and generation; an index rebuild requires a fresh search.
 
-Rebuild limits are 1,000 documents/16 MiB, with 256 KiB per document. Search accepts at most 16 terms/1 KiB and 100 results per page. Failed rebuilds preserve the previous index, while an unbuilt index is distinct from a built empty index. See [index validation](../Development/p2-06a-validation.md). Authoritative revalidation, relationship enrichment and bounded native run-context integration are P2-06b.
+Rebuild limits are 1,000 documents/16 MiB, with 256 KiB per document. Search accepts at most 16 terms/1 KiB and 100 results per page. Failed rebuilds preserve the previous index, while an unbuilt index is distinct from a built empty index. See [index validation](../Development/p2-06a-validation.md). Authoritative revalidation, relationship enrichment and bounded native run-context integration are described below.
+
+## Selective run context (P2-06b)
+
+An agent's **Knowledge** tab enables explicit include/exclude paths, query terms, classifications and context budgets. Existing agents have no selection and retrieve nothing. New selections default to active requirements and confirmed memory; notes and inbox are opt-in and retain their origin/classification. Empty includes match nothing. Preferences are saved with the agent revision and included in the effective execution fingerprint. Paths are taxonomy labels, not file grants.
+
+`KnowledgeCandidateSearching` is the real discovery boundary for FTS and future search implementations. `KnowledgeContextService` discards cached bodies and reopens authoritative records in the exact project/environment. A changed cache revision/hash is reported as stale, never used as current evidence. Archived, retired, missing and environment-inapplicable sources are unavailable. Fresh records must still pass the path and classification selection even if a search backend returns an invalid selection.
+
+Explicit structured subjects use `kind/id` (automatedTest, manualTest, bug, documentation or workflow). Their reviewed links select the latest active requirement, not the historical version attached when the link was created. These references take priority over FTS candidates, still obey path/classification/environment selection, and remain bound to the reviewed trace revision. A nonmatching search term does not disable an explicitly chosen relationship.
+
+Preparation first authorizes the run and evidence read, then rebuilds the scoped index and assembles context. The complete redacted packet is limited to 1–32 records and 1–32 KiB. FTS discovery considers at most 32 candidates; relationship discovery considers at most 64 references from 16 subjects. Omission is explicit. Records are not sliced into misleading fragments; if necessary whole records are omitted. Oversized metadata diagnostics fail preparation instead of silently losing provenance. The native console’s **Inspect Selected Knowledge** sheet presents source IDs, revisions, paths, classifications, bodies, provenance and sanitized fingerprints as readable sections before approval. The original sanitized packet remains bound to dispatch; display formatting does not change it.
+
+Raw source-history fingerprints remain in the in-memory revalidation closure; persisted input contains fingerprints of sanitized bytes. Original source provenance remains distinct from interpretation. The exact packet is appended to the task as untrusted data and included in the existing input/dispatch fingerprint. Enabling selection without a reader fails preparation. Before approval consumption and again immediately before provider dispatch, selected source and relationship fingerprints are checked against current files. Changed sources require another preparation. A concurrent external edit immediately after this last check cannot be made atomic with starting an external process; the persisted packet still records the exact reviewed input used by that run.
+
+See the [P2-06b validation record](../Development/p2-06b-validation.md) for acceptance status. This adds no automatic knowledge promotion, semantic search, global company aggregation or external infrastructure access.

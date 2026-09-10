@@ -13,6 +13,7 @@ struct ProjectRunConsoleView: View {
     @StateObject private var liveOutput = NativeLiveOutputModel()
     @State private var taskText = ""
     @State private var confirmClose = false
+    @State private var showKnowledge = false
     @State private var historyError: String?
     @Environment(\.dismiss) private var dismiss
 
@@ -52,6 +53,10 @@ struct ProjectRunConsoleView: View {
                                 Text("Run \(prepared.runID)").textSelection(.enabled)
                                 Text("Read-only agent · input fingerprint \(prepared.action.payload.rawValue)").textSelection(.enabled)
                                 if let approval = prepared.approval { Text("Approval version \(approval.sequence)") }
+                                if session.prepared?.knowledgeSnapshot != nil {
+                                    Button("Inspect Selected Knowledge") { showKnowledge = true }
+                                        .accessibilityIdentifier("run.knowledge")
+                                }
                                 if let snapshot = session.inputSnapshot { DisclosureGroup("Prepared input") { plain(snapshot) } }
                                 if session.phase == .prepared {
                                     Text("Review the prepared input before starting. Codex has not been started for this run.")
@@ -121,6 +126,9 @@ struct ProjectRunConsoleView: View {
             }
         }
         .background(NativeRunWindowAnchor { session.presentWindow = $0 }.frame(width: 0, height: 0))
+        .sheet(isPresented: $showKnowledge) {
+            if let snapshot = session.prepared?.knowledgeSnapshot { KnowledgeContextInspector(snapshot: snapshot) }
+        }
         .onDisappear { let owned = session; Task { await owned.close() } }
         .confirmationDialog("Stop this run and close the console?", isPresented: $confirmClose) {
             Button("Stop and Close", role: .destructive) { Task { await session.close(); evidence.clear(); dismiss() } }

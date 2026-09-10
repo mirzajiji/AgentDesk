@@ -17,7 +17,7 @@ public struct KnowledgePath: RawRepresentable, Codable, Hashable, Sendable {
     public func encode(to encoder: any Encoder) throws { var value = encoder.singleValueContainer(); try value.encode(rawValue) }
 }
 
-public struct KnowledgePathFilter: Equatable, Sendable {
+public struct KnowledgePathFilter: Codable, Equatable, Sendable {
     public let include: [String]
     public let exclude: [String]
     public init(include: [String] = ["**"], exclude: [String] = []) throws {
@@ -28,6 +28,13 @@ public struct KnowledgePathFilter: Equatable, Sendable {
             }
         }
         self.include = include; self.exclude = exclude
+    }
+    private enum CodingKeys: String, CodingKey { case include, exclude }
+    public init(from decoder: any Decoder) throws {
+        try rejectUnknownConfigurationKeys(decoder, allowed: ["include", "exclude"])
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(include: values.decode([String].self, forKey: .include),
+                      exclude: values.decode([String].self, forKey: .exclude))
     }
     public func permits(_ path: KnowledgePath) -> Bool {
         func matches(_ pattern: String) -> Bool {

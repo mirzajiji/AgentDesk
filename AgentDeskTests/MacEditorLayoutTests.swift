@@ -37,6 +37,10 @@ final class MacEditorLayoutTests: XCTestCase {
         }))
     }
 
+    func testKnowledgeInspectorFitsLongContextAcrossLogicalSizesAndTextScaling() {
+        assertFitsAndExpands(KnowledgeContextInspector(snapshot: String(repeating: "Synthetic reviewed source with version and provenance.\n", count: 500)))
+    }
+
     func testExecutionFormsFitCompactWindowsAndExpandOnLargeDesktops() {
         let scope = ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID())
         let environments = (0..<20).map { index in

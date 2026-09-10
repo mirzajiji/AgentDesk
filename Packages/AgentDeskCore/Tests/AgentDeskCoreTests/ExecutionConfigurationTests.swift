@@ -147,6 +147,21 @@ final class ExecutionConfigurationTests: XCTestCase {
         try Data(#"{"schemaVersion":999}"#.utf8).write(to: directory.appendingPathComponent("current.json"))
         do { _ = try await f.store.configuration(at: .project, in: f.project.scope); XCTFail() } catch { XCTAssertEqual(error as? ExecutionConfigurationError, .invalidConfiguration) }
     }
+    func testKnowledgeSelectionSurvivesStorageAndChangesEffectiveRunBinding() async throws {
+        let selection = try AgentKnowledgeSelection(paths: .init(include: ["qa/**"], exclude: ["qa/private/**"]), query: "refund")
+        let f = try await Fixture(profile: .init(knowledge: selection)); defer { f.cleanup() }
+        _ = try await f.save()
+        let reopened = try await f.agents.agent(f.agent.id, in: f.project.scope)
+        XCTAssertEqual(reopened.definition.profile.knowledge, selection)
+        let first = try await f.store.preview(for: reopened, in: f.project.scope)
+        XCTAssertEqual(first.knowledge, selection)
+        var draft = reopened.draft
+        draft.profile.knowledge = try AgentKnowledgeSelection(paths: .init(include: ["requirements/**"]))
+        let changed = try await f.agents.update(reopened.id, in: f.project.scope, expectedRevision: 1, draft: draft)
+        let next = try await f.store.preview(for: changed, in: f.project.scope)
+        XCTAssertEqual(next.knowledge, draft.profile.knowledge)
+        XCTAssertNotEqual(try first.fingerprint, try next.fingerprint)
+    }
     func testLegacyAgentProfilesDecodeAndAdvancedFieldsSurviveOrdinaryEdits() async throws {
         let legacy = Data(#"{"modelIdentifier":"legacy-model","requestedAccess":"readOnly","maximumSteps":20,"timeoutSeconds":600}"#.utf8)
         let old = try JSONDecoder().decode(CodexAgentProfile.self, from: legacy)

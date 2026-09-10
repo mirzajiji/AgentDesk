@@ -62,7 +62,7 @@ final class NativeRunSession: ObservableObject {
             guard token == generation else { await service.shutdown(); return }
             self.service = service
             try await registry.register(service)
-            let prepared = try await service.prepare(context: context, setup: services.setup, task: task)
+            let prepared = try await service.prepare(context: context, setup: services.setup, task: task, knowledgeCatalog: services.catalog)
             let snapshot = try await service.inputSnapshot(for: prepared.runID)
             let run = try await service.run(prepared.runID)
             try Task.checkCancellation()
@@ -205,6 +205,7 @@ final class NativeRunSession: ObservableObject {
         if error is CancellationError { return "The operation was cancelled." }
         if error is AuthorizationError { return "This operation is not authorized by the current policy or approval. Review the current settings." }
         if error is ExecutionSetupError { return "The reviewed context is no longer current. Reload and review it before preparing a run." }
+        if error is KnowledgeContextError || error is KnowledgeIndexError { return "Selected knowledge changed, is unavailable, or exceeds its context limit. Review the knowledge settings and prepare again." }
         if error is NativeConsoleError { return "Open Codex Settings and verify an enabled, signed-in Codex installation." }
         if error as? RunCoordinatorError == .busy { return "Another run session owns this project. Close it before opening a new session." }
         return "The run operation could not complete. Check project setup and the current run state before retrying."

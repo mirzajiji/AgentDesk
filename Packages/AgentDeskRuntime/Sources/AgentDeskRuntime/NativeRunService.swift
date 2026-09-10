@@ -72,7 +72,8 @@ public actor NativeRunService: RunEvidenceReading {
         self.requesterID = requesterID; self.reviewerID = reviewerID; self.resource = resource
         self.captureRepository = captureRepository; self.makeRedactor = redactor
     }
-    public func prepare(instructions: ComposedInstructions, configuration: EffectiveExecutionConfiguration, task: String) async throws -> PreparedRun {
+    public func prepare(instructions: ComposedInstructions, configuration: EffectiveExecutionConfiguration, task: String,
+                        knowledgeCatalog: WorkspaceCatalog? = nil) async throws -> PreparedRun {
         try checkOpen()
         guard configuration.agentID == agentID else { throw RunCoordinatorError.invalidPreparation }
         let repository: (@Sendable (RedactionContext, ContentRedactor) async throws -> any RunRepositoryCapturing)?
@@ -80,17 +81,31 @@ public actor NativeRunService: RunEvidenceReading {
             let directory = directory
             repository = { context, redactor in try GitRepositoryCapture(root: directory, context: context, redactor: redactor) }
         } else { repository = nil }
+        let knowledge: (@Sendable (ContentRedactor) async throws -> PreparedKnowledgeContext)?
+        if let selection = configuration.knowledge {
+            guard let catalog = knowledgeCatalog else { throw RunCoordinatorError.invalidPreparation }
+            let database = database, scope = scope, environment = environmentID
+            knowledge = { redactor in
+                let memory = try await catalog.memoryStore(in: scope)
+                let requirements = try await catalog.requirementStore(in: scope)
+                let index = try KnowledgeSearchIndex(database: database, scope: scope, environment: environment)
+                _ = try await index.rebuild(memory: memory, requirements: requirements, redactor: redactor)
+                let service = try KnowledgeContextService(memory: memory, requirements: requirements, environment: environment, search: index)
+                return try await service.prepare(selection, redactor: redactor)
+            }
+        } else { knowledge = nil }
         return try await coordinator.prepare(instructions: instructions, configuration: configuration, task: task,
             requesterID: requesterID, location: RunLocationSnapshot(scope: scope, selectedDirectory: directory.path,
                 registrationID: repositoryAccess?.registration.id, registrationRevision: repositoryAccess?.registration.revision),
-            redactor: makeRedactor, repository: repository)
+            redactor: makeRedactor, knowledge: knowledge, repository: repository)
     }
     /// Revalidates the displayed native context before any preparation record or provider work.
-    public func prepare(context: ProjectRunContext, setup: ProjectExecutionSetupService, task: String) async throws -> PreparedRun {
+    public func prepare(context: ProjectRunContext, setup: ProjectExecutionSetupService, task: String,
+                        knowledgeCatalog: WorkspaceCatalog? = nil) async throws -> PreparedRun {
         try checkOpen()
         guard context.scope == scope, setup.scope == scope else { throw RunCoordinatorError.invalidPreparation }
         try await setup.validate(context)
-        return try await prepare(instructions: context.instructions, configuration: context.configuration, task: task)
+        return try await prepare(instructions: context.instructions, configuration: context.configuration, task: task, knowledgeCatalog: knowledgeCatalog)
     }
     public func start(_ prepared: PreparedRun) async throws -> RunExecution {
         try checkOpen(); return try await coordinator.start(prepared.token)

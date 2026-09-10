@@ -20,7 +20,7 @@ actor RunJournal {
     private func change(_ change: WorkPlanChange) async throws {
         sequence = try await lifecycle.changeProgress(change, for: id, in: scope, expectedSequence: sequence, at: date()).sequence
     }
-    func perform(provider: any ExecutionProvider) async throws -> UUID {
+    func perform(provider: any ExecutionProvider, beforeDispatch: @Sendable () async throws -> Void) async throws -> UUID {
         guard let run = try await lifecycle.run(id, in: scope) else { throw RunCoordinatorError.persistenceUnavailable }
         sequence = run.sequence
         sequence = try await lifecycle.transition(id, in: scope, to: .running, expectedSequence: sequence, at: date()).sequence
@@ -33,6 +33,10 @@ actor RunJournal {
         try await change(.transition(prepared.stages[0].id, to: .completed))
         try await change(.transition(prepared.stages[1].id, to: .running))
         try Task.checkCancellation()
+        do { try await prepared.knowledge?.validate() }
+        catch is CancellationError { throw CancellationError() }
+        catch { throw RunCoordinatorError.invalidPreparation }
+        try await beforeDispatch()
         let execution = try await provider.start(prepared.request)
         defer { execution.cancel() }
         var validator = RunEventValidator(request: prepared.request)

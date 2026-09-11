@@ -89,7 +89,7 @@ The following tasks implement section 110's eleven connection requirements and t
 | Task | Status and scope | Acceptance |
 | --- | --- | --- |
 | P3-01 | Complete: scoped plugin configuration and lifecycle foundation | Immutable scoped storage, Keychain references, capability metadata and cleanup; 15 package tests on Mac and iPhone, 196 Core, 518 Mac app and 337 iPhone app tests pass. See [validation and boundaries](p3-01-validation.md). |
-| P3-02 | Pending: plugin capability policy and exact approvals | Every dispatch crosses existing policy gate; capability-specific allow/approval/deny, exact payload/resource binding, expiry and no transport fallback bypass |
+| P3-02 | Complete: plugin capability policy and exact approvals | Restrictive grants, exact bindings, durable review/dispatch and mobile denial; 150 Runtime, 19 plugin, 520 Mac and 339 iPhone tests plus final native rechecks pass. See [validation](p3-02-validation.md). |
 | P3-03 | Pending: Jira authentication and read capabilities | Instance/account validation, scoped login/logout/reauthentication, capability discovery, issue/comment/attachment reads, pagination, cancellation and safe network/authentication errors |
 | P3-04 | Pending: reviewed Jira mutations and bug integration | Explicit reviewed issue/comment/attachment operations, current-requirement and duplicate checks, known-ticket evidence additions, denial tests and ambiguous network outcome handling |
 | P3-05 | Pending: native plugin setup and diagnostics | Enable/configure/login/save/test/disconnect/logout/reset, permission review, real account/scope/status/health, compact windows and native lifecycle tests |

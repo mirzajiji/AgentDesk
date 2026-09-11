@@ -28,6 +28,7 @@
 			};
 			platformFilters = ("macos", );
 		};
+		AF0000000000000000000001 /* AgentDeskPlugins in Frameworks */ = {isa = PBXBuildFile; productRef = AF0000000000000000000002 /* AgentDeskPlugins */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -135,6 +136,7 @@
 				AD0000000000000000000005 /* AgentDeskPersistence in Frameworks */,
 				AD0000000000000000000007 /* AgentDeskSecurity in Frameworks */,
 				AD0000000000000000000009 /* AgentDeskRuntime in Frameworks */,
+				AF0000000000000000000001 /* AgentDeskPlugins in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -238,6 +240,7 @@
 				AD0000000000000000000015 /* AgentDeskPersistence */,
 				AD0000000000000000000017 /* AgentDeskSecurity */,
 				AD0000000000000000000019 /* AgentDeskRuntime */,
+				AF0000000000000000000002 /* AgentDeskPlugins */,
 			);
 			productName = AgentDeskTests;
 			productReference = C514A9233051AAE2006A58EA /* AgentDeskTests.xctest */;
@@ -317,6 +320,7 @@
 				AD0000000000000000000023 /* XCLocalSwiftPackageReference "Packages/AgentDeskPersistence" */,
 				AD0000000000000000000024 /* XCLocalSwiftPackageReference "Packages/AgentDeskSecurity" */,
 				AD0000000000000000000025 /* XCLocalSwiftPackageReference "Packages/AgentDeskRuntime" */,
+				AF0000000000000000000003 /* XCLocalSwiftPackageReference "Packages/AgentDeskPlugins" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C514A9173051AAE0006A58EA /* Products */;
@@ -822,6 +826,7 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/AgentDeskRuntime;
 		};
+		AF0000000000000000000003 /* XCLocalSwiftPackageReference "Packages/AgentDeskPlugins" */ = {isa = XCLocalSwiftPackageReference; relativePath = Packages/AgentDeskPlugins; };
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -866,6 +871,7 @@
 			package = "AD0000000000000000000025";
 			productName = "AgentDeskRuntime";
 		};
+		AF0000000000000000000002 /* AgentDeskPlugins */ = {isa = XCSwiftPackageProductDependency; package = AF0000000000000000000003 /* XCLocalSwiftPackageReference "Packages/AgentDeskPlugins" */; productName = AgentDeskPlugins; };
 /* End XCSwiftPackageProductDependency section */
 /* Begin PBXCopyFilesBuildPhase section */
 		AE0000000000000000000012 = {

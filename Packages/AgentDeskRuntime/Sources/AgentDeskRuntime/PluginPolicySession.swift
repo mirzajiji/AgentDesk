@@ -64,6 +64,79 @@ actor PluginPolicySession {
         }
     }
 
+    func executeJiraIssueSnapshot(identifier: String, connection: JiraCloudSession,
+                                  permissions: PluginPermissions, context: RedactionContext,
+                                  redactor: ContentRedactor, approvalID: UUID? = nil) async throws -> PolicyExecutionResult<JiraIssueSnapshot> {
+        let invocation = prepared
+        guard invocation.capability == .issuesRead else { throw AuthorizationError.invalidInput }
+        return try await execute(approvalID: approvalID) { action in
+            guard action == invocation.action else { throw AuthorizationError.stalePolicy }
+            return try await connection.executeIssueSnapshot(identifier: identifier, prepared: invocation,
+                permissions: permissions, context: context, redactor: redactor)
+        }
+    }
+
+    func reconcileJiraComment(_ draft: JiraCommentDraft, startAt: Int, limit: Int,
+                              connection: JiraCloudSession, permissions: PluginPermissions,
+                              redactor: ContentRedactor, approvalID: UUID? = nil) async throws -> PolicyExecutionResult<JiraCommentCandidates> {
+        let invocation = prepared
+        guard invocation.capability == .commentsRead else { throw AuthorizationError.invalidInput }
+        return try await execute(approvalID: approvalID) { action in
+            guard action == invocation.action else { throw AuthorizationError.stalePolicy }
+            return try await connection.reconcileComment(draft, startAt: startAt, limit: limit,
+                preparedRead: invocation, permissions: permissions, redactor: redactor)
+        }
+    }
+
+    func executeJiraComment(_ draft: JiraCommentDraft, connection: JiraCloudSession,
+                            permissions: PluginPermissions, context: RedactionContext, redactor: ContentRedactor,
+                            approvalID: UUID? = nil,
+                            beforeDispatch: @escaping @Sendable () async throws -> Void = {}) async throws -> PolicyExecutionResult<JiraCommentReceipt> {
+        let invocation = prepared
+        guard invocation.capability == .commentsWrite, draft.content.context == context else { throw AuthorizationError.invalidInput }
+        let generation = authorityGeneration
+        return try await execute(approvalID: approvalID) { action in
+            // A write always needs an explicit consumed review, even if general policy allows it.
+            guard approvalID != nil else { throw AuthorizationError.approvalRequired }
+            guard action == invocation.action else { throw AuthorizationError.stalePolicy }
+            return try await connection.executeComment(draft, prepared: invocation, permissions: permissions, redactor: redactor,
+                beforeDispatch: {
+                    try await self.checkCurrent(expectedAuthority: generation)
+                    try await beforeDispatch()
+                    try await self.checkCurrent(expectedAuthority: generation)
+                })
+        }
+    }
+
+    func executeJiraIssueEdit(_ draft: JiraIssueEditDraft, connection: JiraCloudSession,
+                              permissions: PluginPermissions, redactor: ContentRedactor,
+                              readSession: PluginPolicySession, readApprovalID: UUID? = nil,
+                              approvalID: UUID) async throws -> PolicyExecutionResult<JiraIssueEditReceipt> {
+        let invocation = prepared
+        guard invocation.capability == .issuesUpdate else { throw AuthorizationError.invalidInput }
+        let generation = authorityGeneration
+        return try await execute(approvalID: approvalID) { action in
+            guard action == invocation.action else { throw AuthorizationError.stalePolicy }
+            return try await connection.executeIssueEdit(draft, prepared: invocation, permissions: permissions,
+                redactor: redactor, readCurrent: {
+                    let result = try await readSession.executeJiraIssueSnapshot(identifier: draft.identifier,
+                        connection: connection, permissions: permissions, context: draft.context,
+                        redactor: redactor, approvalID: readApprovalID)
+                    guard case .executed(let snapshot) = result else { throw AuthorizationError.denied }
+                    return snapshot
+                }, beforeDispatch: { try await self.checkCurrent(expectedAuthority: generation) })
+        }
+    }
+
+    func executeBugJiraComment(_ evidence: BugJiraComment, connection: JiraCloudSession,
+                               permissions: PluginPermissions, redactor: ContentRedactor,
+                               approvalID: UUID) async throws -> PolicyExecutionResult<JiraCommentReceipt> {
+        try await evidence.validate()
+        return try await executeJiraComment(evidence.draft, connection: connection, permissions: permissions,
+            context: evidence.draft.content.context, redactor: redactor, approvalID: approvalID,
+            beforeDispatch: { try await evidence.validate() })
+    }
+
     func installAuthority(_ authority: PolicyAuthority) async throws {
         authorityGeneration = UUID()
         if authority.id == requesterID, case .pairedDevice = authority.kind {

@@ -77,14 +77,20 @@ public actor JiraCloudSession: PluginConnectionSession {
     private var closed = false
     init(account: JiraCloudAccount, transport: JiraHTTPTransport, configuration: JiraConnectionConfiguration,
          resource: JiraCloudResource, tokens: JiraOAuthTokens, vault: JiraCredentialVault, now: @escaping @Sendable () -> Date) {
-        self.capabilities = Self.readCapabilities(tokenScopes: tokens.scopes, siteScopes: resource.scopes)
+        self.capabilities = Self.availableCapabilities(tokenScopes: tokens.scopes, siteScopes: resource.scopes)
         self.account = account; self.transport = transport; self.configuration = configuration
         self.resource = resource; self.tokens = tokens; self.vault = vault; self.now = now
     }
     /// Scope discovery describes available implementations; runtime policy still authorizes each call.
-    static func readCapabilities(tokenScopes: Set<String>, siteScopes: Set<String>) -> Set<PluginCapability> {
-        tokenScopes.contains("read:jira-work") && siteScopes.contains("read:jira-work")
-            ? [.issuesRead, .commentsRead, .attachmentsRead] : []
+    static func availableCapabilities(tokenScopes: Set<String>, siteScopes: Set<String>) -> Set<PluginCapability> {
+        var result: Set<PluginCapability> = []
+        if tokenScopes.contains("read:jira-work") && siteScopes.contains("read:jira-work") {
+            result.formUnion([.issuesRead, .commentsRead, .attachmentsRead])
+        }
+        if tokenScopes.contains("write:jira-work") && siteScopes.contains("write:jira-work") {
+            result.insert(.commentsWrite)
+        }
+        return result
     }
     public func prepare(_ operation: JiraReadOperation, id: UUID = UUID(), configurationRevision: Int,
                         permissions: PluginPermissions, runID: RunID, agentID: AgentID? = nil) throws -> PreparedPluginAction {
@@ -129,6 +135,107 @@ public actor JiraCloudSession: PluginConnectionSession {
                 resource: resource, tokens: downloadGrant, now: now(), maximumBytes: maximum, transport: transport))
         }
     }
+    /// Runtime callers must execute this through the independently authorized issue-read action.
+    public func executeIssueSnapshot(identifier: String, prepared: PreparedPluginAction,
+                                     permissions: PluginPermissions, context: RedactionContext,
+                                     redactor: ContentRedactor) async throws -> JiraIssueSnapshot {
+        guard let runID = prepared.action.runID, runID == context.runID,
+              context.scope == configuration.scope, context.environmentID == configuration.environmentID,
+              redactor.context == context else { throw AuthorizationError.scopeMismatch }
+        let expected = try prepare(.issue(identifier: identifier), id: prepared.action.id,
+            configurationRevision: prepared.configurationRevision, permissions: permissions,
+            runID: runID, agentID: prepared.action.agentID)
+        guard expected.action == prepared.action else { throw AuthorizationError.stalePolicy }
+        let current = try await currentGrant()
+        let secure = try redactor.includingKnownSecrets([current.accessToken] + (current.refreshToken.map { [$0] } ?? []), in: context)
+        let evidence = try await JiraIssueRead.load(identifier: identifier, configuration: configuration, resource: resource,
+            tokens: current, context: context, redactor: secure, now: now(), transport: transport)
+        return try JiraIssueSnapshot(evidence)
+    }
+
+    public func reconcileComment(_ draft: JiraCommentDraft, startAt: Int, limit: Int,
+                                 preparedRead: PreparedPluginAction, permissions: PluginPermissions,
+                                 redactor: ContentRedactor) async throws -> JiraCommentCandidates {
+        let operation = JiraReadOperation.comments(identifier: draft.identifier, startAt: startAt, limit: limit)
+        let result = try await executePrepared(operation, prepared: preparedRead, permissions: permissions,
+            context: draft.content.context, redactor: redactor)
+        guard case .comments(let content, let nextStartAt) = result else { throw JiraServiceError.invalidResponse }
+        return try JiraCommentReconciliation.compare(draft, content: content, nextStartAt: nextStartAt)
+    }
+
+    public func prepareComment(_ draft: JiraCommentDraft, id: UUID = UUID(), configurationRevision: Int,
+                        permissions: PluginPermissions, runID: RunID, agentID: AgentID? = nil) throws -> PreparedPluginAction {
+        guard !closed else { throw JiraTransportError.closed }
+        return try draft.prepare(id: id, configuration: configuration, configurationRevision: configurationRevision,
+            permissions: permissions, cloudID: resource.id, runID: runID, agentID: agentID)
+    }
+
+    public func executeComment(_ draft: JiraCommentDraft, prepared: PreparedPluginAction,
+                        permissions: PluginPermissions, redactor: ContentRedactor,
+                        beforeDispatch: @Sendable () async throws -> Void = {}) async throws -> JiraCommentReceipt {
+        let context = draft.content.context
+        guard let runID = prepared.action.runID, runID == context.runID, redactor.context == context else {
+            throw AuthorizationError.scopeMismatch
+        }
+        let expected = try prepareComment(draft, id: prepared.action.id, configurationRevision: prepared.configurationRevision,
+            permissions: permissions, runID: runID, agentID: prepared.action.agentID)
+        guard expected.action == prepared.action else { throw AuthorizationError.stalePolicy }
+        let current = try await currentGrant()
+        let secure = try redactor.includingKnownSecrets([current.accessToken] + (current.refreshToken.map { [$0] } ?? []), in: context)
+        let checked = try secure.redactText(draft.content.text, in: context)
+        guard checked.text == draft.content.text else { throw AuthorizationError.stalePolicy }
+        try await beforeDispatch()
+        // Evidence checks may suspend while logout or token rotation removes the grant.
+        let dispatchGrant = try await currentGrant()
+        let request = try JiraCommentWrite.make(draft, resource: resource, tokens: dispatchGrant, now: now())
+        let response: JiraHTTPResponse
+        do { response = try await transport.send(request, maximumResponseBytes: 262_144) }
+        catch { throw JiraMutationError.outcomeUnknown }
+        return try JiraCommentWrite.decode(response, context: context, redactor: secure)
+    }
+
+    public func prepareIssueEdit(_ draft: JiraIssueEditDraft, id: UUID = UUID(), configurationRevision: Int,
+                                 permissions: PluginPermissions, runID: RunID, agentID: AgentID? = nil) throws -> PreparedPluginAction {
+        guard !closed else { throw JiraTransportError.closed }
+        return try draft.prepare(id: id, configuration: configuration, configurationRevision: configurationRevision,
+            permissions: permissions, cloudID: resource.id, runID: runID, agentID: agentID)
+    }
+
+    /// The runtime supplies an independently authorized fresh read and rechecks write authority.
+    public func executeIssueEdit(_ draft: JiraIssueEditDraft, prepared: PreparedPluginAction,
+                                 permissions: PluginPermissions, redactor: ContentRedactor,
+                                 readCurrent: @Sendable () async throws -> JiraIssueSnapshot,
+                                 beforeDispatch: @Sendable () async throws -> Void) async throws -> JiraIssueEditReceipt {
+        let context = draft.context
+        guard let runID = prepared.action.runID, runID == context.runID, redactor.context == context else {
+            throw AuthorizationError.scopeMismatch
+        }
+        let expected = try prepareIssueEdit(draft, id: prepared.action.id, configurationRevision: prepared.configurationRevision,
+            permissions: permissions, runID: runID, agentID: prepared.action.agentID)
+        guard expected.action == prepared.action else { throw AuthorizationError.stalePolicy }
+        let current = try await currentGrant()
+        let secure = try redactor.includingKnownSecrets([current.accessToken] + (current.refreshToken.map { [$0] } ?? []), in: context)
+        for content in [draft.summary, draft.description].compactMap({ $0 }) {
+            guard try secure.redactText(content.text, in: context).text == content.text else { throw AuthorizationError.stalePolicy }
+        }
+        let started = now()
+        guard started.timeIntervalSince1970.isFinite else { throw AuthorizationError.clockRegression }
+        let snapshot = try await readCurrent()
+        guard snapshot.content.context == context, snapshot.cloudID == resource.id,
+              snapshot.identifier == draft.identifier, snapshot.fingerprint == draft.expectedIssue,
+              snapshot.observedAt >= started else { throw AuthorizationError.stalePolicy }
+        try await beforeDispatch()
+        let dispatchGrant = try await currentGrant()
+        let instant = now()
+        guard instant >= snapshot.observedAt else { throw AuthorizationError.clockRegression }
+        let request = try JiraIssueEdit.make(draft, resource: resource, tokens: dispatchGrant, now: instant)
+        let response: JiraHTTPResponse
+        do { response = try await transport.send(request, maximumResponseBytes: 262_144) }
+        catch { throw JiraMutationError.outcomeUnknown }
+        try JiraIssueEdit.validateAcknowledgment(response)
+        return JiraIssueEditReceipt(identifier: draft.identifier)
+    }
+
     private func currentGrant() async throws -> JiraOAuthTokens {
         try Task.checkCancellation()
         guard !closed else { throw JiraTransportError.closed }

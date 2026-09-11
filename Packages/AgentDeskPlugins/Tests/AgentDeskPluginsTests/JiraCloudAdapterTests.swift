@@ -5,12 +5,17 @@ import XCTest
 @testable import AgentDeskPlugins
 
 final class JiraCloudAdapterTests: XCTestCase {
-    func testDiscoveryRequiresBothGrantsAndNeverAdvertisesMutations() {
+    func testDiscoveryRequiresBothGrantsAndOnlyAdvertisesImplementedOperations() {
         let read: Set<String> = ["read:jira-work"]
-        XCTAssertEqual(JiraCloudSession.readCapabilities(tokenScopes: read, siteScopes: read), [.issuesRead, .commentsRead, .attachmentsRead])
-        XCTAssertTrue(JiraCloudSession.readCapabilities(tokenScopes: [], siteScopes: read).isEmpty)
-        XCTAssertTrue(JiraCloudSession.readCapabilities(tokenScopes: read, siteScopes: []).isEmpty)
-        XCTAssertTrue(JiraCloudSession.readCapabilities(tokenScopes: ["write:jira-work"], siteScopes: ["write:jira-work"]).isEmpty)
+        XCTAssertEqual(JiraCloudSession.availableCapabilities(tokenScopes: read, siteScopes: read), [.issuesRead, .commentsRead, .attachmentsRead])
+        XCTAssertTrue(JiraCloudSession.availableCapabilities(tokenScopes: [], siteScopes: read).isEmpty)
+        XCTAssertTrue(JiraCloudSession.availableCapabilities(tokenScopes: read, siteScopes: []).isEmpty)
+        let write: Set<String> = ["write:jira-work"]
+        XCTAssertEqual(JiraCloudSession.availableCapabilities(tokenScopes: write, siteScopes: write), [.commentsWrite])
+        XCTAssertTrue(JiraCloudSession.availableCapabilities(tokenScopes: write, siteScopes: read).isEmpty)
+        XCTAssertTrue(JiraCloudSession.availableCapabilities(tokenScopes: read, siteScopes: write).isEmpty)
+        XCTAssertEqual(JiraCloudSession.availableCapabilities(tokenScopes: read.union(write), siteScopes: read.union(write)),
+                       [.issuesRead, .commentsRead, .attachmentsRead, .commentsWrite])
     }
     func testLifecycleValidatesAccountAndMissingCredentialsExpireConnection() async throws {
         let scope = ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID())

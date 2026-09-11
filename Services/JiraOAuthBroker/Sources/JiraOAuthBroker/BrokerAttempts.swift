@@ -37,7 +37,7 @@ public actor BrokerAttempts {
               (1...1000).contains(capacity) else { throw BrokerError.invalidRequest }
         self.clientID = clientID; self.callback = callback; self.capacity = capacity; self.now = now
     }
-    public func start(challenge: String) throws -> BrokerAttempt {
+    public func start(challenge: String, writeAccess: Bool = false) throws -> BrokerAttempt {
         let instant = try sweep()
         guard Self.validProof(challenge) else { throw BrokerError.invalidRequest }
         guard records.count < capacity else { throw BrokerError.capacity }
@@ -46,7 +46,7 @@ public actor BrokerAttempts {
         let state = Self.base64URL(random), id = UUID()
         var url = URLComponents(string: "https://auth.atlassian.com/authorize")!
         url.queryItems = [.init(name: "audience", value: "api.atlassian.com"), .init(name: "client_id", value: clientID),
-            .init(name: "redirect_uri", value: callback.absoluteString), .init(name: "scope", value: "read:jira-user read:jira-work offline_access"),
+            .init(name: "redirect_uri", value: callback.absoluteString), .init(name: "scope", value: "read:jira-user read:jira-work" + (writeAccess ? " write:jira-work" : "") + " offline_access"),
             .init(name: "state", value: state), .init(name: "response_type", value: "code"), .init(name: "prompt", value: "consent")]
         records[id] = Record(challenge: challenge, state: state, expires: instant.addingTimeInterval(600))
         return BrokerAttempt(id: id, authorizationURL: url.url!)

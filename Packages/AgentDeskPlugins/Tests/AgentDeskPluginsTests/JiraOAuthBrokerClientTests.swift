@@ -15,6 +15,20 @@ final class JiraOAuthBrokerClientTests: XCTestCase {
         try await client.cancel(attempt, proof: proof)
         await client.close()
     }
+    func testWriteConsentMustMatchExplicitNativeAccessChoice() async throws {
+        for access in JiraOAuthAccess.allCases {
+            let client = try JiraOAuthBrokerClient(origin: URL(string: "https://write.example")!, clientID: "synthetic-client",
+                callback: URL(string: "https://broker.example/callback")!, access: access, protocolClasses: [NativeBrokerProtocol.self])
+            do {
+                _ = try await client.start(proof: JiraOAuthClaimProof())
+                XCTAssertEqual(access, .readWrite)
+            } catch {
+                XCTAssertEqual(access, .readOnly)
+                XCTAssertEqual(error as? JiraServiceError, .invalidResponse)
+            }
+            await client.close()
+        }
+    }
     func testForeignAuthorizationDestinationAndWrongClientAreRejected() async throws {
         for (host, clientID) in [("evil.example", "synthetic-client"), ("broker.example", "wrong-client")] {
             let client = try JiraOAuthBrokerClient(origin: URL(string: "https://" + host)!, clientID: clientID,
@@ -34,7 +48,7 @@ final class NativeBrokerProtocol: URLProtocol {
         var authorization = URLComponents(string: url.host == "evil.example" ? "https://phishing.example/authorize" : "https://auth.atlassian.com/authorize")!
         authorization.queryItems = [.init(name: "client_id", value: "synthetic-client"), .init(name: "redirect_uri", value: "https://broker.example/callback"),
             .init(name: "audience", value: "api.atlassian.com"), .init(name: "response_type", value: "code"), .init(name: "prompt", value: "consent"),
-            .init(name: "scope", value: "read:jira-user read:jira-work offline_access"), .init(name: "state", value: String(repeating: "A", count: 43))]
+            .init(name: "scope", value: url.host == "write.example" ? "read:jira-user read:jira-work write:jira-work offline_access" : "read:jira-user read:jira-work offline_access"), .init(name: "state", value: String(repeating: "A", count: 43))]
         let body = start ? try! JSONSerialization.data(withJSONObject: ["id": UUID().uuidString, "authorizationURL": authorization.url!.absoluteString])
             : Data(#"{"access_token":"synthetic-access","refresh_token":"synthetic-refresh","expires_in":3600,"scope":"read:jira-user read:jira-work offline_access"}"#.utf8)
         let response = HTTPURLResponse(url: url, statusCode: url.host == "refresh-failed.example" && url.path == "/v1/refresh" ? 502 : start ? 201 : cancel ? 204 : 200, httpVersion: nil, headerFields: nil)!

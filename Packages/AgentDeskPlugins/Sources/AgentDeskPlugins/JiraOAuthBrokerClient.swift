@@ -11,15 +11,16 @@ actor JiraOAuthBrokerClient {
     private let origin: URL
     private let clientID: String
     private let callback: URL
+    private let access: JiraOAuthAccess
     private let transport: JiraHTTPTransport
-    init(origin: URL, clientID: String, callback: URL, protocolClasses: [URLProtocol.Type] = []) throws {
+    init(origin: URL, clientID: String, callback: URL, access: JiraOAuthAccess = .readOnly, protocolClasses: [URLProtocol.Type] = []) throws {
         guard !clientID.isEmpty, clientID.utf8.count <= 256, callback.scheme == "https", callback.host != nil,
               callback.user == nil, callback.password == nil, callback.query == nil, callback.fragment == nil else { throw JiraOAuthError.invalidConfiguration }
-        self.origin = origin; self.clientID = clientID; self.callback = callback
+        self.origin = origin; self.clientID = clientID; self.callback = callback; self.access = access
         transport = try JiraHTTPTransport(origin: origin, maximumBytes: 65_536, protocolClasses: protocolClasses)
     }
     func start(proof: JiraOAuthClaimProof) async throws -> JiraBrokerAttempt {
-        let response = try await send(path: "v1/attempts", body: ["challenge": proof.challenge])
+        let response = try await send(path: "v1/attempts", body: ["challenge": proof.challenge, "access": access.rawValue])
         try JiraResponseStatus.validate(response.status)
         guard response.status == 201 else { throw JiraServiceError.invalidResponse }
         struct Result: Decodable { let id: UUID; let authorizationURL: URL }
@@ -33,7 +34,7 @@ actor JiraOAuthBrokerClient {
         let values = Dictionary(uniqueKeysWithValues: query.map { ($0.name, $0.value ?? "") })
         guard values["client_id"] == clientID, values["redirect_uri"] == callback.absoluteString,
               values["audience"] == "api.atlassian.com", values["response_type"] == "code", values["prompt"] == "consent",
-              values["scope"] == "read:jira-user read:jira-work offline_access",
+              values["scope"] == access.scopes,
               let state = values["state"], state.utf8.count == 43,
               state.utf8.allSatisfy({ (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || $0 == 45 || $0 == 95 }) else { throw JiraServiceError.invalidResponse }
         return JiraBrokerAttempt(id: result.id, authorizationURL: result.authorizationURL)

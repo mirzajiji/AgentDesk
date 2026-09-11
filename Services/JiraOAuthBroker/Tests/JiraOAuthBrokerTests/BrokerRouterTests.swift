@@ -5,6 +5,20 @@ import XCTest
 @testable import JiraOAuthBroker
 
 final class BrokerRouterTests: XCTestCase {
+    func testWriteScopeRequiresExplicitAccessChoice() async throws {
+        let attempts = try BrokerAttempts(clientID: "synthetic", callback: URL(string: "https://broker.example/callback")!)
+        let router = try BrokerRouter(attempts: attempts, callbackPath: "/callback") { _ in throw BrokerError.invalidRequest }
+        for access in ["read", "write", "arbitrary-scope"] {
+            let response = try await router.handle(method: "POST", target: "/v1/attempts",
+                body: json(["challenge": String(repeating: "A", count: 43), "access": access]))
+            if access == "arbitrary-scope" { XCTAssertEqual(response.status, 400); continue }
+            XCTAssertEqual(response.status, 201)
+            let payload = try response.withBody { try JSONSerialization.jsonObject(with: $0) as! [String: String] }
+            let parts = try XCTUnwrap(URLComponents(string: XCTUnwrap(payload["authorizationURL"])))
+            let scopes = parts.queryItems?.first { $0.name == "scope" }?.value ?? ""
+            XCTAssertEqual(scopes.contains("write:jira-work"), access == "write")
+        }
+    }
     func testBrowserCallbackNeverReturnsTokensAndNativeClaimIsSingleUse() async throws {
         let attempts = try BrokerAttempts(clientID: "synthetic", callback: URL(string: "https://broker.example/callback")!)
         let router = try BrokerRouter(attempts: attempts, callbackPath: "/callback") { _ in

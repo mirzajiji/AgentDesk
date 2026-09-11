@@ -60,8 +60,10 @@ public struct BrokerRouter: Sendable {
                 return tokens.withBytes { .init(status: 200, data: $0) }
             }
             if method == "POST", parts.path == "/v1/attempts" {
-                let payload = try object(body, key: "challenge")
-                let attempt = try await attempts.start(challenge: payload)
+                guard let payload = try JSONSerialization.jsonObject(with: body) as? [String: String],
+                      let challenge = payload["challenge"], Set(payload.keys).isSubset(of: ["challenge", "access"]),
+                      payload["access"] == nil || payload["access"] == "read" || payload["access"] == "write" else { throw BrokerError.invalidRequest }
+                let attempt = try await attempts.start(challenge: challenge, writeAccess: payload["access"] == "write")
                 let data = try JSONSerialization.data(withJSONObject: ["id": attempt.id.uuidString, "authorizationURL": attempt.authorizationURL.absoluteString])
                 return .init(status: 201, data: data)
             }

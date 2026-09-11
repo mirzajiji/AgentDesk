@@ -12,7 +12,7 @@ public actor JiraOAuthLogin {
     private var closed = false
     public init(configuration: JiraConnectionConfiguration, registration: JiraOAuthRegistration, store: any SecretStore) throws {
         self.configuration = configuration
-        broker = try JiraOAuthBrokerClient(origin: registration.brokerOrigin, clientID: registration.clientID, callback: registration.callback)
+        broker = try JiraOAuthBrokerClient(origin: registration.brokerOrigin, clientID: registration.clientID, callback: registration.callback, access: registration.access)
         adapter = JiraCloudAdapter(store: store)
         vault = try JiraCredentialVault(configuration: configuration, store: store)
     }

@@ -260,3 +260,17 @@ Native suites passed: 163 Runtime tests on macOS (`preflight-runtime-mac.xcresul
 This validates mandatory preflight for the current text upload path, not binary-file upload or a native upload UI. The server remains authoritative for actual issue-level permissions and settings changes after observation. Pre-dispatch failures conservatively leave the already-started mutation record unresolved; they never trigger an automatic upload retry.
 
 Normal Mac and iPhone app builds both passed (`preflight-app-mac.log`, `preflight-app-iphone.log`), using the AgentDesk scheme and native destinations/derived-data paths recorded above. Documentation and diff checks passed. The preflight component is ready for its focused commit; P3-04 remains open.
+
+### Shared image masking primitive in progress
+
+Binary screenshot evidence needs an image-processing boundary before native upload integration. Added `ImageEvidenceRedactor` in Security: bounded single-image decoding, orientation-corrected rasterization into opaque RGB, explicit top-left pixel masks, and PNG re-encoding without source metadata. Inputs are limited to 8 MiB, 8192 pixels per dimension, 16 million pixels and 256 masks. Invalid/out-of-bounds masks fail rather than silently clipping; cancellation is checked around processing. Scoped `MaskedImageEvidence` exposes PNG bytes only for its exact workspace/project/environment/run context and hides contents in diagnostic descriptions. It is deliberately not Codable.
+
+This primitive applies only the supplied masks. It does not detect every secret, grant export permission, or make unmasked pixels safe. Zero masks remove metadata only. Native selection/review, image upload binding, other binary formats and image artifact persistence remain incomplete. No real screenshot or company data was processed.
+
+The focused pixel/metadata/scope regression passed (`TestResults/p3-04/image-redaction-host.log`), followed by all 27 Security host tests (`image-redaction-security-full.log`). The tests confirm source metadata actually exists before checking its removal, masked and untouched pixels, foreign-run denial, invalid regions, input/mask bounds and cancellation. Native validation remains pending.
+
+### Image masking native validation — 2026-09-12
+
+All 27 Security tests passed on macOS 26.5.2 (`image-security-mac.xcresult`) and iPhone 16 Pro / iOS 26.0 (`image-security-iphone.xcresult`), under Xcode 26.0. Commands used `xcodebuild -scheme AgentDeskSecurity -destination 'platform=macOS'` or the primary iPhone Simulator UUID, `-parallel-testing-enabled NO test`, and `TestResults/p3-04/SecurityMac` / `SecurityIPhone` derived-data paths. Matching logs are under `TestResults/p3-04/`. Both normal AgentDesk application builds also passed (`image-app-mac.log`, `image-app-iphone.log`) using the destinations and existing app derived-data paths recorded above.
+
+The security architecture document now describes the explicit-mask contract and its limits. Documentation integrity and whitespace checks passed. This is a shared processing primitive, not completed binary attachment support or a native image editor.

@@ -126,7 +126,7 @@ final class ApprovalStoreTests: XCTestCase {
         let run = RunID()
         try connection.execute("INSERT INTO runs VALUES (?,?,?,1000,'queued')", [.text(f.scope.workspaceID.rawValue),.text(f.scope.projectID.rawValue),.text(run.rawValue)])
         let store = try f.store(); _ = try await f.prepare(store, action: f.action())
-        XCTAssertEqual(try connection.integer("PRAGMA user_version"), 6)
+        XCTAssertEqual(try connection.integer("PRAGMA user_version"), 7)
         XCTAssertEqual(try connection.integer("SELECT count(*) FROM runs"), 1)
         XCTAssertEqual(try connection.integer("SELECT count(*) FROM approvals"), 1)
     }

@@ -66,6 +66,10 @@ import XCTest
                 XCTAssertEqual(error as? JiraMutationError, .outcomeUnknown)
             }
             XCTAssertEqual(JiraEditPolicyProtocol.counts.withLock { $0[path, default: 0] }, before + 2)
+            let ledger = try store.mutationAttempts()
+            let recorded = try await ledger.record(prepared.action.id)
+            XCTAssertEqual(recorded?.approvalID, pending.id)
+            XCTAssertEqual(recorded?.outcome, fail ? .unresolved : .acknowledged)
             let reopened = try ApprovalStore(database: root.appendingPathComponent("operations.sqlite"), scope: scope, environmentID: environment)
             let restoredGate = try PluginPolicySession(prepared: prepared, policy: policy, permissions: permissions, authorities: [user],
                 requesterID: user.id, store: reopened, validateCurrent: { (prepared, policy) })

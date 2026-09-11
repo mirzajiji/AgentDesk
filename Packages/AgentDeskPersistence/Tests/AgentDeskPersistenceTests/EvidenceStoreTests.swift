@@ -216,7 +216,7 @@ final class EvidenceStoreTests: XCTestCase {
         XCTAssertEqual(try connection.integer("SELECT COUNT(*) FROM sqlite_master WHERE name='evidence_runs'"), 0)
         XCTAssertEqual(try connection.integer("SELECT COUNT(*) FROM runs"), 1)
         try connection.execute("DROP TABLE evidence_items")
-        let store = try fixture.store(); XCTAssertEqual(try connection.integer("PRAGMA user_version"), 6)
+        let store = try fixture.store(); XCTAssertEqual(try connection.integer("PRAGMA user_version"), 7)
         let binding = try await store.binding(); XCTAssertNil(binding)
         _ = try await store.register(snapshot: fixture.text(), agentRevision: 1, configurationFingerprint: fixture.fingerprint())
     }

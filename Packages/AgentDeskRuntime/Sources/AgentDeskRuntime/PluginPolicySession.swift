@@ -7,6 +7,8 @@ import Foundation
 /// One exact prepared invocation. Owned by trusted host code, never decoded from a client request.
 actor PluginPolicySession {
     private let prepared: PreparedPluginAction
+    private let mutationAttempts: MutationAttemptStore
+    private let clock: @Sendable () -> Date
     private let gate: PolicyGate
     private let requesterID: UUID
     private var authorityGeneration = UUID()
@@ -26,6 +28,8 @@ actor PluginPolicySession {
                                                      capability: prepared.capability)
         guard prepared.action.scope == restricted.scope,
               prepared.action.environmentID == restricted.environmentID else { throw AuthorizationError.scopeMismatch }
+        mutationAttempts = try store.mutationAttempts()
+        self.clock = clock
         self.policyFingerprint = try policy.fingerprint
         self.prepared = prepared; self.requesterID = requesterID; self.validateCurrent = validateCurrent
         gate = try PolicyGate(policy: restricted, authorities: authorities, store: store, clock: clock)
@@ -97,14 +101,16 @@ actor PluginPolicySession {
         let generation = authorityGeneration
         return try await execute(approvalID: approvalID) { action in
             // A write always needs an explicit consumed review, even if general policy allows it.
-            guard approvalID != nil else { throw AuthorizationError.approvalRequired }
+            guard let approvalID else { throw AuthorizationError.approvalRequired }
             guard action == invocation.action else { throw AuthorizationError.stalePolicy }
-            return try await connection.executeComment(draft, prepared: invocation, permissions: permissions, redactor: redactor,
+            return try await self.recordMutation(action, approvalID: approvalID) {
+                try await connection.executeComment(draft, prepared: invocation, permissions: permissions, redactor: redactor,
                 beforeDispatch: {
                     try await self.checkCurrent(expectedAuthority: generation)
                     try await beforeDispatch()
                     try await self.checkCurrent(expectedAuthority: generation)
                 })
+            }
         }
     }
 
@@ -117,7 +123,8 @@ actor PluginPolicySession {
         let generation = authorityGeneration
         return try await execute(approvalID: approvalID) { action in
             guard action == invocation.action else { throw AuthorizationError.stalePolicy }
-            return try await connection.executeIssueEdit(draft, prepared: invocation, permissions: permissions,
+            return try await self.recordMutation(action, approvalID: approvalID) {
+                try await connection.executeIssueEdit(draft, prepared: invocation, permissions: permissions,
                 redactor: redactor, readCurrent: {
                     let result = try await readSession.executeJiraIssueSnapshot(identifier: draft.identifier,
                         connection: connection, permissions: permissions, context: draft.context,
@@ -125,6 +132,7 @@ actor PluginPolicySession {
                     guard case .executed(let snapshot) = result else { throw AuthorizationError.denied }
                     return snapshot
                 }, beforeDispatch: { try await self.checkCurrent(expectedAuthority: generation) })
+            }
         }
     }
 
@@ -135,6 +143,22 @@ actor PluginPolicySession {
         return try await executeJiraComment(evidence.draft, connection: connection, permissions: permissions,
             context: evidence.draft.content.context, redactor: redactor, approvalID: approvalID,
             beforeDispatch: { try await evidence.validate() })
+    }
+
+    private func recordMutation<Value: Sendable>(_ action: PolicyAction, approvalID: UUID,
+        operation: @Sendable () async throws -> Value) async throws -> Value {
+        _ = try await mutationAttempts.begin(action, approvalID: approvalID, at: clock())
+        let value: Value
+        do { value = try await operation() }
+        catch {
+            if case JiraMutationError.rejected = error {
+                _ = try await mutationAttempts.finish(action, approvalID: approvalID, outcome: .rejected, at: clock())
+            }
+            // Other errors retain uncertainty. No response body or error description is persisted.
+            throw error
+        }
+        _ = try await mutationAttempts.finish(action, approvalID: approvalID, outcome: .acknowledged, at: clock())
+        return value
     }
 
     func installAuthority(_ authority: PolicyAuthority) async throws {

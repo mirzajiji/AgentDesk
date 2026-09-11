@@ -3,7 +3,7 @@ import Foundation
 /// Forward-only, transactional migrations. A failed or future schema is never reset.
 enum OperationalMigrations {
     static let applicationID = 1_095_189_579 // "AGDK"
-    static let currentVersion = 6
+    static let currentVersion = 7
     static let versionOne = [
         """
         CREATE TABLE runs (
@@ -114,6 +114,16 @@ enum OperationalMigrations {
         """
     ]
 
+    static let versionSeven = [
+        """
+        CREATE TABLE mutation_attempts (
+            workspace_id TEXT NOT NULL, project_id TEXT NOT NULL, environment_id TEXT NOT NULL,
+            action_id TEXT NOT NULL, record_json TEXT NOT NULL,
+            PRIMARY KEY (workspace_id, project_id, environment_id, action_id)
+        )
+        """
+    ]
+
     static func apply(to database: SQLiteConnection) throws {
         try database.execute("PRAGMA foreign_keys = ON")
         try database.transaction {
@@ -149,6 +159,11 @@ enum OperationalMigrations {
                 for statement in versionSix { try database.execute(statement) }
                 try database.execute("PRAGMA user_version = 6")
             }
+            if version < 7 {
+                for statement in versionSeven { try database.execute(statement) }
+                try database.execute("PRAGMA user_version = 7")
+            }
+            _ = try database.query("SELECT workspace_id,project_id,environment_id,action_id,record_json FROM mutation_attempts LIMIT 0") { _ in 0 }
             _ = try database.query("SELECT workspace_id,project_id,environment_id,source_id,path,kind,revision,fingerprint,title,body FROM knowledge_fts LIMIT 0") { _ in 0 }
             _ = try database.query("SELECT workspace_id,project_id,environment_id,generation FROM knowledge_generations LIMIT 0") { _ in 0 }
             // Verify required columns even when the database already claims the latest schema.

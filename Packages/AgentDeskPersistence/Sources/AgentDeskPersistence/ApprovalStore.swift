@@ -7,12 +7,17 @@ import SQLite3
 public actor ApprovalStore {
     public nonisolated let scope: ProjectScope
     public nonisolated let environmentID: EnvironmentID
+    private nonisolated let location: URL
     private let database: SQLiteConnection
     private var context: [SQLValue] { [.text(scope.workspaceID.rawValue), .text(scope.projectID.rawValue), .text(environmentID.rawValue)] }
 
     public init(database location: URL, scope: ProjectScope, environmentID: EnvironmentID) throws {
         let database = try SQLiteConnection(database: location); try OperationalMigrations.apply(to: database)
+        self.location = location
         self.database = database; self.scope = scope; self.environmentID = environmentID
+    }
+    public nonisolated func mutationAttempts() throws -> MutationAttemptStore {
+        try MutationAttemptStore(database: location, scope: scope, environmentID: environmentID)
     }
     public func approval(_ id: UUID) throws -> ApprovalRecord? { try load(id) }
     public func approvals(limit: Int = 100) throws -> [ApprovalRecord] {

@@ -131,3 +131,27 @@ Extended the runtime edit test with a valid approved write and a separate read s
 This commit contains the tested comment/evidence and summary/description edit backend, with exact-action review, scoped preflight reads, durable approval consumption, and conservative uncertain-outcome reporting. It is a component checkpoint of P3-04, not completion of that task. Issue creation/deletion, attachment writes, durable user-facing outcome reconciliation, and native mutation flows remain to implement. Full supported issue-edit capability is not advertised yet. OAuth write consent was committed separately as `ee7e71e`.
 
 Reviewed the transport and runtime changes, tests and fixture data. Only synthetic fixtures are included. The three unrelated Xcode/project handoff edits are excluded. Final documentation and staged diff checks passed.
+
+### Durable mutation ledger in progress
+
+Added schema version 7 and a scoped SQLite mutation-attempt store. A begin record is unresolved until an explicit terminal acknowledgment/rejection/not-dispatched result; an interrupted unresolved attempt is never treated as safe to retry. Duplicate begins and terminal rewrites fail, exact action/approval bindings are required, and clock regression is rejected. No response text or credentials enter this ledger. Runtime integration and native validation remain incomplete.
+
+The first persistence run failed four old schema-version assertions (expected 6, actual 7); updated those migration expectations. `swift test --package-path Packages/AgentDeskPersistence` then passed 48 tests (`TestResults/p3-04/mutation-ledger-tests.log`), including reopened storage, duplicate attempts, wrong approvals, terminal immutability, and environment isolation. Initial failure log: `TestResults/p3-04/mutation-ledger-build.log`. No commit for this unfinished integration yet.
+
+### Ledger connected to reviewed dispatch
+
+The policy session now opens a scope-matched mutation ledger from its approval store. After approval consumption, it durably begins the attempt before entering comment/edit dispatch. Acknowledgments and explicit Jira rejections are recorded; other errors conservatively leave unresolved state. Failure to record the outcome is not reported as success. No error text or remote response content is persisted. Approval consumption and ledger begin are separate transactions: interruption between them can consume a review without an attempt record, but cannot dispatch a write through this wrapper.
+
+Seven Jira policy tests passed with `swift test --package-path Packages/AgentDeskRuntime --filter JiraPolicy` (`TestResults/p3-04/mutation-ledger-runtime-final.log`). Edit regressions now reopen the ledger and assert acknowledged versus unresolved outcomes. Initial compile planning missed the new dependency file; cleaning the runtime package refreshed it. A subsequent build was interrupted by a test-file edit; the final run used settled inputs and passed. Native checks and full persistence/runtime validation remain due for this integration.
+
+### Ledger read-integrity review
+
+Full runtime host validation passed 159 tests (`TestResults/p3-04/ledger-runtime-full.log`). Review then added validation of the decoded record's action ID, scope/environment, mutation operation and finite ordered dates before returning stored evidence. A synthetic corrupt-row test verifies matching SQL keys cannot expose a foreign embedded scope. The full persistence suite passed 49 tests (`TestResults/p3-04/ledger-scope-tests.log`). Native runtime validation is being repeated with this additional read check.
+
+The updated runtime passed on iPhone 16 Pro / iOS 26.0: `xcodebuild -scheme AgentDeskRuntime -destination 'platform=iOS Simulator,id=C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE' -derivedDataPath ../../TestResults/p3-04/RuntimeIPhone -resultBundlePath ../../TestResults/p3-04/ledger-runtime-iphone.xcresult -parallel-testing-enabled NO test`, run from `Packages/AgentDeskRuntime`. Matching log: `TestResults/p3-04/ledger-runtime-iphone.log`. Native Mac and full app build checks remain due for this ledger change.
+
+### Durable ledger checkpoint validation
+
+Native Mac runtime tests passed 159 tests on macOS 26.5.2 / Xcode 26.0: from `Packages/AgentDeskRuntime`, `xcodebuild -scheme AgentDeskRuntime -destination 'platform=macOS' -derivedDataPath ../../TestResults/p3-04/RuntimeMac -resultBundlePath ../../TestResults/p3-04/ledger-runtime-mac.xcresult -parallel-testing-enabled NO test`. The iPhone run above passed 78 supported tests. Existing SQLite fixture-cleanup warnings persist.
+
+Both app builds passed with the ledger: `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build` and the equivalent iPhone 16 Pro Simulator destination with `TestResults/p1-08b/FilteredIPhone`. Logs: `TestResults/p3-04/ledger-app-mac.log` and `ledger-app-iphone.log`. Documentation and diff checks passed. This checkpoint persists operational outcomes; native outcome browsing/reconciliation and the remaining P3-04 operations are still incomplete.

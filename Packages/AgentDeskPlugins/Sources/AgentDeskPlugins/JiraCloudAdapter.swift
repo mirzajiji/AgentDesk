@@ -208,6 +208,7 @@ public actor JiraCloudSession: PluginConnectionSession {
 
     public func executeTextAttachment(_ draft: JiraTextAttachmentDraft, prepared: PreparedPluginAction,
                         permissions: PluginPermissions, redactor: ContentRedactor,
+                        readSettings: @Sendable () async throws -> JiraAttachmentSettings,
                         beforeDispatch: @Sendable () async throws -> Void = {}) async throws -> JiraAttachmentReceipt {
         let context = draft.content.context
         guard let runID = prepared.action.runID, runID == context.runID, redactor.context == context else {
@@ -221,10 +222,18 @@ public actor JiraCloudSession: PluginConnectionSession {
         for content in [draft.filename, draft.content] {
             guard try secure.redactText(content.text, in: context).text == content.text else { throw AuthorizationError.stalePolicy }
         }
+        let startedAt = now()
+        guard startedAt.timeIntervalSince1970.isFinite else { throw AuthorizationError.invalidInput }
+        let settings = try await readSettings()
+        guard settings.context == context, settings.cloudID == resource.id else { throw AuthorizationError.scopeMismatch }
+        guard settings.observedAt >= startedAt else { throw AuthorizationError.stalePolicy }
+        guard settings.permitsSize(Int64(draft.content.text.utf8.count)) else { throw AuthorizationError.denied }
         try await beforeDispatch()
         // Evidence checks may suspend while logout or token rotation removes the grant.
         let dispatchGrant = try await currentGrant()
-        let request = try JiraTextAttachmentWrite.make(draft, resource: resource, tokens: dispatchGrant, now: now())
+        let dispatchAt = now()
+        guard dispatchAt.timeIntervalSince1970.isFinite, dispatchAt >= settings.observedAt else { throw AuthorizationError.stalePolicy }
+        let request = try JiraTextAttachmentWrite.make(draft, resource: resource, tokens: dispatchGrant, now: dispatchAt)
         let response: JiraHTTPResponse
         do { response = try await transport.send(request, maximumResponseBytes: 262_144) }
         catch { throw JiraMutationError.outcomeUnknown }

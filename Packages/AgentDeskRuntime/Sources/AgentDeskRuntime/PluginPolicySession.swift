@@ -116,6 +116,7 @@ actor PluginPolicySession {
 
     func executeJiraTextAttachment(_ draft: JiraTextAttachmentDraft, connection: JiraCloudSession,
                             permissions: PluginPermissions, context: RedactionContext, redactor: ContentRedactor,
+                            readSession: PluginPolicySession, readApprovalID: UUID? = nil,
                             approvalID: UUID? = nil,
                             beforeDispatch: @escaping @Sendable () async throws -> Void = {}) async throws -> PolicyExecutionResult<JiraAttachmentReceipt> {
         let invocation = prepared
@@ -127,7 +128,12 @@ actor PluginPolicySession {
             guard action == invocation.action else { throw AuthorizationError.stalePolicy }
             return try await self.recordMutation(action, approvalID: approvalID) {
                 try await connection.executeTextAttachment(draft, prepared: invocation, permissions: permissions, redactor: redactor,
-                beforeDispatch: {
+                readSettings: {
+                    let result = try await readSession.executeJira(.attachmentSettings, connection: connection,
+                        permissions: permissions, context: context, redactor: redactor, approvalID: readApprovalID)
+                    guard case .executed(.attachmentSettings(let settings)) = result else { throw AuthorizationError.denied }
+                    return settings
+                }, beforeDispatch: {
                     try await self.checkCurrent(expectedAuthority: generation)
                     try await beforeDispatch()
                     try await self.checkCurrent(expectedAuthority: generation)

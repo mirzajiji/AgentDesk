@@ -22,31 +22,51 @@ final class JiraTextAttachmentSessionTests: XCTestCase {
             configuration: config, resource: resource, tokens: tokens, vault: vault, now: { Date(timeIntervalSince1970: 1000) })
         let context = RedactionContext(scope: scope, environmentID: environment, runID: RunID())
         let redactor = try ContentRedactor(context: context)
+        let settings: @Sendable () async throws -> JiraAttachmentSettings = {
+            try JiraAttachmentSettingsRead.decode(.init(status: 200, body: Data(#"{"enabled":true,"uploadLimit":1000}"#.utf8)),
+                context: context, cloudID: resource.id, observedAt: Date(timeIntervalSince1970: 1000))
+        }
         let permissions = try PluginPermissions(connectionID: config.id, scope: scope, environmentID: environment, rules: [.init(.attachmentsAdd, .approval), .init(.commentsRead, .approval)])
         let draft = try JiraTextAttachmentDraft(identifier: "A-1", filename: redactor.redactText("evidence.txt", in: context), content: redactor.redactText("Evidence", in: context))
         let prepared = try await session.prepareTextAttachment(draft, configurationRevision: 1, permissions: permissions, runID: context.runID)
         let changed = try JiraTextAttachmentDraft(identifier: "A-1", filename: redactor.redactText("evidence.txt", in: context), content: redactor.redactText("Changed", in: context))
-        do { _ = try await session.executeTextAttachment(changed, prepared: prepared, permissions: permissions, redactor: redactor); XCTFail("Changed draft sent") }
+        do { _ = try await session.executeTextAttachment(changed, prepared: prepared, permissions: permissions, redactor: redactor, readSettings: settings); XCTFail("Changed draft sent") }
         catch { XCTAssertEqual(error as? AuthorizationError, .stalePolicy) }
         let sensitive = try JiraTextAttachmentDraft(identifier: "A-1", filename: redactor.redactText("evidence.txt", in: context), content: redactor.redactText("Echo synthetic-access", in: context))
         let sensitiveAction = try await session.prepareTextAttachment(sensitive, configurationRevision: 1, permissions: permissions, runID: context.runID)
-        do { _ = try await session.executeTextAttachment(sensitive, prepared: sensitiveAction, permissions: permissions, redactor: redactor); XCTFail("Credential sent") }
+        do { _ = try await session.executeTextAttachment(sensitive, prepared: sensitiveAction, permissions: permissions, redactor: redactor, readSettings: settings); XCTFail("Credential sent") }
         catch { XCTAssertEqual(error as? AuthorizationError, .stalePolicy) }
         XCTAssertEqual(AttachmentSessionProtocol.calls.withLock { $0 }, 0)
         do {
-            _ = try await session.executeTextAttachment(draft, prepared: prepared, permissions: permissions, redactor: redactor,
+            _ = try await session.executeTextAttachment(draft, prepared: prepared, permissions: permissions, redactor: redactor, readSettings: settings,
                 beforeDispatch: { throw BugRegistryError.staleRevision })
             XCTFail("Stale evidence dispatched")
         } catch { XCTAssertEqual(error as? BugRegistryError, .staleRevision) }
         XCTAssertEqual(AttachmentSessionProtocol.calls.withLock { $0 }, 0)
         do {
-            _ = try await session.executeTextAttachment(draft, prepared: prepared, permissions: permissions, redactor: redactor,
+            _ = try await session.executeTextAttachment(draft, prepared: prepared, permissions: permissions, redactor: redactor, readSettings: settings,
                 beforeDispatch: { try await vault.logout() })
             XCTFail("Grant removed during evidence validation was used")
         } catch { XCTAssertEqual(error as? PluginConnectionError, .authenticationExpired) }
         XCTAssertEqual(AttachmentSessionProtocol.calls.withLock { $0 }, 0)
         try await vault.save(tokens)
-        let receipt = try await session.executeTextAttachment(draft, prepared: prepared, permissions: permissions, redactor: redactor)
+        for (enabled, limit, cloud, timestamp) in [
+            (false, Int64(1000), resource.id, 1000.0),
+            (true, Int64(7), resource.id, 1000.0),
+            (true, Int64(1000), UUID(), 1000.0),
+            (true, Int64(1000), resource.id, 999.0),
+            (true, Int64(1000), resource.id, 1001.0)
+        ] {
+            let invalid = JiraAttachmentSettings(enabled: enabled, uploadLimit: limit, context: context,
+                cloudID: cloud, observedAt: Date(timeIntervalSince1970: timestamp))
+            do {
+                _ = try await session.executeTextAttachment(draft, prepared: prepared, permissions: permissions,
+                    redactor: redactor, readSettings: { invalid })
+                XCTFail("Invalid or stale upload settings accepted")
+            } catch { }
+            XCTAssertEqual(AttachmentSessionProtocol.calls.withLock { $0 }, 0)
+        }
+        let receipt = try await session.executeTextAttachment(draft, prepared: prepared, permissions: permissions, redactor: redactor, readSettings: settings)
         XCTAssertEqual(receipt.id, "123")
         XCTAssertEqual(AttachmentSessionProtocol.calls.withLock { $0 }, 1)
         await session.close()

@@ -246,3 +246,17 @@ After refreshing the Runtime build plan, both focused policy tests passed (`atta
 The native policy regression covers both issue reads and the new attachment-settings endpoint with denied/unapproved zero-request assertions and single-use approved dispatch. The Plugins tests additionally bind settings actions to the exact cloud and distinguish settings from attachment metadata. No live Jira request occurred. This completes the settings-read backend only; native upload preflight and binary evidence remain part of unfinished P3-04.
 
 Both normal application builds passed (`settings-app-mac.log`, `settings-app-iphone.log`), using the AgentDesk project/scheme and native build commands recorded above. Documentation integrity and whitespace checks passed. No new UI surface was added by this backend change.
+
+### Mandatory attachment preflight in progress
+
+Text attachment dispatch now requires a fresh attachment-settings observation obtained through a separate Runtime read-policy session. A denied or non-executed read cannot authorize the upload. The session checks exact context/cloud identity, enabled state, UTF-8 file size and observation time before the final authority/grant checks. Observations predating this dispatch attempt or ahead of the dispatch clock fail closed. These checks do not promise atomic server state: Jira can still change settings or issue permissions before the POST.
+
+The two focused runtime attachment tests passed (`TestResults/p3-04/attachment-preflight-policy.log`), now exercising the settings GET before the approved POST. All 78 host Plugins tests passed (`attachment-preflight-plugins.log`); the session regression additionally checks disabled uploads, an undersized limit, a foreign site, stale and future observations cause zero upload requests. Full native validation is pending; the component remains uncommitted until that gate is satisfied.
+
+### Attachment preflight native validation — 2026-09-12
+
+Native suites passed: 163 Runtime tests on macOS (`preflight-runtime-mac.xcresult`), 82 Runtime tests on iPhone 16 Pro / iOS 26.0 (`preflight-runtime-iphone.xcresult`), and 78 Plugins tests on the same Simulator (`preflight-plugins-iphone.xcresult`). Matching logs are under `TestResults/p3-04/`. Commands use the package schemes, primary Simulator UUID, existing RuntimeMac/RuntimeIPhone/PluginsIPhone derived-data paths and disabled parallel testing recorded above. Host toolchain: Xcode 26.0 on macOS 26.5.2. Existing SQLite fixture-cleanup warnings are still present.
+
+This validates mandatory preflight for the current text upload path, not binary-file upload or a native upload UI. The server remains authoritative for actual issue-level permissions and settings changes after observation. Pre-dispatch failures conservatively leave the already-started mutation record unresolved; they never trigger an automatic upload retry.
+
+Normal Mac and iPhone app builds both passed (`preflight-app-mac.log`, `preflight-app-iphone.log`), using the AgentDesk scheme and native destinations/derived-data paths recorded above. Documentation and diff checks passed. The preflight component is ready for its focused commit; P3-04 remains open.

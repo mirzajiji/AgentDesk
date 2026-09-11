@@ -29,4 +29,8 @@ Test lifecycle transitions, actual disconnect cleanup, expired login, enable wit
 
 ## Current implementation boundary
 
-[The P3-01 validation record](../Development/p3-01-validation.md) documents the typed Jira configuration, immutable catalog storage and connection ownership implementation. Discovered capabilities are metadata, not grants. No live Jira operation or native plugin setup is claimed; the remaining Phase 3 tasks add those features and their policy enforcement.
+[The P3-01 validation record](../Development/p3-01-validation.md) documents typed Jira configuration, immutable catalog storage and connection ownership. [Read backends](../Development/p3-03a-validation.md), [reviewed comment/edit/attachment backends](../Development/p3-04-validation.md) and [native configuration management](../Development/p3-05-validation.md) are now implemented components. Discovered capabilities remain metadata, not grants. Live OAuth registration, native sign-in/diagnostics and remaining Phase 3 operations are unfinished.
+
+## OAuth registration binding
+
+Saved OAuth grants now carry a fingerprint of the exact broker origin, public client ID, callback and requested access mode inside their scoped Keychain bundle. Sign-in and successful rotation preserve this binding. Refresh requires an exact match before consuming the old grant or sending its refresh token. A changed registration or an older unbound bundle requires a new sign-in; rejection does not delete the existing grant. Access-token reads and explicit logout remain available under their existing checks. Public registration metadata is not a confidential client secret.

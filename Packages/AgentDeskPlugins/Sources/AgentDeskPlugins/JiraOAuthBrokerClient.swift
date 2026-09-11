@@ -1,3 +1,4 @@
+import AgentDeskCore
 import AgentDeskSecurity
 import Foundation
 
@@ -8,6 +9,7 @@ struct JiraBrokerAttempt: Sendable {
 
 /// Native client knows only public registration values; the confidential secret stays on the broker.
 actor JiraOAuthBrokerClient {
+    nonisolated let registrationFingerprint: ActionFingerprint
     private let origin: URL
     private let clientID: String
     private let callback: URL
@@ -16,6 +18,14 @@ actor JiraOAuthBrokerClient {
     init(origin: URL, clientID: String, callback: URL, access: JiraOAuthAccess = .readOnly, protocolClasses: [URLProtocol.Type] = []) throws {
         guard !clientID.isEmpty, clientID.utf8.count <= 256, callback.scheme == "https", callback.host != nil,
               callback.user == nil, callback.password == nil, callback.query == nil, callback.fragment == nil else { throw JiraOAuthError.invalidConfiguration }
+        struct Registration: Encodable {
+            let version = 1
+            let origin: URL
+            let clientID: String
+            let callback: URL
+            let access: String
+        }
+        registrationFingerprint = try .canonical(Registration(origin: origin, clientID: clientID, callback: callback, access: access.rawValue))
         self.origin = origin; self.clientID = clientID; self.callback = callback; self.access = access
         transport = try JiraHTTPTransport(origin: origin, maximumBytes: 65_536, protocolClasses: protocolClasses)
     }

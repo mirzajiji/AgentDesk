@@ -14,13 +14,13 @@ final class JiraOAuthRotationTests: XCTestCase {
                 instance: URL(string: "https://synthetic.atlassian.net")!, credential: SecretReference(scope: secretScope), enabled: true)
             let store = RotationSecrets(scope: secretScope)
             let vault = try JiraCredentialVault(configuration: config, store: store)
-            try await vault.save(JiraOAuthTokens(accessToken: SecretValue(Data("synthetic-old-access".utf8)),
-                refreshToken: SecretValue(Data("synthetic-old-refresh".utf8)), expiresAt: Date(timeIntervalSince1970: 1),
-                scopes: ["read:jira-user", "read:jira-work"]))
-            await store.clearEvents()
             let host = succeeds ? "broker.example" : "refresh-failed.example"
             let broker = try JiraOAuthBrokerClient(origin: URL(string: "https://" + host)!, clientID: "synthetic-client",
                 callback: URL(string: "https://broker.example/callback")!, protocolClasses: [NativeBrokerProtocol.self])
+            try await vault.save(JiraOAuthTokens(accessToken: SecretValue(Data("synthetic-old-access".utf8)),
+                refreshToken: SecretValue(Data("synthetic-old-refresh".utf8)), expiresAt: Date(timeIntervalSince1970: 1),
+                scopes: ["read:jira-user", "read:jira-work"]), registration: broker.registrationFingerprint)
+            await store.clearEvents()
             let adapter = JiraCloudAdapter(store: store, now: { Date() }, makeTransport: {
                 try JiraHTTPTransport(origin: $0, protocolClasses: [AdapterProtocol.self])
             })
@@ -32,6 +32,10 @@ final class JiraOAuthRotationTests: XCTestCase {
             } catch { XCTAssertFalse(succeeds) }
             let events = await store.events
             XCTAssertEqual(events, succeeds ? ["get", "delete", "set"] : ["get", "delete"])
+            if succeeds {
+                let rebound = try await vault.load(registration: broker.registrationFingerprint)
+                XCTAssertNotNil(rebound, "Rotated grant lost its registration binding")
+            }
             if !succeeds {
                 do { _ = try await login.refresh(); XCTFail("Consumed token retried") }
                 catch { XCTAssertEqual(error as? JiraServiceError, .authenticationRequired) }

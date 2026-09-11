@@ -1,3 +1,4 @@
+import AgentDeskCore
 import AgentDeskSecurity
 import Foundation
 
@@ -15,17 +16,17 @@ actor JiraCredentialVault {
         self.reference = reference; self.connectionID = configuration.id; self.store = store
     }
 
-    func save(_ tokens: JiraOAuthTokens) async throws {
+    func save(_ tokens: JiraOAuthTokens, registration: ActionFingerprint? = nil) async throws {
         try begin(); defer { busy = false }
         let record = Stored(connectionID: connectionID,
             access: tokens.accessToken.withBytes { String(decoding: $0, as: UTF8.self) },
             refresh: tokens.refreshToken?.withBytes { String(decoding: $0, as: UTF8.self) },
-            expiresAt: tokens.expiresAt, scopes: tokens.scopes)
+            expiresAt: tokens.expiresAt, scopes: tokens.scopes, registration: registration)
         let bytes = try JSONEncoder().encode(record)
         try await store.set(SecretValue(bytes), for: reference)
     }
 
-    func load() async throws -> JiraOAuthTokens? {
+    func load(registration: ActionFingerprint? = nil) async throws -> JiraOAuthTokens? {
         try begin(); defer { busy = false }
         guard let secret = try await store.get(reference) else { return nil }
         let record: Stored
@@ -33,6 +34,7 @@ actor JiraCredentialVault {
         catch { throw JiraServiceError.invalidResponse }
         guard record.connectionID == connectionID, record.expiresAt.timeIntervalSince1970.isFinite,
               !record.access.isEmpty, !record.scopes.isEmpty else { throw JiraServiceError.invalidResponse }
+        if let registration, record.registration != registration { throw JiraServiceError.authenticationRequired }
         return try JiraOAuthTokens(accessToken: SecretValue(Data(record.access.utf8)),
             refreshToken: record.refresh.map { try SecretValue(Data($0.utf8)) },
             expiresAt: record.expiresAt, scopes: record.scopes)
@@ -54,5 +56,6 @@ actor JiraCredentialVault {
         let refresh: String?
         let expiresAt: Date
         let scopes: Set<String>
+        let registration: ActionFingerprint?
     }
 }

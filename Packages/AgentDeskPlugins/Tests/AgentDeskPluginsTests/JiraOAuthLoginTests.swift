@@ -26,6 +26,11 @@ final class JiraOAuthLoginTests: XCTestCase {
             }
             let count = await store.count
             XCTAssertEqual(count, allowed ? 1 : 0)
+            if allowed {
+                let vault = try JiraCredentialVault(configuration: config, store: store)
+                let bound = try await vault.load(registration: broker.registrationFingerprint)
+                XCTAssertNotNil(bound, "New sign-in did not bind its grant")
+            }
             await login.close()
             let afterClose = await store.count
             XCTAssertEqual(afterClose, count, "Transport disposal must preserve an established grant")

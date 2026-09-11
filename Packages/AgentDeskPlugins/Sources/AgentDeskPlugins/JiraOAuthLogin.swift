@@ -24,6 +24,7 @@ public actor JiraOAuthLogin {
     public func signIn(openBrowser: @escaping @Sendable (URL) async throws -> Void) async throws -> JiraCloudAccount {
         guard !closed, active == nil, !loggingOut, configuration.enabled else { throw JiraServiceError.unavailable }
         let configuration = configuration, broker = broker, adapter = adapter, vault = vault
+        let registration = broker.registrationFingerprint
         let job = Task {
             let proof = try JiraOAuthClaimProof()
             let attempt = try await broker.start(proof: proof)
@@ -38,7 +39,7 @@ public actor JiraOAuthLogin {
                         let account = try await adapter.validate(tokens, configuration: configuration)
                         try Task.checkCancellation()
                         attemptedSave = true
-                        try await vault.save(tokens)
+                        try await vault.save(tokens, registration: registration)
                         try Task.checkCancellation()
                         return account
                     }
@@ -69,8 +70,9 @@ public actor JiraOAuthLogin {
     public func refresh() async throws -> JiraCloudAccount {
         guard !closed, active == nil, !loggingOut, configuration.enabled else { throw JiraServiceError.unavailable }
         let configuration = configuration, broker = broker, adapter = adapter, vault = vault
+        let registration = broker.registrationFingerprint
         let job = Task {
-            guard let current = try await vault.load(), let refreshToken = current.refreshToken else {
+            guard let current = try await vault.load(registration: registration), let refreshToken = current.refreshToken else {
                 throw JiraServiceError.authenticationRequired
             }
             // Persist consumption before any remote exchange. A crash or ambiguous response requires sign-in.
@@ -82,7 +84,7 @@ public actor JiraOAuthLogin {
                 let account = try await adapter.validate(tokens, configuration: configuration)
                 try Task.checkCancellation()
                 attemptedSave = true
-                try await vault.save(tokens)
+                try await vault.save(tokens, registration: registration)
                 try Task.checkCancellation()
                 return account
             } catch {

@@ -5,6 +5,38 @@ import XCTest
 
 final class PluginStorageTests: XCTestCase {
     @MainActor
+    func testListingPagesPublishedHeadsAndFiltersEnvironment() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let catalog = try WorkspaceCatalog(container: root)
+        let workspace = try await catalog.createWorkspace(name: "Synthetic")
+        let project = try await catalog.createProject(in: workspace.id, name: "Connections")
+        let store = try await catalog.pluginConfigurationStore(for: JiraConnectionConfiguration.self, in: project.scope)
+        let empty = try await store.list(in: project.scope)
+        XCTAssertTrue(empty.records.isEmpty); XCTAssertNil(empty.nextID)
+        let environment = EnvironmentID(), other = EnvironmentID()
+        var expected: [UUID] = []
+        for index in 0..<5 {
+            let value = try JiraConnectionConfiguration(scope: project.scope, environmentID: index == 2 ? other : environment,
+                instance: XCTUnwrap(URL(string: "https://synthetic.atlassian.net")))
+            _ = try await store.save(value, in: project.scope, expectedRevision: nil)
+            if index != 2 { expected.append(value.id) }
+        }
+        let first = try await store.list(in: project.scope, environmentID: environment, limit: 2)
+        XCTAssertEqual(first.records.count, 2)
+        let cursor = try XCTUnwrap(first.nextID)
+        let reopened = try await catalog.pluginConfigurationStore(for: JiraConnectionConfiguration.self, in: project.scope)
+        let second = try await reopened.list(in: project.scope, environmentID: environment, after: cursor, limit: 2)
+        XCTAssertNil(second.nextID)
+        XCTAssertEqual((first.records + second.records).map { $0.configuration.id }, expected.sorted { $0.uuidString < $1.uuidString })
+        do { _ = try await store.list(in: .init(workspaceID: workspace.id, projectID: ProjectID())); XCTFail("Foreign list accepted") }
+        catch { XCTAssertEqual(error as? PluginStorageError, .scopeMismatch) }
+        do { _ = try await store.list(in: project.scope, limit: 0); XCTFail("Invalid page accepted") }
+        catch { XCTAssertEqual(error as? PluginStorageError, .invalidRecord) }
+    }
+
+    @MainActor
     func testReopenHistoryAndStaleEdits() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

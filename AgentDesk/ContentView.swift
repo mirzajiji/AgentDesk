@@ -103,9 +103,13 @@ struct ContentView: View {
             EmptyView()
             #endif
         case .connections:
+            #if os(macOS)
+            NativeConnectionsView(catalog: catalog)
+            #else
             DeskEmptyState("No connections configured", systemImage: "point.3.connected.trianglepath.dotted",
                            message: "Project connections will appear here. No external services are connected.",
                            accessibilityIdentifier: "empty.connections")
+            #endif
         case .companion:
             DeskEmptyState("No Mac connected", systemImage: "laptopcomputer.and.iphone",
                            message: "Your Mac runs your agents. This companion will let you review their progress. Pairing is not available in this build.",

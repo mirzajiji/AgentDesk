@@ -1,6 +1,7 @@
 #if os(macOS)
 import AgentDeskCore
 import AgentDeskRuntime
+import AgentDeskPlugins
 import Combine
 import Foundation
 import SwiftUI
@@ -207,6 +208,13 @@ final class WorkspaceBrowserModel: ObservableObject {
     func skillStore(for project: ProjectRecord) async throws -> ProjectSkillStore {
         guard let catalog else { throw CatalogError.invalidConfiguration }
         return try await catalog.skillStore(in: project.scope)
+    }
+
+    func jiraConfigurationServices(for project: ProjectRecord) async throws -> NativeJiraConfigurationServices {
+        guard let catalog else { throw CatalogError.invalidConfiguration }
+        let store = try await catalog.pluginConfigurationStore(for: JiraConnectionConfiguration.self, in: project.scope)
+        let settings = try await ProjectExecutionSetupService(catalog: catalog, scope: project.scope).settings()
+        return NativeJiraConfigurationServices(store: store, environments: settings.project?.draft.environments ?? [])
     }
 
     func executionServices(for project: ProjectRecord) async throws -> ProjectNativeServices {

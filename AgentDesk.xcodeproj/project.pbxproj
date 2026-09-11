@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AF0000000000000000000004 /* AgentDeskPlugins in Frameworks */ = {isa = PBXBuildFile; productRef = AF0000000000000000000005 /* AgentDeskPlugins */; };
 		AD0000000000000000000001 /* AgentDeskCore in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000011 /* AgentDeskCore */; };
 		AD0000000000000000000002 /* AgentDeskDesign in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000012 /* AgentDeskDesign */; };
 		AD0000000000000000000003 /* AgentDeskCore in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000013 /* AgentDeskCore */; };
@@ -125,6 +126,7 @@
 				AD0000000000000000000004 /* AgentDeskPersistence in Frameworks */,
 				AD0000000000000000000006 /* AgentDeskSecurity in Frameworks */,
 				AD0000000000000000000008 /* AgentDeskRuntime in Frameworks */,
+				AF0000000000000000000004 /* AgentDeskPlugins in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -209,6 +211,7 @@
 				AD0000000000000000000014 /* AgentDeskPersistence */,
 				AD0000000000000000000016 /* AgentDeskSecurity */,
 				AD0000000000000000000018 /* AgentDeskRuntime */,
+				AF0000000000000000000005 /* AgentDeskPlugins */,
 			);
 			productName = AgentDesk;
 			productReference = C514A9163051AAE0006A58EA /* AgentDesk.app */;
@@ -830,6 +833,7 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		AF0000000000000000000005 /* AgentDeskPlugins */ = {isa = XCSwiftPackageProductDependency; package = AF0000000000000000000003 /* XCLocalSwiftPackageReference "Packages/AgentDeskPlugins" */; productName = AgentDeskPlugins; };
 		AD0000000000000000000011 /* AgentDeskCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AgentDeskCore;

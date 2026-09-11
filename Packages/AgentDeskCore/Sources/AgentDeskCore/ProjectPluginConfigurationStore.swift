@@ -17,6 +17,11 @@ public struct PluginConfigurationRevision<Value: ScopedPluginConfiguration>: Cod
     public let configuration: Value
 }
 
+public struct PluginConfigurationPage<Value: ScopedPluginConfiguration>: Sendable {
+    public let records: [PluginConfigurationRevision<Value>]
+    public let nextID: UUID?
+}
+
 /// Local administrative storage. Runtime callers must use the policy-authorized plugin service.
 public actor ProjectPluginConfigurationStore<Value: ScopedPluginConfiguration> {
     public nonisolated let scope: ProjectScope
@@ -32,6 +37,38 @@ public actor ProjectPluginConfigurationStore<Value: ScopedPluginConfiguration> {
         try root.withLock {
             try validate(requested)
             return try load(id: id, revision: revision)
+        }
+    }
+
+    /// Administrative browsing of published heads only. Orphaned, unpublished revisions remain hidden.
+    public func list(in requested: ProjectScope, environmentID: EnvironmentID? = nil,
+                     after: UUID? = nil, limit: Int = 50) throws -> PluginConfigurationPage<Value> {
+        try root.withLock {
+            try validate(requested)
+            guard (1...100).contains(limit) else { throw PluginStorageError.invalidRecord }
+            let directory: ConfigurationDirectory
+            do { directory = try project.child("Plugins") }
+            catch ScopedFileError.notFound { return .init(records: [], nextID: nil) }
+            let names = try directory.names()
+            guard names.count <= 10_000 else { throw PluginStorageError.invalidRecord }
+            let ids = try names.map { name -> String in
+                guard let id = UUID(uuidString: name), id.uuidString.lowercased() == name else {
+                    throw PluginStorageError.invalidRecord
+                }
+                return name
+            }.sorted()
+            let cursor = after?.uuidString.lowercased()
+            var records: [PluginConfigurationRevision<Value>] = []
+            for name in ids where cursor.map({ name > $0 }) ?? true {
+                try Task.checkCancellation()
+                guard let id = UUID(uuidString: name), let record = try load(id: id),
+                      environmentID.map({ record.configuration.environmentID == $0 }) ?? true else { continue }
+                records.append(record)
+                if records.count > limit { break }
+            }
+            let more = records.count > limit
+            if more { records.removeLast() }
+            return .init(records: records, nextID: more ? records.last?.configuration.id : nil)
         }
     }
 

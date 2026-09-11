@@ -199,3 +199,36 @@ Computer-use inspection again confirmed the Mac is locked. The same gate has per
 The Mac was unlocked. Both pending native UI tests passed using the same macOS AgentDesk scheme and NativeMac derived-data directory, with result bundle `TestResults/p3-04/history-ui-resumed.xcresult`. The command selected `NativeRunsUITests/testMutationHistoryOpensWithCompactHeaderAndCloses` and `NativeRunsUITests/testMutationHistoryShowsConfirmedAndUnresolvedAttempts`, with parallel testing disabled. Exported and visually inspected both screenshots: the header/actions remain visible, empty guidance fills the body, and acknowledged/unresolved rows fit without clipping. Export directory: `TestResults/p3-04/history-ui-resumed-shots`. Screenshots include unrelated desktop background and remain ignored test artifacts, not committed documentation.
 
 This resolves the locked-screen validation gate for the history component. Existing evidence includes 50 persistence tests, 160 runtime host tests, 79 iPhone 16 Pro / iOS 26.0 runtime tests, two Mac model tests and both application builds. Native history provides observation only; remote reconciliation and remaining Jira mutation operations keep P3-04 incomplete.
+
+### Text attachment draft in progress
+
+Started scoped text-evidence attachments with deterministic multipart encoding, a bounded ASCII filename, matching filename/content scope, a 1 MiB text limit and a 70-character boundary. The exact multipart bytes are fingerprint-bound to the prepared attachment action; no local path is accepted. [Atlassian's attachment API](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-attachments/) confirms multipart uploads use the `file` field and the required X-Atlassian-Token header. Request dispatch, response validation, approval integration, binary attachments and native upload UI remain incomplete.
+
+The plugin suite passed 74 tests (`TestResults/p3-04/text-attachment-draft.log`). Review then shortened the boundary and added a length assertion; the focused draft regression passed (`text-attachment-boundary.log`). Tests cover exact text preservation, deterministic encoding, changed filenames, header/path injection and foreign-run rejection. No external upload was attempted.
+
+### Text attachment transport boundary
+
+Added the fixed attachment POST request with the exact reviewed multipart body, selected-site and token write-scope checks, expiration validation and required upload headers. Successful receipts must contain exactly one numeric attachment ID with the expected filename and UTF-8 byte count; mismatched/malformed success responses remain uncertain. Explicit rejections are separate from uncertain server/network outcomes. `swift test --package-path Packages/AgentDeskPlugins` passed 75 tests (`TestResults/p3-04/text-attachment-write.log`). Dispatch through the authenticated session and reviewed runtime ledger remains to integrate; no upload occurred.
+
+### Text attachment dispatch connected
+
+Added exact-action session preparation/dispatch and the runtime approval-ledger wrapper for sanitized text attachments. Both filename and body are rechecked against current credential redaction; policy/evidence callbacks precede a persisted-grant recheck. Unknown transport outcomes do not retry. The attachment capability remains unadvertised while full attachment support is incomplete.
+
+All 76 plugin tests passed (`TestResults/p3-04/attachment-session-tests.log`), including changed draft, credential echo, denied pre-dispatch evidence, logout during validation and successful upload receipt. Runtime dependency planning initially missed new files; `swift package --package-path Packages/AgentDeskRuntime clean` refreshed it. Seven existing Jira policy regressions then passed (`attachment-runtime-replanned.log`). Attachment-specific runtime approval/replay tests and native validation remain due; no external upload was performed.
+
+### Reviewed text attachment backend acceptance — 2026-09-12
+
+Added two runtime attachment regressions covering denied/unapproved dispatch, an exact approved upload, consumed-approval replay after reopening storage, unknown network outcomes retained as unresolved, and authority revocation during pre-dispatch validation. The session tests separately reject changed content, credential echoes and grants removed during validation. Multipart encoding and receipt validation use synthetic HTTP responses only.
+
+Validation on Xcode 26.0, macOS 26.5.2 and the primary iPhone 16 Pro Simulator (iOS 26.0, `C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE`):
+
+- `swift test --package-path Packages/AgentDeskRuntime`: 162 tests passed (`TestResults/p3-04/attachment-runtime-full.log`).
+- Runtime package native macOS test: 162 tests passed (`attachment-runtime-mac.xcresult` and matching log).
+- Runtime package native iPhone test: 81 tests passed (`attachment-runtime-iphone.xcresult` and matching log).
+- Plugins package native iPhone test: 76 tests passed (`attachment-plugins-iphone.xcresult` and matching log). The earlier host plugin run also passed 76 tests.
+
+Native package commands use `xcodebuild -scheme AgentDeskRuntime` or `AgentDeskPlugins`, `-destination 'platform=macOS'` or the primary iOS Simulator UUID, `-parallel-testing-enabled NO test`, and existing `TestResults/p3-04/RuntimeMac`, `RuntimeIPhone` or `PluginsIPhone` derived-data directories. Test names were corrected to describe attachments rather than comments before the iPhone runs. Existing SQLite fixture-cleanup warnings still occur in native runtime logs; test success is not a claim that those warnings were resolved.
+
+This is a backend component of P3-04. Binary attachments, native upload review, attachment reconciliation, issue creation/deletion and full bug integration remain incomplete. Attachment capability discovery remains withheld; no live Jira upload or mobile upload UI is claimed.
+
+Both ordinary application builds passed: `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build` (`attachment-app-mac.log`) and the same scheme targeting the primary iOS Simulator with `TestResults/p1-08b/FilteredIPhone` (`attachment-app-iphone.log`). Logs are under `TestResults/p3-04/`. Documentation integrity and diff whitespace checks passed.

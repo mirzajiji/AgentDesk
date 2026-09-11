@@ -194,6 +194,38 @@ public actor JiraCloudSession: PluginConnectionSession {
         return try JiraCommentWrite.decode(response, context: context, redactor: secure)
     }
 
+    public func prepareTextAttachment(_ draft: JiraTextAttachmentDraft, id: UUID = UUID(), configurationRevision: Int,
+                        permissions: PluginPermissions, runID: RunID, agentID: AgentID? = nil) throws -> PreparedPluginAction {
+        guard !closed else { throw JiraTransportError.closed }
+        return try draft.prepare(id: id, configuration: configuration, configurationRevision: configurationRevision,
+            permissions: permissions, cloudID: resource.id, runID: runID, agentID: agentID)
+    }
+
+    public func executeTextAttachment(_ draft: JiraTextAttachmentDraft, prepared: PreparedPluginAction,
+                        permissions: PluginPermissions, redactor: ContentRedactor,
+                        beforeDispatch: @Sendable () async throws -> Void = {}) async throws -> JiraAttachmentReceipt {
+        let context = draft.content.context
+        guard let runID = prepared.action.runID, runID == context.runID, redactor.context == context else {
+            throw AuthorizationError.scopeMismatch
+        }
+        let expected = try prepareTextAttachment(draft, id: prepared.action.id, configurationRevision: prepared.configurationRevision,
+            permissions: permissions, runID: runID, agentID: prepared.action.agentID)
+        guard expected.action == prepared.action else { throw AuthorizationError.stalePolicy }
+        let current = try await currentGrant()
+        let secure = try redactor.includingKnownSecrets([current.accessToken] + (current.refreshToken.map { [$0] } ?? []), in: context)
+        for content in [draft.filename, draft.content] {
+            guard try secure.redactText(content.text, in: context).text == content.text else { throw AuthorizationError.stalePolicy }
+        }
+        try await beforeDispatch()
+        // Evidence checks may suspend while logout or token rotation removes the grant.
+        let dispatchGrant = try await currentGrant()
+        let request = try JiraTextAttachmentWrite.make(draft, resource: resource, tokens: dispatchGrant, now: now())
+        let response: JiraHTTPResponse
+        do { response = try await transport.send(request, maximumResponseBytes: 262_144) }
+        catch { throw JiraMutationError.outcomeUnknown }
+        return try JiraTextAttachmentWrite.decode(response, draft: draft, redactor: secure)
+    }
+
     public func prepareIssueEdit(_ draft: JiraIssueEditDraft, id: UUID = UUID(), configurationRevision: Int,
                                  permissions: PluginPermissions, runID: RunID, agentID: AgentID? = nil) throws -> PreparedPluginAction {
         guard !closed else { throw JiraTransportError.closed }

@@ -114,6 +114,28 @@ actor PluginPolicySession {
         }
     }
 
+    func executeJiraTextAttachment(_ draft: JiraTextAttachmentDraft, connection: JiraCloudSession,
+                            permissions: PluginPermissions, context: RedactionContext, redactor: ContentRedactor,
+                            approvalID: UUID? = nil,
+                            beforeDispatch: @escaping @Sendable () async throws -> Void = {}) async throws -> PolicyExecutionResult<JiraAttachmentReceipt> {
+        let invocation = prepared
+        guard invocation.capability == .attachmentsAdd, draft.content.context == context else { throw AuthorizationError.invalidInput }
+        let generation = authorityGeneration
+        return try await execute(approvalID: approvalID) { action in
+            // A write always needs an explicit consumed review, even if general policy allows it.
+            guard let approvalID else { throw AuthorizationError.approvalRequired }
+            guard action == invocation.action else { throw AuthorizationError.stalePolicy }
+            return try await self.recordMutation(action, approvalID: approvalID) {
+                try await connection.executeTextAttachment(draft, prepared: invocation, permissions: permissions, redactor: redactor,
+                beforeDispatch: {
+                    try await self.checkCurrent(expectedAuthority: generation)
+                    try await beforeDispatch()
+                    try await self.checkCurrent(expectedAuthority: generation)
+                })
+            }
+        }
+    }
+
     func executeJiraIssueEdit(_ draft: JiraIssueEditDraft, connection: JiraCloudSession,
                               permissions: PluginPermissions, redactor: ContentRedactor,
                               readSession: PluginPolicySession, readApprovalID: UUID? = nil,

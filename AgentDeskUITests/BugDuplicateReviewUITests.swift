@@ -12,6 +12,10 @@ final class BugDuplicateReviewUITests: XCTestCase {
         let title = app.staticTexts["bug.detail.title"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         attach(app, "Selected bug spacing")
+        let status = app.popUpButtons["bugs.filter.status"]
+        let archived = app.checkBoxes["bugs.filter.archived"]
+        XCTAssertLessThan(archived.frame.maxY - status.frame.minY, 80,
+                          "Filters should share rows instead of pushing the bug list down")
         let sheet = app.sheets.firstMatch
         XCTAssertLessThan(app.staticTexts["bugs.title"].frame.minY - sheet.frame.minY, 40)
         XCTAssertLessThan(title.frame.minY - app.scrollViews["bug.detail.scroll"].frame.minY, 36)

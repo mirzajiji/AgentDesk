@@ -30,9 +30,9 @@ struct ProjectBugsView: View {
             if let issue = model.services?.environmentIssue { Text(issue).font(.caption).foregroundStyle(.orange) }
             TextField("Search title, behavior, details, ticket or UUID", text: $model.filter.query)
                 .textFieldStyle(.roundedBorder).accessibilityIdentifier("bugs.search")
-            ViewThatFits(in: .horizontal) {
-                HStack { filters }
-                VStack(alignment: .leading) { filters }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), alignment: .leading)],
+                      alignment: .leading, spacing: 8) {
+                filters
             }
             HSplitView {
                 VStack {

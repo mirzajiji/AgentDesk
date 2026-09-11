@@ -20,6 +20,10 @@ final class JiraReadOperationTests: XCTestCase {
             XCTAssertNotEqual(first.action, try prepare(changed).action)
         }
         XCTAssertNotEqual(first.action, try prepare(.comments(identifier: "A-1", startAt: 0, limit: 20), cloud: UUID()).action)
+        let settings = try prepare(.attachmentSettings)
+        XCTAssertEqual(settings.capability, .attachmentsRead)
+        XCTAssertNotEqual(settings.action, try prepare(.attachmentSettings, cloud: UUID()).action)
+        XCTAssertNotEqual(settings.action, try prepare(.attachmentMetadata(id: "123")).action)
         let metadata = try prepare(.attachmentMetadata(id: "123"))
         let bytes = try prepare(.attachmentContent(id: "123", expectedSize: 4, maximumBytes: 8))
         XCTAssertNotEqual(metadata.action, bytes.action)

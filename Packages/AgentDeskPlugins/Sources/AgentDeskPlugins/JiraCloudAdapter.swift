@@ -122,6 +122,11 @@ public actor JiraCloudSession: PluginConnectionSession {
             let value = try await JiraCommentsRead.load(identifier: identifier, startAt: startAt, limit: limit,
                 configuration: configuration, resource: resource, tokens: current, context: context, redactor: secureRedactor, now: instant, transport: transport)
             return .comments(content: value.content, nextStartAt: value.nextStartAt)
+        case .attachmentSettings:
+            let request = try JiraAttachmentSettingsRead.make(resource: resource, tokens: current, now: instant)
+            let response = try await transport.send(request, maximumResponseBytes: 16_384)
+            try Task.checkCancellation()
+            return .attachmentSettings(try JiraAttachmentSettingsRead.decode(response, context: context, cloudID: resource.id, observedAt: now()))
         case .attachmentMetadata(let id):
             let value = try await JiraAttachmentRead.load(id: id, configuration: configuration, resource: resource,
                 tokens: current, context: context, redactor: secureRedactor, now: instant, transport: transport)
@@ -287,4 +292,5 @@ public enum JiraReadResult: Sendable {
     case json(RedactedText)
     case comments(content: RedactedText, nextStartAt: Int?)
     case attachment(JiraAttachmentBytes)
+    case attachmentSettings(JiraAttachmentSettings)
 }

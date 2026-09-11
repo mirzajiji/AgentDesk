@@ -9,6 +9,12 @@ import XCTest
 
 @MainActor final class JiraPolicyReadTests: XCTestCase {
     func testUnapprovedAndDeniedReadsNeverDispatchThenApprovalRunsOnce() async throws {
+        try await exercise(.issue(identifier: "A-1"), pathSuffix: "/issue/A-1")
+    }
+    func testAttachmentSettingsRequireIndependentReadApproval() async throws {
+        try await exercise(.attachmentSettings, pathSuffix: "/attachment/meta")
+    }
+    private func exercise(_ operation: JiraReadOperation, pathSuffix: String) async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -32,10 +38,9 @@ import XCTest
             environment: PolicyDocument(level: .environment, workspaceID: scope.workspaceID, projectID: scope.projectID, environmentID: environment, rules: rules), environmentKind: .test)
         let user = try PolicyAuthority(id: UUID(), kind: .localUser, scopes: [scope], environments: [environment], operations: [.readEvidence], canApprove: true, expiresAt: Date().addingTimeInterval(600))
         let store = try ApprovalStore(database: root.appendingPathComponent("operations.sqlite"), scope: scope, environmentID: environment)
-        let path = resource.apiOrigin.path + "/rest/api/3/issue/A-1"
+        let path = resource.apiOrigin.path + "/rest/api/3" + pathSuffix
         for disposition: PolicyDisposition in [.deny, .approval] {
-            let permissions = try PluginPermissions(connectionID: config.id, scope: scope, environmentID: environment, rules: [.init(.issuesRead, disposition)])
-            let operation = JiraReadOperation.issue(identifier: "A-1")
+            let permissions = try PluginPermissions(connectionID: config.id, scope: scope, environmentID: environment, rules: [.init(operation.capability, disposition)])
             let prepared = try await connection.prepare(operation, configurationRevision: 1, permissions: permissions, runID: context.runID)
             let gate = try PluginPolicySession(prepared: prepared, policy: policy, permissions: permissions, authorities: [user], requesterID: user.id, store: store, validateCurrent: { (prepared, policy) })
             do {
@@ -77,7 +82,10 @@ private final class JiraPolicyProtocol: URLProtocol {
         Self.counts.withLock { $0[url.path, default: 0] += 1 }
         let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Data(#"{"id":"123","key":"A-1","fields":{"summary":"Synthetic issue"}}"#.utf8))
+        let body = url.path.hasSuffix("/attachment/meta")
+            ? #"{"enabled":true,"uploadLimit":8388608}"#
+            : #"{"id":"123","key":"A-1","fields":{"summary":"Synthetic issue"}}"#
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
         client?.urlProtocolDidFinishLoading(self)
     }
     override func stopLoading() {}

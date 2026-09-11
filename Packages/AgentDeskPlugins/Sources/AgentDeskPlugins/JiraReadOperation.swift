@@ -5,6 +5,7 @@ import Foundation
 public enum JiraReadOperation: Equatable, Sendable {
     case issue(identifier: String)
     case comments(identifier: String, startAt: Int, limit: Int)
+    case attachmentSettings
     case attachmentMetadata(id: String)
     case attachmentContent(id: String, expectedSize: Int64, maximumBytes: Int)
 
@@ -12,7 +13,7 @@ public enum JiraReadOperation: Equatable, Sendable {
         switch self {
         case .issue: .issuesRead
         case .comments: .commentsRead
-        case .attachmentMetadata, .attachmentContent: .attachmentsRead
+        case .attachmentSettings, .attachmentMetadata, .attachmentContent: .attachmentsRead
         }
     }
 
@@ -35,6 +36,8 @@ public enum JiraReadOperation: Equatable, Sendable {
         case .comments(let identifier, let startAt, let limit):
             guard JiraIssueRead.validIdentifier(identifier), (0...1_000_000).contains(startAt), (1...100).contains(limit) else { throw AuthorizationError.invalidInput }
             invocation = .init(kind: "comments", identifier: identifier, startAt: startAt, limit: limit, expectedSize: nil, maximumBytes: nil)
+        case .attachmentSettings:
+            invocation = .init(kind: "attachmentSettings", identifier: "attachment-settings", startAt: nil, limit: nil, expectedSize: nil, maximumBytes: nil)
         case .attachmentMetadata(let identifier):
             try Self.validateAttachmentID(identifier)
             invocation = .init(kind: "attachmentMetadata", identifier: identifier, startAt: nil, limit: nil, expectedSize: nil, maximumBytes: nil)

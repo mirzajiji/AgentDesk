@@ -20,6 +20,18 @@ public struct JiraCloudAdapter: JiraConnectionAdapter {
         guard configuration.credential != nil else { throw PluginConnectionError.notConfigured }
         let vault = try JiraCredentialVault(configuration: configuration, store: store)
         guard let tokens = try await vault.load() else { throw PluginConnectionError.authenticationExpired }
+        return try await open(configuration, tokens: tokens, vault: vault)
+    }
+    func validate(_ tokens: JiraOAuthTokens, configuration: JiraConnectionConfiguration) async throws -> JiraCloudAccount {
+        guard configuration.enabled else { throw PluginConnectionError.disabled }
+        let vault = try JiraCredentialVault(configuration: configuration, store: store)
+        let session = try await open(configuration, tokens: tokens, vault: vault)
+        let account = await session.account
+        await session.close()
+        return account
+    }
+    private func open(_ configuration: JiraConnectionConfiguration, tokens: JiraOAuthTokens, vault: JiraCredentialVault) async throws -> JiraCloudSession {
+        try Task.checkCancellation()
         let instant = now()
         guard instant.timeIntervalSince1970.isFinite, tokens.expiresAt > instant else {
             throw PluginConnectionError.authenticationExpired

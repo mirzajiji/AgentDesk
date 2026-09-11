@@ -68,7 +68,7 @@ final class JiraCloudAdapterTests: XCTestCase {
     }
 }
 
-private final class AdapterProtocol: URLProtocol {
+final class AdapterProtocol: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {

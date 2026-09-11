@@ -3,7 +3,7 @@ import AgentDeskSecurity
 import Foundation
 
 public enum JiraOAuthError: Error, Equatable, Sendable {
-    case invalidConfiguration, invalidCallback, expired, alreadyUsed, denied
+    case invalidConfiguration, invalidCallback, expired, alreadyUsed, denied, credentialCleanupFailed
 }
 
 /// One scoped browser authorization attempt. Token exchange is a separate trusted boundary.

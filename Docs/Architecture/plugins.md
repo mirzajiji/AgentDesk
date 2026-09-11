@@ -1,6 +1,6 @@
 # Plugins, connection lifecycle and diagnostics
 
-Status: planned design. Source: [final architecture](final-architecture.txt), sections 31–36, 105–106 and 142.
+Status: configuration storage and lifecycle foundation implemented in P3-01; live adapters, policy dispatch and native setup remain planned. Source: [final architecture](final-architecture.txt), sections 31–36, 105–106 and 142.
 <!-- Source sections: 31,32,33,34,35,36,105,106,142 -->
 
 A Plugin is AgentDesk's user-facing integration abstraction. Implementations may use MCP, REST, CLI, native Swift or a local process. Agents normally depend on normalized capabilities rather than provider internals. Examples include Jira, GitLab/GitHub, Confluence, Slack, Grafana, PostgreSQL, Kubernetes, Playwright, browser and filesystem capabilities.
@@ -26,3 +26,7 @@ Diagnostics should expose staged checks where supported: DNS/TCP/TLS/authenticat
 ## Verification
 
 Test lifecycle transitions, actual disconnect cleanup, expired login, enable without configuration, denied capabilities, exact approved writes, two-company account isolation and diagnostics that identify the failed layer. Verify a fallback transport goes through policy and cannot gain broader permissions. A stored configuration is not evidence of a successful live connection.
+
+## Current implementation boundary
+
+[The P3-01 validation record](../Development/p3-01-validation.md) documents the typed Jira configuration, immutable catalog storage and connection ownership implementation. Discovered capabilities are metadata, not grants. No live Jira operation or native plugin setup is claimed; the remaining Phase 3 tasks add those features and their policy enforcement.

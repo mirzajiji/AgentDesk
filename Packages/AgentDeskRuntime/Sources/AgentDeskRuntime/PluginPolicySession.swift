@@ -142,6 +142,34 @@ actor PluginPolicySession {
         }
     }
 
+    func executeJiraImageAttachment(_ draft: JiraImageAttachmentDraft, connection: JiraCloudSession,
+                            permissions: PluginPermissions, context: RedactionContext, redactor: ContentRedactor,
+                            readSession: PluginPolicySession, readApprovalID: UUID? = nil,
+                            approvalID: UUID? = nil,
+                            beforeDispatch: @escaping @Sendable () async throws -> Void = {}) async throws -> PolicyExecutionResult<JiraAttachmentReceipt> {
+        let invocation = prepared
+        guard invocation.capability == .attachmentsAdd, draft.context == context else { throw AuthorizationError.invalidInput }
+        let generation = authorityGeneration
+        return try await execute(approvalID: approvalID) { action in
+            // A write always needs an explicit consumed review, even if general policy allows it.
+            guard let approvalID else { throw AuthorizationError.approvalRequired }
+            guard action == invocation.action else { throw AuthorizationError.stalePolicy }
+            return try await self.recordMutation(action, approvalID: approvalID) {
+                try await connection.executeImageAttachment(draft, prepared: invocation, permissions: permissions, redactor: redactor,
+                readSettings: {
+                    let result = try await readSession.executeJira(.attachmentSettings, connection: connection,
+                        permissions: permissions, context: context, redactor: redactor, approvalID: readApprovalID)
+                    guard case .executed(.attachmentSettings(let settings)) = result else { throw AuthorizationError.denied }
+                    return settings
+                }, beforeDispatch: {
+                    try await self.checkCurrent(expectedAuthority: generation)
+                    try await beforeDispatch()
+                    try await self.checkCurrent(expectedAuthority: generation)
+                })
+            }
+        }
+    }
+
     func executeJiraIssueEdit(_ draft: JiraIssueEditDraft, connection: JiraCloudSession,
                               permissions: PluginPermissions, redactor: ContentRedactor,
                               readSession: PluginPolicySession, readApprovalID: UUID? = nil,

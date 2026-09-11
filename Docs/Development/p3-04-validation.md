@@ -274,3 +274,26 @@ The focused pixel/metadata/scope regression passed (`TestResults/p3-04/image-red
 All 27 Security tests passed on macOS 26.5.2 (`image-security-mac.xcresult`) and iPhone 16 Pro / iOS 26.0 (`image-security-iphone.xcresult`), under Xcode 26.0. Commands used `xcodebuild -scheme AgentDeskSecurity -destination 'platform=macOS'` or the primary iPhone Simulator UUID, `-parallel-testing-enabled NO test`, and `TestResults/p3-04/SecurityMac` / `SecurityIPhone` derived-data paths. Matching logs are under `TestResults/p3-04/`. Both normal AgentDesk application builds also passed (`image-app-mac.log`, `image-app-iphone.log`) using the destinations and existing app derived-data paths recorded above.
 
 The security architecture document now describes the explicit-mask contract and its limits. Documentation integrity and whitespace checks passed. This is a shared processing primitive, not completed binary attachment support or a native image editor.
+
+### Reviewed PNG attachment backend in progress
+
+Added `JiraImageAttachmentDraft`, constructed only from scoped `MaskedImageEvidence` and a sanitized ASCII PNG filename. It snapshots the processed PNG into deterministic multipart bytes and binds content, mask count, filename, target, cloud/configuration and run into the prepared action. Diagnostic descriptions hide content. PNG input remains bounded by the shared image primitive. This does not support arbitrary binary formats or claim unmasked pixels are safe.
+
+The session and Runtime now dispatch image attachments through explicit reviewed writes, a separately authorized fresh settings read, current grant/authority checks, and the durable mutation ledger. Text and PNG uploads share multipart request/receipt validation. Image capability discovery remains withheld while native review and remaining attachment integration are incomplete.
+
+Initial host validation passed: 79 Plugins tests (`image-attachment-draft-host.log`, `image-attachment-transport-host.log`), two new runtime image upload tests (`image-attachment-policy-host.log`), and three focused image redaction tests (`image-orientation-host.log`). The rotation regression uses an asymmetric TIFF fixture with verified orientation metadata and asserts transformed dimensions, masked coordinates and untouched colors. The runtime image tests cover denied/unapproved writes, approved settings-read/upload, unknown transport outcomes, durable approval replay protection and authority removal before dispatch. Native validation is pending; no live upload occurred.
+
+### Reviewed PNG backend native validation — 2026-09-12
+
+Passed native checks on Xcode 26.0, macOS 26.5.2 and iPhone 16 Pro / iOS 26.0:
+
+- 165 Mac Runtime tests (`image-upload-runtime-mac.xcresult`).
+- 84 iPhone Runtime tests (`image-upload-runtime-iphone.xcresult`).
+- 79 iPhone Plugins tests (`image-upload-plugins-iphone.xcresult`).
+- Three focused iPhone image-processing tests, including orientation-before-mask verification (`image-orientation-iphone.xcresult`).
+
+Matching logs are under `TestResults/p3-04/`. Native package commands use their existing schemes, primary Simulator UUID, RuntimeMac/RuntimeIPhone/PluginsIPhone/SecurityIPhone derived-data paths and disabled parallel testing; the Security run selected `AgentDeskSecurityTests/ImageEvidenceRedactorTests`. Existing SQLite fixture-cleanup warnings remain unresolved. The common multipart helper was renamed to `JiraAttachmentWrite` before the final iPhone tests; no behavior changed in that rename.
+
+These checks exercise synthetic PNG evidence and synthetic Jira responses. They do not establish real Jira permissions, live upload acceptance, or native image review usability. Other binary formats, image artifact persistence, native image review and the remaining P3-04 operations are still unfinished.
+
+Normal Mac and iPhone AgentDesk app builds passed (`image-upload-app-mac.log`, `image-upload-app-iphone.log`) using the existing native destinations and app derived-data paths documented above. Documentation integrity and diff whitespace checks passed.

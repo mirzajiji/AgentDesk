@@ -47,6 +47,35 @@ final class ImageEvidenceRedactorTests: XCTestCase {
         catch { XCTAssertTrue(error is CancellationError) }
     }
 
+    func testRotationMetadataIsAppliedBeforeMaskCoordinates() throws {
+        let context = RedactionContext(scope: .init(workspaceID: WorkspaceID(), projectID: ProjectID()), environmentID: EnvironmentID(), runID: RunID())
+        let row: [UInt8] = [255, 0, 0, 255, 255, 0, 0, 255, 0, 0, 255, 255, 0, 0, 255, 255]
+        let provider = try XCTUnwrap(CGDataProvider(data: Data(row + row) as CFData))
+        let image = try XCTUnwrap(CGImage(width: 4, height: 2, bitsPerComponent: 8, bitsPerPixel: 32,
+            bytesPerRow: 16, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
+            provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
+        let input = NSMutableData()
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithData(input, "public.tiff" as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, image, [kCGImagePropertyOrientation: 6] as CFDictionary)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        let original = try XCTUnwrap(CGImageSourceCreateWithData(input, nil))
+        let originalProperties = try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(original, 0, nil) as? [CFString: Any])
+        XCTAssertEqual(originalProperties[kCGImagePropertyOrientation] as? Int, 6)
+        let output = try ImageEvidenceRedactor.mask(input as Data, regions: [.init(x: 0, y: 0, width: 1, height: 1)], in: context)
+        XCTAssertEqual(output.width, 2); XCTAssertEqual(output.height, 4)
+        let png = try output.withPNG(in: context) { $0 }
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(png as CFData, nil))
+        let rendered = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        let bytes = try XCTUnwrap(rendered.dataProvider?.data) as Data
+        func pixel(_ x: Int, _ y: Int) -> [UInt8] {
+            let offset = y * rendered.bytesPerRow + x * (rendered.bitsPerPixel / 8)
+            return Array(bytes[offset..<(offset + 3)])
+        }
+        XCTAssertEqual(pixel(0, 0), [0, 0, 0])
+        XCTAssertEqual(pixel(1, 0), [255, 0, 0])
+        XCTAssertEqual(pixel(0, 3), [0, 0, 255])
+    }
+
     private func fixture() throws -> Data {
         let pixels = Data(repeating: 255, count: 16 * 16 * 4)
         let provider = try XCTUnwrap(CGDataProvider(data: pixels as CFData))

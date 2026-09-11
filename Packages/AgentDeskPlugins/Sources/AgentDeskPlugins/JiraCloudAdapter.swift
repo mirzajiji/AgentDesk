@@ -233,11 +233,52 @@ public actor JiraCloudSession: PluginConnectionSession {
         let dispatchGrant = try await currentGrant()
         let dispatchAt = now()
         guard dispatchAt.timeIntervalSince1970.isFinite, dispatchAt >= settings.observedAt else { throw AuthorizationError.stalePolicy }
-        let request = try JiraTextAttachmentWrite.make(draft, resource: resource, tokens: dispatchGrant, now: dispatchAt)
+        let request = try JiraAttachmentWrite.make(draft, resource: resource, tokens: dispatchGrant, now: dispatchAt)
         let response: JiraHTTPResponse
         do { response = try await transport.send(request, maximumResponseBytes: 262_144) }
         catch { throw JiraMutationError.outcomeUnknown }
-        return try JiraTextAttachmentWrite.decode(response, draft: draft, redactor: secure)
+        return try JiraAttachmentWrite.decode(response, draft: draft, redactor: secure)
+    }
+
+    public func prepareImageAttachment(_ draft: JiraImageAttachmentDraft, id: UUID = UUID(), configurationRevision: Int,
+                        permissions: PluginPermissions, runID: RunID, agentID: AgentID? = nil) throws -> PreparedPluginAction {
+        guard !closed else { throw JiraTransportError.closed }
+        return try draft.prepare(id: id, configuration: configuration, configurationRevision: configurationRevision,
+            permissions: permissions, cloudID: resource.id, runID: runID, agentID: agentID)
+    }
+
+    public func executeImageAttachment(_ draft: JiraImageAttachmentDraft, prepared: PreparedPluginAction,
+                        permissions: PluginPermissions, redactor: ContentRedactor,
+                        readSettings: @Sendable () async throws -> JiraAttachmentSettings,
+                        beforeDispatch: @Sendable () async throws -> Void = {}) async throws -> JiraAttachmentReceipt {
+        let context = draft.context
+        guard let runID = prepared.action.runID, runID == context.runID, redactor.context == context else {
+            throw AuthorizationError.scopeMismatch
+        }
+        let expected = try prepareImageAttachment(draft, id: prepared.action.id, configurationRevision: prepared.configurationRevision,
+            permissions: permissions, runID: runID, agentID: prepared.action.agentID)
+        guard expected.action == prepared.action else { throw AuthorizationError.stalePolicy }
+        let current = try await currentGrant()
+        let secure = try redactor.includingKnownSecrets([current.accessToken] + (current.refreshToken.map { [$0] } ?? []), in: context)
+        for content in [draft.filename] {
+            guard try secure.redactText(content.text, in: context).text == content.text else { throw AuthorizationError.stalePolicy }
+        }
+        let startedAt = now()
+        guard startedAt.timeIntervalSince1970.isFinite else { throw AuthorizationError.invalidInput }
+        let settings = try await readSettings()
+        guard settings.context == context, settings.cloudID == resource.id else { throw AuthorizationError.scopeMismatch }
+        guard settings.observedAt >= startedAt else { throw AuthorizationError.stalePolicy }
+        guard settings.permitsSize(Int64(draft.byteCount)) else { throw AuthorizationError.denied }
+        try await beforeDispatch()
+        // Evidence checks may suspend while logout or token rotation removes the grant.
+        let dispatchGrant = try await currentGrant()
+        let dispatchAt = now()
+        guard dispatchAt.timeIntervalSince1970.isFinite, dispatchAt >= settings.observedAt else { throw AuthorizationError.stalePolicy }
+        let request = try JiraAttachmentWrite.make(draft, resource: resource, tokens: dispatchGrant, now: dispatchAt)
+        let response: JiraHTTPResponse
+        do { response = try await transport.send(request, maximumResponseBytes: 262_144) }
+        catch { throw JiraMutationError.outcomeUnknown }
+        return try JiraAttachmentWrite.decode(response, draft: draft, redactor: secure)
     }
 
     public func prepareIssueEdit(_ draft: JiraIssueEditDraft, id: UUID = UUID(), configurationRevision: Int,

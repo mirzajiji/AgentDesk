@@ -55,7 +55,7 @@ The user's 32-inch 4K, 27-inch 2K, 16-inch 4K and 14-inch 4K Mac display targets
 
 ## Phase 2 — Project memory
 
-Phase 2 is decomposed into 11 planned tasks (P2-06 split into index and context integration) plus the user-reported modal-spacing regression. The first storage task does not claim native editing, executable validation rules, retrieval or Bug Registry behavior; those have their own acceptance gates.
+Phase 2 contains 18 completed commit-sized tasks, including the split native UI work and user-reported regressions. The first storage task does not claim native editing, executable validation rules, retrieval or Bug Registry behavior; those have their own acceptance gates.
 
 | Task | Status and scope | Acceptance |
 | --- | --- | --- |
@@ -76,11 +76,11 @@ Phase 2 is decomposed into 11 planned tasks (P2-06 split into index and context 
 | P2-10d | Complete: native duplicate and report review | Current evidence, deterministic/semantic comparisons, explicit decisions, known-ticket additions and CityPay report/group review |
 | P2-10e | Complete: compact Bug Registry filters | Adaptive two-row filter layout and native selected-bug spacing regression; see [validation](bug-filter-layout-validation.md). |
 | P2-10f | Complete: coordinate native bug review context checks | Avoid background/foreground catalog contention; preserve invalidation and exact review. See [validation](bug-review-contention-validation.md). |
-| P2-11 | In progress: Phase 2 acceptance and documentation | Native latest-versus-historical scenario, stale tests, known duplicate with additional evidence, isolation, Mac/iPhone tests and docs |
+| P2-11 | Complete: Phase 2 acceptance and documentation | Native latest/historical and stale-link flow, known-ticket additions, isolation, 518 Mac unit tests, 337 iPhone tests and focused post-fix native checks; see [acceptance and limitations](p2-11-validation.md). |
 
 These tasks include the Phase 2 bullets in section 110, retrieval in section 17 and the corresponding notes/inbox/relationship requirements. Later integration phases must consume these services through their policy boundaries; completing storage alone does not authorize model or mobile writes.
 
-P2-10 was decomposed into four focused native UI commits on 2026-09-11; its scope is unchanged. This increases the remaining Phase 2 task count from two to five while keeping Phase 3–6 work outstanding.
+P2-10 was decomposed into four focused native UI commits on 2026-09-11; its scope is unchanged. The four native UI tasks and subsequent focused regressions are now complete. Phase 3–6 work remains outstanding.
 
 ## Later phases
 
@@ -88,7 +88,6 @@ Break each row below into independent feature commits using the same validation 
 
 | Phase | Work and acceptance focus |
 | --- | --- |
-| 2 — Project memory | Structured records, immutable requirement versions/latest-active resolution, diffs, traceability/staleness/impact, Bug Registry, manual Jira links, root-behavior duplicate detection, blocked scenarios, CityPay bug formatting |
 | 3 — Connections | Plugin/capability lifecycle, Jira, scoped permissions/authentication, MCP transport/discovery/process management, database framework/PostgreSQL, deterministic SQL policy, schema browsing and real diagnostics |
 | 4 — Workflows | Versioned mixed deterministic/agent nodes, conditions/branches/retries/timeouts, delegation, QA flows, preflight, budgets, queue limits, named locks, evidence relationships |
 | 5 — iPhone / LAN | Native Mac control server, Bonjour, secure pairing/device credentials/revocation, workspace authorization, live sockets/replay/reconnect, native run/diff/artifact/approval views, denied mobile capabilities, local simulator matrix and physical-device acceptance |

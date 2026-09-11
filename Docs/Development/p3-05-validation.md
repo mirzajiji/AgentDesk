@@ -63,3 +63,15 @@ Final native sign-in component checks passed:
 - Documentation integrity/link and diff whitespace checks passed.
 
 This commits the native sign-in integration component, not full P3-05 acceptance. Synthetic model services and broker transports establish local behavior; the UI test does not open a real authorization browser or exercise a live account. Publisher registration, deployed broker, complete native authentication UI acceptance, refresh/logout/reset/test/health/permissions and broader display validation remain outstanding. No live credentials or external Jira mutation occurred.
+
+
+## Local logout component
+
+Added native Log Out for credential-bearing configurations with scoped Keychain deletion and the same ownership gate used by native sign-in. Disabled connections/retired environments remain eligible; stale configuration rows are rejected before deletion. Configuration versions and references are retained, and the UI explicitly distinguishes local grant removal from browser/Atlassian consent.
+
+`native-logout-build.log`: normal native Mac build passed. Added a model regression covering the exact secret reference, deletion failure, disabled/retired configuration cleanup, preservation of configuration history and stale-row rejection. Native tests are recorded in `native-logout.xcresult` / `native-logout.log`; final results follow. No live account was logged out.
+
+
+`native-logout.xcresult` passed six native Mac model tests and the existing connection configuration UI test, zero failures, using Xcode 26.0 on macOS 26.5.2. The UI regression verifies existing configuration navigation; it does not simulate a live authenticated account or click logout against one. Added a direct model assertion that active native sign-in ownership causes zero deletion calls; its focused result is `native-logout-ownership.xcresult`. This Mac-only change does not alter shared or iPhone code; the prior 82-test iPhone run is not claimed as new coverage.
+
+The focused ownership regression passed (one test, zero failures). Documentation and diff checks passed. Local logout is complete as a component; live-account lifecycle acceptance and remaining P3-05 controls are still open.

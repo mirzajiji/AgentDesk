@@ -3,6 +3,7 @@ import AgentDeskCore
 import AgentDeskPlugins
 import AgentDeskSecurity
 import Foundation
+import Synchronization
 import XCTest
 @testable import AgentDesk
 
@@ -59,6 +60,48 @@ import XCTest
             XCTAssertNotNil(model.records.first?.configuration.credential)
             let closed = await fake.closed
             XCTAssertTrue(closed)
+            model.close()
+        }
+    }
+
+    func testLogoutDeletesOnlyCurrentScopedGrantAndReportsFailure() async throws {
+        for fails in [false, true] {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let catalog = try WorkspaceCatalog(container: root)
+            let workspace = try await catalog.createWorkspace(name: "Synthetic")
+            let project = try await catalog.createProject(in: workspace.id, name: "Logout")
+            let environment = EnvironmentID()
+            let scope = try SecretScope(workspaceID: workspace.id, projectID: project.id, environmentID: environment)
+            let reference = SecretReference(scope: scope)
+            let store = try await catalog.pluginConfigurationStore(for: JiraConnectionConfiguration.self, in: project.scope)
+            let value = try JiraConnectionConfiguration(scope: project.scope, environmentID: environment,
+                instance: URL(string: "https://synthetic.atlassian.net")!, credential: reference, enabled: false)
+            let first = try await store.save(value, in: project.scope, expectedRevision: nil)
+            let calls = Mutex<[SecretReference]>([])
+            let model = ProjectJiraConnectionsModel(project: project, removeGrant: { requested in
+                calls.withLock { $0.append(requested) }
+                if fails { throw SecretStoreError.invalidResult }
+            }, open: { NativeJiraConfigurationServices(store: store, environments: []) })
+            // Disabled connections and retired environments must still permit removing their grant.
+            await model.logout(first)
+            XCTAssertEqual(calls.withLock { $0 }, [reference])
+            XCTAssertEqual(model.error != nil, fails)
+            XCTAssertEqual(model.authenticationMessage != nil, !fails)
+            XCTAssertFalse(model.busy)
+            let current = try await store.read(id: value.id, in: project.scope)
+            XCTAssertEqual(current?.revision, first.revision)
+            XCTAssertEqual(current?.configuration, value)
+            try await NativeJiraLoginOwnership.shared.acquire(value.id)
+            await model.logout(first)
+            await NativeJiraLoginOwnership.shared.release(value.id)
+            XCTAssertNotNil(model.error)
+            XCTAssertEqual(calls.withLock { $0.count }, 1, "Logout raced another native window’s sign-in")
+            _ = try await store.save(value, in: project.scope, expectedRevision: first.revision)
+            await model.logout(first)
+            XCTAssertNotNil(model.error)
+            XCTAssertEqual(calls.withLock { $0.count }, 1, "A stale row deleted a current grant")
             model.close()
         }
     }

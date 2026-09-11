@@ -97,6 +97,10 @@ struct ProjectJiraConnectionsView: View {
                                     }
                                 }.disabled(model.busy || !record.configuration.enabled || registration == nil)
                                     .accessibilityIdentifier("connection.login.\(record.configuration.id)")
+                                if record.configuration.credential != nil {
+                                    Button("Log Out") { Task { await model.logout(record) } }.disabled(model.busy)
+                                        .accessibilityIdentifier("connection.logout.\(record.configuration.id)")
+                                }
                                 Button("Edit") { editor = .init(existing: record) }.disabled(model.busy)
                                     .accessibilityIdentifier("connection.edit.\(record.configuration.id)")
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(6)

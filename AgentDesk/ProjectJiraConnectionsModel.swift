@@ -21,6 +21,7 @@ final class ProjectJiraConnectionsModel: ObservableObject {
     @Published private(set) var authenticationMessage: String?
     private var loginTask: Task<Void, Never>?
     private let makeLogin: (JiraConnectionConfiguration, JiraOAuthRegistration) throws -> any NativeJiraLogin
+    private let removeGrant: @Sendable (SecretReference) async throws -> Void
     private var cursor: UUID?
     private var generation = UUID()
     private let open: () async throws -> NativeJiraConfigurationServices
@@ -30,8 +31,10 @@ final class ProjectJiraConnectionsModel: ObservableObject {
              guard let reference = configuration.credential else { throw PluginConfigurationError.credentialScopeMismatch }
              return try NativeJiraLoginSession(configuration: configuration, registration: registration,
                                        store: KeychainSecretStore(scope: reference.scope))
+         }, removeGrant: @escaping @Sendable (SecretReference) async throws -> Void = { reference in
+             try await KeychainSecretStore(scope: reference.scope).delete(reference)
          }, open: @escaping () async throws -> NativeJiraConfigurationServices) {
-        self.project = project; self.open = open; self.makeLogin = makeLogin
+        self.project = project; self.open = open; self.makeLogin = makeLogin; self.removeGrant = removeGrant
     }
     func load(more: Bool = false) async {
         guard !busy, !more || hasMore else { return }
@@ -148,6 +151,33 @@ final class ProjectJiraConnectionsModel: ObservableObject {
             }
         }
     }
+    func logout(_ record: PluginConfigurationRevision<JiraConnectionConfiguration>) async {
+        guard !busy else { return }
+        busy = true; error = nil; authenticationMessage = nil
+        let current = generation, id = record.configuration.id
+        var owned = false
+        do {
+            try await NativeJiraLoginOwnership.shared.acquire(id); owned = true
+            try Task.checkCancellation()
+            guard generation == current, record.configuration.scope == project.scope else { throw PluginStorageError.scopeMismatch }
+            let services = try await open()
+            guard let latest = try await services.store.read(id: id, in: project.scope),
+                  latest.revision == record.revision, latest.configuration == record.configuration else {
+                throw PluginStorageError.staleRevision
+            }
+            try Task.checkCancellation()
+            guard generation == current else { throw CancellationError() }
+            if let reference = latest.configuration.credential { try await removeGrant(reference) }
+            if generation == current {
+                authenticationMessage = "Local Jira grant removed. Your browser session and Atlassian consent are unchanged."
+            }
+        } catch {
+            if generation == current { self.error = "Could not remove the local Jira grant. Finish any active sign-in, refresh, and try again." }
+        }
+        if owned { await NativeJiraLoginOwnership.shared.release(id) }
+        if generation == current { busy = false }
+    }
+
     private func validate(_ record: PluginConfigurationRevision<JiraConnectionConfiguration>, generation expected: UUID) async throws {
         try Task.checkCancellation()
         guard generation == expected, record.configuration.scope == project.scope, record.configuration.enabled else {

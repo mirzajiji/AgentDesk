@@ -32,8 +32,8 @@ public struct RedactedText: Encodable, Equatable, Sendable {
 /// Scoped, deterministic defense in depth. Known values never appear in diagnostics or Codable output.
 public struct ContentRedactor: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     public let context: RedactionContext
-    private let variants: [String]
-    private let secretBytes: [Data]
+    private var variants: [String]
+    private var secretBytes: [Data]
     private let fields: Set<String>
     private let fieldPatterns: [String]
     private static let defaults = ["password", "passwd", "pwd", "secret", "token", "apiKey", "accessToken", "refreshToken",
@@ -82,6 +82,19 @@ public struct ContentRedactor: Sendable, CustomStringConvertible, CustomDebugStr
         variants = values.sorted { $0.utf8.count == $1.utf8.count ? $0 < $1 : $0.utf8.count > $1.utf8.count }
         secretBytes = rawValues
     }
+    /// Adds in-memory credentials owned by the caller in this exact context, preserving existing field rules.
+    public func includingKnownSecrets(_ secrets: [SecretValue], in requested: RedactionContext) throws -> ContentRedactor {
+        try Task.checkCancellation()
+        guard requested == context else { throw RedactionError.scopeMismatch }
+        guard secrets.count <= 64, secretBytes.count + secrets.count <= 64 else { throw RedactionError.invalidPolicy }
+        let existing = try secretBytes.map(SecretValue.init)
+        let expanded = try ContentRedactor(context: context, sensitiveFields: [], secrets: existing + secrets)
+        var result = self
+        result.variants = expanded.variants
+        result.secretBytes = expanded.secretBytes
+        return result
+    }
+
     /// Resolve only deliberately supplied scoped references. Missing/failed secrets prevent policy creation.
     /// The injected resolver remains responsible for authorizing Keychain access.
     public static func load(context: RedactionContext, sensitiveFields: [String] = [], references: [SecretReference],

@@ -52,6 +52,18 @@ actor PluginPolicySession {
         }
     }
 
+    func executeJira(_ operation: JiraReadOperation, connection: JiraCloudSession,
+                     permissions: PluginPermissions, context: RedactionContext, redactor: ContentRedactor,
+                     approvalID: UUID? = nil) async throws -> PolicyExecutionResult<JiraReadResult> {
+        let invocation = prepared
+        guard invocation.capability == operation.capability else { throw AuthorizationError.invalidInput }
+        return try await execute(approvalID: approvalID) { action in
+            guard action == invocation.action else { throw AuthorizationError.stalePolicy }
+            return try await connection.executePrepared(operation, prepared: invocation, permissions: permissions,
+                context: context, redactor: redactor)
+        }
+    }
+
     func installAuthority(_ authority: PolicyAuthority) async throws {
         authorityGeneration = UUID()
         if authority.id == requesterID, case .pairedDevice = authority.kind {

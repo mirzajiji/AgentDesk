@@ -90,7 +90,8 @@ The following tasks implement section 110's eleven connection requirements and t
 | --- | --- | --- |
 | P3-01 | Complete: scoped plugin configuration and lifecycle foundation | Immutable scoped storage, Keychain references, capability metadata and cleanup; 15 package tests on Mac and iPhone, 196 Core, 518 Mac app and 337 iPhone app tests pass. See [validation and boundaries](p3-01-validation.md). |
 | P3-02 | Complete: plugin capability policy and exact approvals | Restrictive grants, exact bindings, durable review/dispatch and mobile denial; 150 Runtime, 19 plugin, 520 Mac and 339 iPhone tests plus final native rechecks pass. See [validation](p3-02-validation.md). |
-| P3-03 | Pending: Jira authentication and read capabilities | Instance/account validation, scoped login/logout/reauthentication, capability discovery, issue/comment/attachment reads, pagination, cancellation and safe network/authentication errors |
+| P3-03a | Complete: Jira read backend and authentication primitives | Scoped grant restoration, site/account validation, read discovery, policy-gated issue/comment/attachment reads, paging, cancellation, safe errors and credential redaction. See [acceptance and remaining scope](p3-03a-validation.md). |
+| P3-03b | In progress: interactive Jira OAuth lifecycle | Confidential code exchange, scoped sign-in/logout/reauthentication, refresh rotation and failure/cancellation tests; native setup is P3-05. |
 | P3-04 | Pending: reviewed Jira mutations and bug integration | Explicit reviewed issue/comment/attachment operations, current-requirement and duplicate checks, known-ticket evidence additions, denial tests and ambiguous network outcome handling |
 | P3-05 | Pending: native plugin setup and diagnostics | Enable/configure/login/save/test/disconnect/logout/reset, permission review, real account/scope/status/health, compact windows and native lifecycle tests |
 | P3-06 | Pending: MCP transports and process lifecycle | Protocol handshake, scoped local process and remote transport, start/stop/restart/reconnect, bounded messages, cancellation/timeouts, process cleanup and redacted logs |
@@ -101,6 +102,8 @@ The following tasks implement section 110's eleven connection requirements and t
 | P3-11 | Pending: native database manager and schema browser | Configure/test/edit/duplicate/delete/password update, schema/table/column inspection, scoped query review, real connection states and native UI checks |
 | P3-12 | Pending: unified connection diagnostics | Measured supported DNS/TCP/TLS/authentication/access stages, MCP handshake/discovery and DB/schema failures; redacted actionable results and no invented health |
 | P3-13 | Pending: Phase 3 acceptance | Integrated native connection lifecycle, cross-company isolation, denied/approved dispatch, local protocol/database fixtures, Mac/iPhone validation and documentation audit |
+
+P3-03 was split into P3-03a and P3-03b for focused review and commits; their combined scope preserves the original authentication/read requirements. Native setup remains the separate P3-05 task.
 
 External service tests must use synthetic fixtures or an explicitly configured test account; development authorization does not authorize posting messages or tickets to a real company. AgentDesk's runtime review is still required for mutations. AgentDesk's own MCP server remains Phase 6.
 

@@ -14,6 +14,19 @@ final class ContentRedactorTests: XCTestCase {
         let secrets = try Dictionary(uniqueKeysWithValues: zip(references, values.map { try SecretValue(Data($0.utf8)) }))
         return try await ContentRedactor.load(context: context, sensitiveFields: fields, references: references) { secrets[$0] }
     }
+    func testAddingCredentialsPreservesExistingSecretsAndCustomFields() async throws {
+        let context = context
+        let original = try await redactor(["first-private-value"], context: context, fields: ["internalCredential"])
+        let expanded = try original.includingKnownSecrets([SecretValue(Data("new-private-value".utf8))], in: context)
+        let result = try expanded.redactJSON(#"{"summary":"first-private-value new-private-value","internalCredential":"custom-value","public":"unchanged"}"#, in: context)
+        XCTAssertFalse(result.text.contains("first-private-value"))
+        XCTAssertFalse(result.text.contains("new-private-value"))
+        XCTAssertFalse(result.text.contains("custom-value"))
+        XCTAssertTrue(result.text.contains("unchanged"))
+        XCTAssertTrue(try original.redactText("new-private-value", in: context).text.contains("new-private-value"), "Copying must not mutate the existing policy")
+        XCTAssertThrowsError(try original.includingKnownSecrets([], in: self.context))
+    }
+
     func testKnownOverlappingAndEncodedValuesAreRemovedWithoutChangingPublicText() async throws {
         let context = context, secret = "synthetic/P@ss-🔒"
         let redactor = try await redactor([secret, "overlap", "overlapping-value"], context: context)

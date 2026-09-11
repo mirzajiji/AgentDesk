@@ -82,6 +82,28 @@ These tasks include the Phase 2 bullets in section 110, retrieval in section 17 
 
 P2-10 was decomposed into four focused native UI commits on 2026-09-11; its scope is unchanged. The four native UI tasks and subsequent focused regressions are now complete. Phase 3–6 work remains outstanding.
 
+## Phase 3 — Connections
+
+The following tasks implement section 110's eleven connection requirements and the detailed plugin/MCP/database requirements in sections 31–49. Each implementation task includes documentation and focused tests; native integration tasks include Mac UI and primary iPhone shared-code validation. Configured, authenticated and healthy remain distinct states.
+
+| Task | Status and scope | Acceptance |
+| --- | --- | --- |
+| P3-01 | Pending: scoped plugin configuration and lifecycle | Versioned non-secret configuration with Keychain references, normalized capabilities, actual disconnect cleanup, cancellation, stale-generation rejection and two-project isolation |
+| P3-02 | Pending: plugin capability policy and exact approvals | Every dispatch crosses existing policy gate; capability-specific allow/approval/deny, exact payload/resource binding, expiry and no transport fallback bypass |
+| P3-03 | Pending: Jira authentication and read capabilities | Instance/account validation, scoped login/logout/reauthentication, capability discovery, issue/comment/attachment reads, pagination, cancellation and safe network/authentication errors |
+| P3-04 | Pending: reviewed Jira mutations and bug integration | Explicit reviewed issue/comment/attachment operations, current-requirement and duplicate checks, known-ticket evidence additions, denial tests and ambiguous network outcome handling |
+| P3-05 | Pending: native plugin setup and diagnostics | Enable/configure/login/save/test/disconnect/logout/reset, permission review, real account/scope/status/health, compact windows and native lifecycle tests |
+| P3-06 | Pending: MCP transports and process lifecycle | Protocol handshake, scoped local process and remote transport, start/stop/restart/reconnect, bounded messages, cancellation/timeouts, process cleanup and redacted logs |
+| P3-07 | Pending: MCP discovery and policy dispatch | Tools/resources/prompts discovery and paging, scoped capability permissions, exact approvals, changed-capability handling and untrusted output boundaries |
+| P3-08 | Pending: native MCP manager | Scoped configuration, transport/endpoint/process information, capabilities/authentication/permissions/logs/health, edit/disable/delete/test and native failure-state tests |
+| P3-09 | Pending: database configuration and deterministic SQL policy | Project/environment-bound configuration, Keychain credentials, driver contract, conservative multi-statement classification and allow/approval/deny before execution |
+| P3-10 | Pending: PostgreSQL driver and lifecycle | Parameterized execution, TLS configuration, connect/disconnect/cancel/timeout, transaction/resource cleanup, read/write/destructive permission tests and isolated local PostgreSQL integration |
+| P3-11 | Pending: native database manager and schema browser | Configure/test/edit/duplicate/delete/password update, schema/table/column inspection, scoped query review, real connection states and native UI checks |
+| P3-12 | Pending: unified connection diagnostics | Measured supported DNS/TCP/TLS/authentication/access stages, MCP handshake/discovery and DB/schema failures; redacted actionable results and no invented health |
+| P3-13 | Pending: Phase 3 acceptance | Integrated native connection lifecycle, cross-company isolation, denied/approved dispatch, local protocol/database fixtures, Mac/iPhone validation and documentation audit |
+
+External service tests must use synthetic fixtures or an explicitly configured test account; development authorization does not authorize posting messages or tickets to a real company. AgentDesk's runtime review is still required for mutations. AgentDesk's own MCP server remains Phase 6.
+
 ## Later phases
 
 Break each row below into independent feature commits using the same validation gate when that phase begins.

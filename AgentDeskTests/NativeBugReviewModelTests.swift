@@ -57,9 +57,21 @@ final class NativeBugReviewModelTests: XCTestCase {
         let first = try await store.prepare(draft, in: f.scope), incoming = try await store.publishReviewed(first, in: f.scope)
         let second = try await store.prepare(draft, in: f.scope), existing = try await store.publishReviewed(second, in: f.scope)
         var contextValid = true
+        var storageBusy = false
         let model = NativeBugReviewModel(service: service, catalog: catalog, incomingID: incoming.id,
-            validateContext: { if !contextValid { throw ExecutionSetupError.staleContext } })
+            validateContext: {
+                if storageBusy { throw CatalogError.busy }
+                if !contextValid { throw ExecutionSetupError.staleContext }
+            })
         await model.load(); XCTAssertEqual(model.review?.matches.count, 1)
+        storageBusy = true
+        await model.prepareResolution(existingID: existing.id, resolution: .duplicate, reason: "Reviewed same behavior")
+        XCTAssertNil(model.decision)
+        XCTAssertFalse(model.busy)
+        XCTAssertTrue(model.error?.contains("storage is busy") == true)
+        let afterBusy = try await store.history(incoming.id, in: f.scope)
+        XCTAssertEqual(afterBusy.count, 1)
+        storageBusy = false
         await model.prepareResolution(existingID: existing.id, resolution: .duplicate, reason: "Reviewed same behavior")
         XCTAssertNotNil(model.decision)
         await model.discardDecision(); XCTAssertNil(model.decision)

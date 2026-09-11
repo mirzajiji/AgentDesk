@@ -23,6 +23,13 @@ final class NativeBugReviewSessionTests: XCTestCase {
         })
         await session.open(using: context, incomingID: incoming.id)
         XCTAssertNotNil(session.model?.review, session.error ?? "")
+        // Exercise foreground refresh across monitoring ticks, then verify monitoring resumes.
+        for _ in 0..<20 {
+            try await Task.sleep(for: .milliseconds(75))
+            await session.model?.load()
+            XCTAssertNotNil(session.model?.review)
+            XCTAssertNil(session.model?.error)
+        }
         let changed = expectation(description: "Changed context closes review")
         let observation = session.$error.compactMap { $0 }.filter { $0.contains("context changed") }.prefix(1).sink { _ in changed.fulfill() }
         let settings = try await services.setup.settings(), current = try XCTUnwrap(settings.project)

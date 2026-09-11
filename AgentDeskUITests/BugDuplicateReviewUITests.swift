@@ -24,7 +24,7 @@ final class BugDuplicateReviewUITests: XCTestCase {
         let app = fixture("duplicate"); app.launch(); openReview(app)
         click("Prepare Ticket Addition", app, scroll: "bug.review.scroll")
         let copy = app.buttons["bug.draft.copy"]
-        XCTAssertTrue(copy.waitForExistence(timeout: 10)); reveal(copy, app, "bug.review.scroll")
+        XCTAssertTrue(copy.waitForExistence(timeout: 10), app.staticTexts["bug.review.error"].firstMatch.value as? String ?? "No draft error shown"); reveal(copy, app, "bug.review.scroll")
         XCTAssertTrue(copy.isHittable)
         XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "value CONTAINS %@", "synthetic-review-secret")).firstMatch.exists)
         attach(app, "Native known-ticket draft")
@@ -33,11 +33,11 @@ final class BugDuplicateReviewUITests: XCTestCase {
         let reason = app.textFields["bug.decision.reason"]
         reveal(reason, app, "bug.review.scroll"); reason.click(); reason.typeText("Reviewed identical synthetic behavior")
         click("bug.decision.review", app, scroll: "bug.review.scroll")
-        XCTAssertTrue(app.buttons["bug.decision.publish"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["bug.decision.publish"].waitForExistence(timeout: 5), app.staticTexts["bug.review.error"].firstMatch.value as? String ?? "No decision error shown")
         XCTAssertTrue(app.buttons["bug.decision.publish"].isHittable)
         attach(app, "Native exact comparison decision")
         click("bug.decision.publish", app)
-        XCTAssertTrue(app.staticTexts["Recorded user decision: Duplicate"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Recorded user decision: Duplicate"].waitForExistence(timeout: 5), app.staticTexts["bug.review.error"].firstMatch.value as? String ?? "No publication error shown")
         click("bug.review.done", app); app.terminate(); app.launch()
         click("project.bugs.Synthetic run project", app)
         let row = app.staticTexts["Incoming synthetic finding"].firstMatch

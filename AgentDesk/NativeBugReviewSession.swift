@@ -41,27 +41,47 @@ final class NativeBugReviewSession: ObservableObject {
             guard token == generation, !Task.isCancelled else { await opened.shutdown(); return }
             service = opened
             let model = NativeBugReviewModel(service: opened, catalog: services.catalog, incomingID: incomingID,
-                validateContext: { try await services.setup.validate(context) })
+                validateContext: { [weak self] in
+                    guard let self else { throw ExecutionSetupError.staleContext }
+                    await self.stopMonitoring()
+                    try await services.setup.validate(context)
+                    self.startMonitoring(services: services, context: context, token: token)
+                })
             self.model = model
             await model.load()
             guard token == generation else { return }
             try Task.checkCancellation()
-            monitoring = Task { [weak self] in
-                do {
-                    while !Task.isCancelled {
-                        try await Task.sleep(for: .seconds(1))
-                        try await services.setup.validate(context)
-                    }
-                } catch is CancellationError { } catch {
-                    guard let self, self.generation == token else { return }
-                    await self.close()
-                    self.error = "The selected context changed. Review the current agent and environment before continuing."
-                }
-            }
+            startMonitoring(services: services, context: context, token: token)
         } catch {
             if token == generation {
                 await close()
                 self.error = NativeRunSession.message(error)
+            }
+        }
+    }
+
+    private func stopMonitoring() async {
+        let previous = monitoring
+        monitoring = nil
+        previous?.cancel()
+        await previous?.value
+    }
+
+    private func startMonitoring(services: ProjectNativeServices, context: ProjectRunContext, token: Int) {
+        guard generation == token, monitoring == nil else { return }
+        monitoring = Task { [weak self] in
+            do {
+                while !Task.isCancelled {
+                    try await Task.sleep(for: .seconds(1))
+                    guard let self, self.generation == token else { return }
+                    // Foreground actions validate their context; avoid competing catalog readers.
+                    if self.model?.busy == true { continue }
+                    try await services.setup.validate(context)
+                }
+            } catch is CancellationError { } catch {
+                guard let self, self.generation == token else { return }
+                await self.close()
+                self.error = "The selected context changed. Review the current agent and environment before continuing."
             }
         }
     }

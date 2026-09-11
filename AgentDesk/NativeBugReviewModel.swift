@@ -104,7 +104,13 @@ final class NativeBugReviewModel: ObservableObject {
             let value = try await prepareDecision(review, existingID, resolution, reason)
             guard token == generation, !Task.isCancelled else { await cancelDecision(value); return }
             decision = value
-        } catch { if token == generation { self.error = "The decision could not be prepared. Check the reason and refresh the current evidence." } }
+        } catch {
+            if token == generation {
+                self.error = error as? CatalogError == .busy
+                    ? "Project storage is busy. Try preparing the decision again shortly."
+                    : "The decision could not be prepared. Check the reason and refresh the current evidence."
+            }
+        }
     }
     func publishResolution() async {
         guard !busy, let decision else { return }
@@ -118,7 +124,9 @@ final class NativeBugReviewModel: ObservableObject {
             await cancelDecision(decision)
             if token == generation {
                 self.decision = nil; busy = false; review = nil
-                self.error = "The decision was not saved. Refresh and review the current registry before trying again."
+                self.error = error as? CatalogError == .busy
+                    ? "Project storage is busy. The decision was not saved; refresh and review it again."
+                    : "The decision was not saved. Refresh and review the current registry before trying again."
             }
         }
     }
@@ -143,7 +151,20 @@ final class NativeBugReviewModel: ObservableObject {
             try Task.checkCancellation(); guard token == generation else { return }
             draft = value
         } catch {
-            if token == generation { self.error = "A draft could not be prepared. Resolve duplicate decisions and verify the required context, current requirements and evidence." }
+            if token == generation {
+                let reason: String
+                switch error {
+                case CatalogError.busy: reason = "Project storage is busy. Try again shortly."
+                case BugRegistryError.staleRevision: reason = "The registry changed."
+                case BugRegistryError.invalidReview: reason = "The comparison or ticket is not eligible for this draft."
+                case BugRegistryError.unavailableReference: reason = "Required evidence is unavailable."
+                case BugRegistryError.scopeMismatch: reason = "The evidence belongs to another context."
+                case BugRegistryError.limitExceeded: reason = "The draft exceeds the supported size."
+                case is RedactionError: reason = "The content could not be safely redacted."
+                default: reason = "The current context or source data could not be verified."
+                }
+                self.error = "A draft could not be prepared. \(reason) Refresh and review the current evidence."
+            }
         }
     }
     func validatedDraftText() async throws -> String {

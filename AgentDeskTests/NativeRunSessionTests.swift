@@ -69,6 +69,55 @@ final class NativeRunSessionTests: XCTestCase {
         XCTAssertGreaterThan(f.provider.cancellations.withLock { $0 }, 0)
         await session.close(); await f.remove()
     }
+    func testBugAmbiguityRequiresApprovalAndDoesNotDecideRegistry() async throws {
+        let f = try await RunCoordinatorTests.Fixture.make(disposition: .approval); await f.coordinator.shutdown()
+        let catalog = try WorkspaceCatalog(container: f.root), store = try await catalog.bugStore(in: f.scope)
+        var draft = BugDraft(title: "Synthetic comparison", sources: [.init(scope: f.scope, origin: .observed, label: "Fixture", capturedAt: Date())],
+            changeReason: "Reviewed", assessment: .observed, environment: f.configuration.environment.id,
+            rootBehavior: "Synthetic callback", expectedBehavior: "Accept", actualBehavior: "Reject",
+            details: ["endpoint": .text("POST /synthetic"), "password": .text("synthetic-review-secret")])
+        let first = try await store.prepare(draft, in: f.scope), incoming = try await store.publishReviewed(first, in: f.scope)
+        draft.actualBehavior = "Reject after retry"
+        let second = try await store.prepare(draft, in: f.scope); _ = try await store.publishReviewed(second, in: f.scope)
+        let model = try await contextModel(f), session = session(f)
+        await session.prepareBugAmbiguity(using: model, incomingID: incoming.id)
+        XCTAssertEqual(session.phase, .prepared, session.errorMessage ?? "")
+        XCTAssertNotNil(session.prepared?.approval)
+        XCTAssertTrue(session.prepared?.bugReviewSnapshot?.contains("possibleDuplicate") == true)
+        XCTAssertFalse(session.prepared?.bugReviewSnapshot?.contains("synthetic-review-secret") == true)
+        let before = await f.provider.requests; XCTAssertTrue(before.isEmpty)
+        let finished = expectation(description: "Reviewed ambiguity completed")
+        let observation = session.$phase.filter { $0 == .finished }.prefix(1).sink { _ in finished.fulfill() }
+        await session.start(); await fulfillment(of: [finished], timeout: 5); observation.cancel()
+        XCTAssertEqual(session.outcome?.state, .completed)
+        let after = await f.provider.requests; XCTAssertEqual(after.count, 1)
+        let history = try await store.history(incoming.id, in: f.scope)
+        XCTAssertEqual(history.count, 1); XCTAssertNil(history.first?.content.comparisonReview)
+        await session.close(); await f.remove()
+    }
+
+    func testChangedRegistryBlocksPreparedNativeAmbiguity() async throws {
+        let f = try await RunCoordinatorTests.Fixture.make(disposition: .approval); await f.coordinator.shutdown()
+        let catalog = try WorkspaceCatalog(container: f.root), store = try await catalog.bugStore(in: f.scope)
+        var draft = BugDraft(title: "Synthetic", sources: [.init(scope: f.scope, origin: .observed, label: "Fixture", capturedAt: Date())],
+            changeReason: "Reviewed", assessment: .observed, environment: f.configuration.environment.id,
+            rootBehavior: "Callback", expectedBehavior: "Accept", actualBehavior: "Reject")
+        let first = try await store.prepare(draft, in: f.scope), incoming = try await store.publishReviewed(first, in: f.scope)
+        draft.actualBehavior = "Different reject"
+        let second = try await store.prepare(draft, in: f.scope); _ = try await store.publishReviewed(second, in: f.scope)
+        let model = try await contextModel(f), session = session(f)
+        await session.prepareBugAmbiguity(using: model, incomingID: incoming.id)
+        XCTAssertEqual(session.phase, .prepared, session.errorMessage ?? "")
+        let third = try await store.prepare(draft, in: f.scope); _ = try await store.publishReviewed(third, in: f.scope)
+        await session.start()
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while session.phase == .running, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+        let requests = await f.provider.requests; XCTAssertTrue(requests.isEmpty)
+        XCTAssertTrue(session.phase == .idle || session.phase == .finished)
+        XCTAssertNotEqual(session.outcome?.state, .completed)
+        await session.close(); await f.remove()
+    }
+
     private func contextModel(_ f: RunCoordinatorTests.Fixture) async throws -> ProjectRunContextModel {
         let catalog = try WorkspaceCatalog(container: f.root)
         let project = try await catalog.project(f.scope)

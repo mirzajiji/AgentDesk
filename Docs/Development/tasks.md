@@ -73,7 +73,7 @@ Phase 2 is decomposed into 11 planned tasks (P2-06 split into index and context 
 | P2-10a | Complete: native memory, notes and inbox | Scoped browser/editor, exact sanitized review, promotion/archive/ignore and immutable history; 192 Core and 333 iPhone tests pass, plus native Mac model/layout/UI checks. See [validation](p2-10a-validation.md). |
 | P2-10b | Complete: native Bug Registry workspace | Reviewed scoped bug edits, ticket links, immutable history, direct/inverse navigation and measured sheet sizing; 193 Core, 334 iPhone and native Mac model/layout/UI checks pass. See [validation](p2-10b-validation.md). |
 | P2-10c | Complete: native traceability and impact views | Reviewed links, current/historical inspection, Bug Registry associations and coverage; 196 Core, 22 final Mac model/command/layout, two native UI flows and 337 iPhone tests pass. See [validation](p2-10c-validation.md). |
-| P2-10d | Pending: native duplicate and report review | Current evidence, deterministic/semantic comparisons, explicit decisions, known-ticket additions and CityPay report/group review |
+| P2-10d | Complete: native duplicate and report review | Current evidence, deterministic/semantic comparisons, explicit decisions, known-ticket additions and CityPay report/group review |
 | P2-11 | Pending: Phase 2 acceptance and documentation | Native latest-versus-historical scenario, stale tests, known duplicate with additional evidence, isolation, Mac/iPhone tests and docs |
 
 These tasks include the Phase 2 bullets in section 110, retrieval in section 17 and the corresponding notes/inbox/relationship requirements. Later integration phases must consume these services through their policy boundaries; completing storage alone does not authorize model or mobile writes.

@@ -50,6 +50,12 @@ final class NativeRunSession: ObservableObject {
     var hasPendingWork: Bool { phase == .preparing || phase == .prepared || phase == .running || phase == .closing }
 
     func prepare(using model: ProjectRunContextModel, task: String) async {
+        await prepare(using: model, task: task, bugID: nil)
+    }
+    func prepareBugAmbiguity(using model: ProjectRunContextModel, incomingID: BugID) async {
+        await prepare(using: model, task: "", bugID: incomingID)
+    }
+    private func prepare(using model: ProjectRunContextModel, task: String, bugID: BugID?) async {
         guard !hasPendingWork else { return }
         await close()
         phase = .preparing; errorMessage = nil; outcome = nil; run = nil; progress = nil; inputSnapshot = nil
@@ -62,7 +68,16 @@ final class NativeRunSession: ObservableObject {
             guard token == generation else { await service.shutdown(); return }
             self.service = service
             try await registry.register(service)
-            let prepared = try await service.prepare(context: context, setup: services.setup, task: task, knowledgeCatalog: services.catalog)
+            let prepared: PreparedRun
+            if let bugID {
+                try await services.setup.validate(context)
+                let review = try await service.prepareBugReview(catalog: services.catalog, incomingID: bugID)
+                try await services.setup.validate(context)
+                prepared = try await service.prepareBugAmbiguity(review, instructions: context.instructions,
+                    configuration: context.configuration, knowledgeCatalog: services.catalog)
+            } else {
+                prepared = try await service.prepare(context: context, setup: services.setup, task: task, knowledgeCatalog: services.catalog)
+            }
             let snapshot = try await service.inputSnapshot(for: prepared.runID)
             let run = try await service.run(prepared.runID)
             try Task.checkCancellation()

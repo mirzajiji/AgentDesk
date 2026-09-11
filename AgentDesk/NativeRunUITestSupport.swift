@@ -31,6 +31,31 @@ enum NativeRunUITestSupport {
         }
         _ = try await catalog.agentStore(in: project.scope).create(.init(name: "Synthetic reviewer",
             instructions: "Inspect synthetic files only."), in: project.scope)
+        if let mode = ProcessInfo.processInfo.environment["AGENTDESK_TEST_BUG_REVIEW_MODE"], ["duplicate", "ambiguous"].contains(mode) {
+            guard let environment = try await setup.settings().project?.draft.environments.first?.id else { throw CatalogError.invalidConfiguration }
+            let requirements = try await catalog.requirementStore(in: project.scope), id = RequirementID(rawValue: "synthetic-refund")!
+            let requirement = try await requirements.prepare(.init(description: "Accept a valid synthetic refund", changeReason: "UI fixture", status: .active), id: id, expectedVersion: nil, in: project.scope)
+            _ = try await requirements.publishReviewed(requirement, in: project.scope)
+            let bugs = try await catalog.bugStore(in: project.scope)
+            var draft = BugDraft(title: "Incoming synthetic finding", sources: [.init(scope: project.scope, origin: .observed, label: "Synthetic UI fixture", capturedAt: Date())],
+                changeReason: "UI fixture", assessment: .observed, environment: environment,
+                rootBehavior: "Valid synthetic refund rejected", expectedBehavior: "Accept", actualBehavior: "Reject", reproduction: ["Request a synthetic refund"],
+                details: ["endpoint": .text("POST /synthetic/refunds"), "password": .text("synthetic-review-secret")])
+            let incoming = try await bugs.prepare(draft, requirements: [.init(requirement: .init(id: id))], in: project.scope)
+            _ = try await bugs.publishReviewed(incoming, in: project.scope)
+            draft.title = "Existing synthetic ticket"; draft.ticket = try .init(key: "SYN-42")
+            if mode == "ambiguous" { draft.actualBehavior = "Reject only after retry" }
+            let existing = try await bugs.prepare(draft, requirements: [.init(requirement: .init(id: id))], in: project.scope)
+            _ = try await bugs.publishReviewed(existing, in: project.scope)
+        }
+    }
+    static func openReview(_ services: ProjectNativeServices, context: ProjectRunContext) async throws -> NativeRunService {
+        guard mode() != nil else { throw CatalogError.invalidConfiguration }
+        let expected = try root().appendingPathComponent("Data/\(context.scope.workspaceID)/operations.sqlite")
+        guard services.database.standardizedFileURL == expected.standardizedFileURL,
+              services.setup.scope == context.scope else { throw CatalogError.invalidConfiguration }
+        return try await NativeRunService.openReview(database: services.database,
+            directory: services.database.deletingLastPathComponent(), configuration: context.configuration)
     }
     static func open(_ services: ProjectNativeServices, context: ProjectRunContext) async throws -> NativeRunService {
         guard let mode = mode() else { throw CatalogError.invalidConfiguration }

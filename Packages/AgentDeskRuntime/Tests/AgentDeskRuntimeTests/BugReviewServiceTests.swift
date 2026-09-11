@@ -17,6 +17,47 @@ final class BugReviewServiceTests: XCTestCase {
         let proposal = try await store.prepare(draft, in: store.scope)
         return try await store.publishReviewed(proposal, in: store.scope)
     }
+    func testReviewOnlyServiceReadsWithoutProviderAndCannotPrepareExecution() async throws {
+        let f = try await RunCoordinatorTests.Fixture.make(); await f.coordinator.shutdown()
+        let service = try await NativeRunService.openReview(database: f.database, directory: f.root, configuration: f.configuration)
+        let catalog = try WorkspaceCatalog(container: f.root), store = try await catalog.bugStore(in: f.scope)
+        let incoming = try await save(draft(f), to: store)
+        let review = try await service.prepareBugReview(catalog: catalog, incomingID: incoming.id)
+        try await service.validateBugReview(review)
+        XCTAssertEqual(review.incomingID, incoming.id)
+        do {
+            _ = try await service.prepare(instructions: f.instructions, configuration: f.configuration, task: "Cannot execute")
+            XCTFail("Review-only service prepared an execution")
+        } catch { XCTAssertTrue(error is AuthorizationError) }
+        let requests = await f.provider.requests; XCTAssertTrue(requests.isEmpty)
+        await service.shutdown(); await f.remove()
+    }
+
+    func testNativeDecisionReviewCancellationStalenessAndExactPublication() async throws {
+        let f = try await RunCoordinatorTests.Fixture.make(); await f.coordinator.shutdown()
+        let service = try await NativeRunService.openReview(database: f.database, directory: f.root, configuration: f.configuration)
+        let catalog = try WorkspaceCatalog(container: f.root), store = try await catalog.bugStore(in: f.scope)
+        let incoming = try await save(draft(f), to: store), existing = try await save(draft(f), to: store)
+        let review = try await service.prepareBugReview(catalog: catalog, incomingID: incoming.id)
+        let cancelled = try await service.prepareBugDecision(review, existingID: existing.id, resolution: .distinct, reason: "Reviewed distinction")
+        await service.cancelBugDecision(cancelled)
+        do { _ = try await service.publishBugDecision(cancelled); XCTFail("Cancelled decision published") } catch { }
+        let unchanged = try await store.history(incoming.id, in: f.scope); XCTAssertEqual(unchanged.count, 1)
+        let stale = try await service.prepareBugDecision(review, existingID: existing.id, resolution: .duplicate, reason: "Same behavior")
+        _ = try await save(draft(f), to: store)
+        do { _ = try await service.publishBugDecision(stale); XCTFail("Changed registry accepted") }
+        catch { XCTAssertEqual(error as? BugRegistryError, .staleRevision) }
+        let current = try await service.prepareBugReview(catalog: catalog, incomingID: incoming.id)
+        let exact = try await service.prepareBugDecision(current, existingID: existing.id, resolution: .duplicate, reason: "Reviewed matching behavior")
+        XCTAssertFalse(exact.content.text.contains("synthetic-private-value"))
+        let published = try await service.publishBugDecision(exact)
+        XCTAssertEqual(published.revision, 2)
+        XCTAssertEqual(published.content.comparisonReview, exact.decision)
+        XCTAssertEqual(published.content.relationships.first?.target, existing.id)
+        do { _ = try await service.publishBugDecision(exact); XCTFail("Decision replay accepted") } catch { }
+        await service.shutdown(); await f.remove()
+    }
+
     func testAuthorizedReviewRedactsSourceDataAndInvalidatesOnRegistryChange() async throws {
         let f = try await RunCoordinatorTests.Fixture.make(); await f.coordinator.shutdown()
         let service = try await NativeRunService.open(database: f.database, directory: f.root,
@@ -30,12 +71,18 @@ final class BugReviewServiceTests: XCTestCase {
         XCTAssertEqual(review.matches.first?.result.classification, .duplicate)
         XCTAssertFalse(review.content.text.contains("synthetic-private-value"))
         XCTAssertTrue(review.content.text.contains("SYN-18"))
-        try await review.validate()
+        try await service.validateBugReview(review)
         _ = try await save(draft(f), to: store)
-        do { try await review.validate(); XCTFail("Stale review remained usable") }
+        do { try await service.validateBugReview(review); XCTFail("Stale review remained usable") }
         catch { XCTAssertEqual(error as? BugRegistryError, .staleRevision) }
         let requests = await f.provider.requests; XCTAssertTrue(requests.isEmpty, "Deterministic comparison must not invoke Codex")
-        await service.shutdown(); await f.remove()
+        await service.shutdown()
+        let other = try await NativeRunService.open(database: f.database, directory: f.root,
+            configuration: f.configuration, captureRepository: false, provider: f.provider)
+        do { try await other.validateBugReview(review); XCTFail("Review transferred between native services") }
+        catch { XCTAssertEqual(error as? BugRegistryError, .scopeMismatch) }
+        await other.shutdown()
+        await f.remove()
     }
 
     func testAmbiguityUsesReviewedProviderRunWithExactSanitizedEvidence() async throws {

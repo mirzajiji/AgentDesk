@@ -96,3 +96,15 @@ Mac views use scrollable forms, an explicit review footer, and adaptive logical 
 Ticket & Links now provides an explicit Edit requirement associations toggle. Leaving it off preserves the exact saved references on ordinary bug edits. Turning it on reviews latest-active requirements by default, allows deliberately historical versions and roles, and permits an explicitly empty selection to clear all associations. The review includes before/after requirement IDs, versions and historical choices. A requirement changing between review and publication rejects a latest-active request.
 
 Coverage subjects support adding/removing manual or automated test identities. These are inert associations, not claims of execution or correctness. The traceability inspector includes current, potentially stale and unavailable Bug Registry requirement associations and opens the scoped bug editor for review. Archived bug heads are excluded from impact. Bugs retain their immutable revision history. See [P2-10c validation](../Development/p2-10c-validation.md) for native UI, Mac and iPhone coverage.
+
+## Native comparison and report review (P2-10d)
+
+The current implementation opens **Review Duplicates** from a selected bug. Select an agent and environment, review the context, then compare current evidence. This opens a read-only review service without requiring a Codex login. The service holds the project lease and validates context, scope, source revisions and expiry. Changing context or closing the sheet releases that lease.
+
+The comparison separates deterministic suggestions, recorded user decisions, current requirements and source provenance. Choosing Duplicate, Related or Distinct and entering a reason prepares an exact local decision for review. Saving consumes that proposal; cancellation leaves history unchanged. A changed comparison invalidates publication. These native administrative controls do not give the agent registry-write authority.
+
+For a matching registered ticket, **Prepare Ticket Addition** creates a local evidence draft. **Prepare CityPay Report** requires explicit component, region, area and module; grouping additionally requires compatible observations and a shared problem title. Unresolved duplicate candidates block a new report. **Copy Reviewed Draft** revalidates the context and bound sources before writing the clipboard. Neither action creates or updates an external ticket.
+
+A possible duplicate can open the existing Codex run console. The read-only review releases its lease first; the console prepares a fresh comparison and displays the exact comparison evidence before the normal execution approval. Its result remains interpretation and does not save a duplicate decision automatically.
+
+Native interactive scenarios and the unlocked-session Keychain recheck passed. See [P2-10d validation](../Development/p2-10d-validation.md) for passing model, Runtime and iPhone coverage and the blocked UI runs.

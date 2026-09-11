@@ -11,14 +11,19 @@ struct ProjectRunConsoleView: View {
     @StateObject private var session = NativeRunSession()
     @StateObject private var evidence = RunEvidenceModel()
     @StateObject private var liveOutput = NativeLiveOutputModel()
+    private let bugReviewID: BugID?
     @State private var taskText = ""
     @State private var confirmClose = false
     @State private var showKnowledge = false
     @State private var historyError: String?
     @Environment(\.dismiss) private var dismiss
 
-    init(project: ProjectRecord, open: @escaping () async throws -> ProjectNativeServices) {
-        _context = StateObject(wrappedValue: ProjectRunContextModel(project: project, open: open))
+    init(project: ProjectRecord, bugReviewID: BugID? = nil, selectedAgentID: AgentID? = nil,
+         selectedEnvironmentID: EnvironmentID? = nil, open: @escaping () async throws -> ProjectNativeServices) {
+        self.bugReviewID = bugReviewID
+        let model = ProjectRunContextModel(project: project, open: open)
+        model.selectedAgentID = selectedAgentID; model.selectedEnvironmentID = selectedEnvironmentID
+        _context = StateObject(wrappedValue: model)
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -58,6 +63,9 @@ struct ProjectRunConsoleView: View {
                                         .accessibilityIdentifier("run.knowledge")
                                 }
                                 if let snapshot = session.inputSnapshot { DisclosureGroup("Prepared input") { plain(snapshot) } }
+                                if let comparison = prepared.bugReviewSnapshot {
+                                    DisclosureGroup("Prepared bug comparison evidence") { plain(comparison) }
+                                }
                                 if session.phase == .prepared {
                                     Text("Review the prepared input before starting. Codex has not been started for this run.")
                                     HStack {
@@ -157,11 +165,18 @@ struct ProjectRunConsoleView: View {
                         }
                     }.disabled(context.selectedAgentID == nil).accessibilityIdentifier("run.history.open")
                 }
+                if let bugReviewID {
+                    Text("Codex will interpret only current ambiguous comparisons. Its result does not save a registry decision or change a ticket.").font(.callout)
+                    Button("Prepare Ambiguity Review") {
+                        evidence.clear(); Task { await session.prepareBugAmbiguity(using: context, incomingID: bugReviewID) }
+                    }.disabled(context.presentation == nil).accessibilityIdentifier("run.bug.prepare")
+                } else {
                 Text("Task").font(.headline)
                 MacPlainTextEditor(text: $taskText, label: "Task", identifier: "run.task").frame(height: 120)
                 Button("Prepare Run") { evidence.clear(); Task { await session.prepare(using: context, task: taskText) } }
                     .disabled(context.presentation == nil || taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityIdentifier("run.prepare")
+                }
             }.padding(8).disabled(context.isBusy || session.hasPendingWork)
         }
     }

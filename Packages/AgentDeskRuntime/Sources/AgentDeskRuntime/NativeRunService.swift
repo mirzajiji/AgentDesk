@@ -42,17 +42,31 @@ public actor NativeRunService: RunEvidenceReading {
         await service.retain(repository)
         return service
     }
+    /// Opens deterministic evidence/report review without a Codex installation or execution authority.
+    public static func openReview(database: URL, repository: RepositoryAccess,
+                                  configuration: EffectiveExecutionConfiguration) async throws -> NativeRunService {
+        guard repository.registration.scope == configuration.scope else { throw RunCoordinatorError.invalidPreparation }
+        let service = try await openReview(database: database, directory: repository.directory, configuration: configuration)
+        await service.retain(repository)
+        return service
+    }
+    static func openReview(database: URL, directory: URL, configuration: EffectiveExecutionConfiguration) async throws -> NativeRunService {
+        let files = try GitRepositoryFiles(root: directory)
+        let boundary = ReviewOnlyExecutionBoundary(resource: try files.resource(in: configuration.scope))
+        return try await open(database: database, directory: directory, configuration: configuration,
+            captureRepository: false, provider: boundary, reviewOnly: true)
+    }
     private func retain(_ access: RepositoryAccess) { repositoryAccess = access }
     static func open(database: URL, directory: URL, configuration: EffectiveExecutionConfiguration, captureRepository: Bool,
                      redactor: @escaping @Sendable (RedactionContext) async throws -> ContentRedactor = { try ContentRedactor(context: $0) },
-                     provider: any ExecutionProvider) async throws -> NativeRunService {
+                     provider: any ExecutionProvider, reviewOnly: Bool = false) async throws -> NativeRunService {
         let requesterID = UUID(), reviewerID = UUID(), scope = configuration.scope, environmentID = configuration.environment.id
         // This local session expires; neither provider text nor serialized requests can renew it.
         let expiry = Date().addingTimeInterval(TimeInterval(configuration.timeoutSeconds + 1_800))
         let requester = try PolicyAuthority(id: requesterID, kind: .agent(configuration.agentID), scopes: [scope], environments: [environmentID],
-            operations: [.readEvidence, .runReadOnlyAgent], expiresAt: expiry)
+            operations: reviewOnly ? [.readEvidence] : [.readEvidence, .runReadOnlyAgent], expiresAt: expiry)
         let reviewer = try PolicyAuthority(id: reviewerID, kind: .localUser, scopes: [scope], environments: [environmentID],
-            operations: [.readEvidence, .runReadOnlyAgent], canApprove: true, expiresAt: expiry)
+            operations: reviewOnly ? [.readEvidence] : [.readEvidence, .runReadOnlyAgent], canApprove: true, expiresAt: expiry)
         let approvals = try ApprovalStore(database: database, scope: scope, environmentID: environmentID)
         let gate = try PolicyGate(policy: configuration.policy, authorities: [requester, reviewer], store: approvals)
         let coordinator = try RunCoordinator(database: database, scope: scope, environmentID: environmentID, gate: gate, provider: provider)
@@ -236,6 +250,13 @@ public actor NativeRunService: RunEvidenceReading {
             owner: requesterID, redactor: redactor, authorize: { try await self.authorizeBugRead(incomingID) },
             verify: { try await self.verifyBugEvidence($0) })
     }
+    /// Revalidate a displayed native review before its next action; presentation is not authority.
+    public func validateBugReview(_ review: PreparedBugReview) async throws {
+        try checkOpen()
+        guard review.owner == requesterID, review.scope == scope, review.environment == environmentID else { throw BugRegistryError.scopeMismatch }
+        try await review.validate()
+        try checkOpen()
+    }
     private func authorizeBugRead(_ incomingID: BugID) async throws {
         try checkOpen()
         struct Query: Encodable { let operation = "compare-bug-registry"; let incomingID: BugID }
@@ -243,6 +264,37 @@ public actor NativeRunService: RunEvidenceReading {
             resource: resource.fingerprint, payload: .canonical(Query(incomingID: incomingID)))
         try await gate.authorizePreparationRead(action, requesterID: reviewerID)
         try checkOpen()
+    }
+    /// Local administrative proposal. Explicit native review is required before publication,
+    /// just as for the registry editor; this method is never exposed as a model/mobile tool.
+    public func prepareBugDecision(_ review: PreparedBugReview, existingID: BugID,
+                                   resolution: BugReviewDecision.Resolution, reason: String) async throws -> PreparedBugDecision {
+        try await validateBugReview(review)
+        let redactor = try await makeRedactor(review.content.context)
+        let safeReason = try redactor.redactText(reason, in: redactor.context).text
+        let store = review.store
+        let proposal = try await store.prepareComparisonDecision(review.snapshot, incomingID: review.incomingID,
+            existingID: existingID, resolution: resolution, reason: safeReason, in: scope)
+        do {
+            try await validateBugReview(review)
+            guard let decision = proposal.candidate.content.comparisonReview else { throw BugRegistryError.invalidReview }
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let content = try redactor.redactJSON(String(decoding: encoder.encode(decision), as: UTF8.self), in: redactor.context)
+            return .init(decision: decision, proposedRevision: proposal.candidate.revision, content: content,
+                expiresAt: min(review.expiresAt, proposal.expiresAt), owner: requesterID, review: review, store: store, proposal: proposal)
+        } catch { await store.cancel(proposal); throw error }
+    }
+    public func publishBugDecision(_ decision: PreparedBugDecision) async throws -> BugRecord {
+        try checkOpen()
+        guard decision.owner == requesterID else { throw BugRegistryError.scopeMismatch }
+        do {
+            try await validateBugReview(decision.review)
+            return try await decision.store.publishReviewed(decision.proposal, in: scope)
+        } catch { await decision.store.cancel(decision.proposal); throw error }
+    }
+    public func cancelBugDecision(_ decision: PreparedBugDecision) async {
+        guard decision.owner == requesterID else { return }
+        await decision.store.cancel(decision.proposal)
     }
     public func prepareBugTicketEvidence(_ review: PreparedBugReview, existingID: BugID) async throws -> BugTicketEvidenceDraft {
         try checkOpen()
@@ -307,5 +359,12 @@ public actor NativeRunService: RunEvidenceReading {
         try checkOpen(); return evidence
     }
     private func checkOpen() throws { try Task.checkCancellation(); guard !closed else { throw RunCoordinatorError.closed } }
+}
+/// Defense in depth: the policy authorities also omit runReadOnlyAgent entirely.
+private struct ReviewOnlyExecutionBoundary: ExecutionProvider {
+    let resource: ExecutionResource
+    func start(_ request: ExecutionRequest) async throws -> ProviderExecution {
+        throw ExecutionProviderError.unsupportedAccess
+    }
 }
 #endif

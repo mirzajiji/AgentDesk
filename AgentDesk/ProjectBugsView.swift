@@ -6,9 +6,12 @@ import SwiftUI
 struct ProjectBugsView: View {
     @StateObject private var model: ProjectBugsModel
     @State private var editor: BugEditorRequest?
+    @State private var comparison: BugComparisonRequest?
+    private let openReview: (() async throws -> ProjectNativeServices)?
     @State private var availableHeight: CGFloat = 640
     @Environment(\.dismiss) private var dismiss
-    init(project: ProjectRecord, open: @escaping () async throws -> NativeBugServices) {
+    init(project: ProjectRecord, openReview: (() async throws -> ProjectNativeServices)? = nil, open: @escaping () async throws -> NativeBugServices) {
+        self.openReview = openReview
         _model = StateObject(wrappedValue: ProjectBugsModel(project: project, open: open))
     }
     var body: some View {
@@ -57,6 +60,12 @@ struct ProjectBugsView: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { availableHeight = $0 }
         .task(id: model.filter) { do { try await Task.sleep(for: .milliseconds(150)); await model.load() } catch { } }
         .onDisappear { model.cancel() }
+        .sheet(item: $comparison) { request in
+            if let openReview {
+                BugDuplicateReviewView(project: model.project, incomingID: request.bug, open: openReview)
+                    .frame(height: max(480, min(640, availableHeight - 24)))
+            }
+        }
         .sheet(item: $editor) { request in
             if let services = model.services {
                 BugEditorView(store: services.store, existing: request.existing, environments: services.environments) { record in
@@ -85,11 +94,11 @@ struct ProjectBugsView: View {
         else if let record = model.displayed, let safe = try? BugPresentation.sanitized(record.content, scope: model.project.scope) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    Text(safe.draft.title).font(.title2).bold().accessibilityIdentifier("bug.detail.title")
                     ViewThatFits(in: .horizontal) {
                         HStack { versionPicker; editButton }
                         VStack(alignment: .leading) { versionPicker; editButton }
                     }
-                    Text(safe.draft.title).font(.title2).bold().accessibilityIdentifier("bug.detail.title")
                     Text(record.id.rawValue).font(.caption).textSelection(.enabled).accessibilityIdentifier("bug.detail.id")
                     Text("Viewing v\(record.revision) · \(safe.draft.status.rawValue) · \(safe.draft.assessment.rawValue)").accessibilityIdentifier("bug.detail.version")
                     if safe.changed { Text("Sensitive content is masked.").foregroundStyle(.orange) }
@@ -140,9 +149,13 @@ struct ProjectBugsView: View {
             ForEach(model.history, id: \.revision) { Text("v\($0.revision)").tag(Optional($0.revision)) }
         }.accessibilityIdentifier("bugs.version")
     }
-    private var editButton: some View {
+    @ViewBuilder private var editButton: some View {
+        if openReview != nil, let latest = model.history.first {
+            Button("Review Duplicates") { comparison = .init(bug: latest.id) }.accessibilityIdentifier("bug.duplicates")
+        }
         Button("Edit Latest Version") { editor = .init(existing: model.history.first) }.accessibilityIdentifier("bug.edit")
     }
 }
+private struct BugComparisonRequest: Identifiable { let id = UUID(); let bug: BugID }
 private struct BugEditorRequest: Identifiable { let id = UUID(); var existing: BugRecord? = nil }
 #endif

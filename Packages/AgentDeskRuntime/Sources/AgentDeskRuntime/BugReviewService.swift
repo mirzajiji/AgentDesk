@@ -23,8 +23,16 @@ public struct PreparedBugReview: Sendable {
     public let readiness: BugComparisonResult.Classification?
     public let content: RedactedText
     public let expiresAt: Date
+    /// Exposes only the current decision classification; raw historical reason text stays private.
+    public func recordedResolution(for existingID: BugID) -> BugReviewDecision.Resolution? {
+        decisions.first { $0.existingID == existingID }?.resolution
+    }
+    public var registeredCandidateIDs: Set<BugID> {
+        Set(snapshot.records.filter { $0.record.id != incomingID && $0.record.content.ticket != nil }.map { $0.record.id })
+    }
     let owner: UUID
     let snapshot: BugComparisonSnapshot
+    let store: ProjectBugStore
     let decisions: [BugReviewDecision]
     let validate: @Sendable () async throws -> Void
 }
@@ -77,7 +85,7 @@ struct BugReviewService {
         try await validation()
         return PreparedBugReview(incomingID: incomingID, scope: store.scope, environment: environment,
             matches: matches, readiness: BugComparison.readiness(incoming), content: safe, expiresAt: expires, owner: owner,
-            snapshot: snapshot, decisions: decisions, validate: validation)
+            snapshot: snapshot, store: store, decisions: decisions, validate: validation)
     }
     private struct Packet: Encodable {
         let schemaVersion = 1

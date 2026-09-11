@@ -130,7 +130,7 @@ struct WorkspaceBrowserView: View {
             ProjectMemoryView(project: project, open: { try await model.memoryServices(for: project) })
         }
         .sheet(item: $bugsProject) { project in
-            ProjectBugsView(project: project, open: { try await model.bugServices(for: project) })
+            ProjectBugsView(project: project, openReview: { try await model.executionServices(for: project) }, open: { try await model.bugServices(for: project) })
                 .frame(height: max(480, min(640, availableHeight - 64)))
         }
         .sheet(item: $traceabilityProject) { project in

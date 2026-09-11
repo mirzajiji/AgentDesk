@@ -67,6 +67,9 @@ final class MacEditorLayoutTests: XCTestCase {
         assertFitsAndExpands(ProjectBugsView(project: project, open: {
             NativeBugServices(store: store, environments: [], environmentIssue: nil)
         }))
+        let openReview = { try await WorkspaceBrowserModel(catalog: catalog, applicationRoot: root).executionServices(for: project) }
+        assertFitsAndExpands(BugDuplicateReviewView(project: project, incomingID: BugID(), open: openReview))
+        assertFitsAndExpands(ProjectRunConsoleView(project: project, bugReviewID: BugID(), open: openReview))
     }
 
     func testMemoryEditorsFitCompactAndLargeLogicalWindows() async throws {

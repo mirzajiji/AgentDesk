@@ -21,6 +21,9 @@ final class NativeConnectionsUITests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: "connection.enabled").firstMatch.click()
         app.buttons["connection.save"].click()
         XCTAssertTrue(app.staticTexts["Enabled · Authentication not checked"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["connections.registration.unavailable"].exists)
+        let signIn = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "connection.login.")).firstMatch
+        XCTAssertTrue(signIn.exists); XCTAssertFalse(signIn.isEnabled)
         app.terminate(); app.launch()
         XCTAssertTrue(app.staticTexts["Connections"].firstMatch.waitForExistence(timeout: 5))
         app.staticTexts["Connections"].firstMatch.click()

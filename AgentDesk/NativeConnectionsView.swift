@@ -3,6 +3,7 @@ import AgentDeskCore
 import AgentDeskDesign
 import AgentDeskPlugins
 import SwiftUI
+import AppKit
 
 struct NativeConnectionsView: View {
     @ObservedObject var catalog: WorkspaceBrowserModel
@@ -44,6 +45,7 @@ private struct JiraEditorRequest: Identifiable {
 struct ProjectJiraConnectionsView: View {
     @StateObject private var model: ProjectJiraConnectionsModel
     @State private var editor: JiraEditorRequest?
+    private let registration = try? NativeJiraRegistration.load()
     init(project: ProjectRecord, open: @escaping () async throws -> NativeJiraConfigurationServices) {
         _model = StateObject(wrappedValue: ProjectJiraConnectionsModel(project: project, open: open))
     }
@@ -56,8 +58,16 @@ struct ProjectJiraConnectionsView: View {
                 Button("New Jira Connection") { editor = .init() }
                     .disabled(model.busy || model.environments.isEmpty).accessibilityIdentifier("connections.create")
             }
-            Text("Saving configuration does not sign in or contact Jira. Sign-in and connection testing are not available in this screen yet.")
+            Text("Saving configuration does not contact Jira. Sign-in requests read access; runtime permissions remain separate.")
                 .foregroundStyle(.secondary)
+            if registration == nil {
+                Text("Jira sign-in is unavailable in this build: the publisher’s OAuth registration is not configured.")
+                    .foregroundStyle(.secondary).accessibilityIdentifier("connections.registration.unavailable")
+            }
+            if let message = model.authenticationMessage {
+                Text(message).accessibilityIdentifier("connections.authentication")
+                if model.busy { Button("Cancel Sign-In") { model.cancelSignIn() }.accessibilityIdentifier("connections.login.cancel") }
+            }
             if let error = model.error { Text(error).foregroundStyle(.orange).accessibilityIdentifier("connections.error") }
             if model.busy { ProgressView("Loading connections…") }
             if model.environments.isEmpty && !model.busy {
@@ -79,6 +89,14 @@ struct ProjectJiraConnectionsView: View {
                                     Text("Configuration version \(record.revision)").font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()
+                                Button("Sign In") {
+                                    guard let registration else { return }
+                                    model.signIn(record, registration: registration) { url in
+                                        let opened = await MainActor.run { NSWorkspace.shared.open(url) }
+                                        guard opened else { throw JiraServiceError.unavailable }
+                                    }
+                                }.disabled(model.busy || !record.configuration.enabled || registration == nil)
+                                    .accessibilityIdentifier("connection.login.\(record.configuration.id)")
                                 Button("Edit") { editor = .init(existing: record) }.disabled(model.busy)
                                     .accessibilityIdentifier("connection.edit.\(record.configuration.id)")
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(6)

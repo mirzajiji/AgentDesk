@@ -40,3 +40,26 @@ The initial 80-test host suite passed (`oauth-registration-binding-host.log`). T
 
 
 Final registration-binding checks: 81 Plugins tests passed on native macOS 26.5.2 and 81 on iPhone 16 Pro / iOS 26.0, with zero failures (`registration-binding-mac.xcresult`, `registration-binding-iphone.xcresult`). Commands used `xcodebuild -scheme AgentDeskPlugins -parallel-testing-enabled NO test` from the Plugins package, with native Mac or primary Simulator UUID `C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE` destinations and the existing PluginMac / PluginsIPhone derived-data directories. Both normal app builds passed (`registration-app-mac.log`, `registration-app-iphone.log`) with Xcode 26.0 and the AgentDesk project/scheme. Documentation and diff checks passed. This completes the registration-binding component; native sign-in and full P3-05 acceptance remain outstanding.
+
+
+## Native sign-in coordination in progress
+
+Added an injectable asynchronous configuration validator to `JiraOAuthLogin.signIn`, checked before starting OAuth and before/after saving the validated grant. Rejection after saving uses the existing independent cleanup task to remove the attempted grant. This is not an atomic transaction with configuration storage; the native coordinator still must supply scoped revision checks and manage operation ownership.
+
+`swift test --package-path Packages/AgentDeskPlugins --filter JiraOAuthLoginTests` passed two host tests (`TestResults/p3-05/login-revalidation.log`). The added regression rejects at each of the three validation boundaries, checks browser invocation, and verifies no grant remains. Synthetic transports only. Native integration, full native validation and the task commit remain pending; no new sign-in UI or live authentication is claimed.
+
+
+The native coordinator and Sign In/Cancel controls are now implemented for a publisher-provided bundle registration. It reserves a scoped reference, serializes native window ownership, checks the latest configuration/environment around OAuth, and closes transports after completion. The default build has no production registration; its Sign In button is disabled with explicit configuration guidance.
+
+Initial native compilation exposed a Swift concurrency calling-convention mismatch between the app and package protocol witness; a small adapter resolves it. The first test build then required an explicit Security import. The first running model regression found cancellation also cancelled the list refresh, clearing the visible reserved reference. Refresh now runs in independent cleanup, with an explicit optional result type correcting a subsequent compiler inference failure. Final model/UI results follow when available. Logs: `native-login-build.log`, `native-login-model.log`, `native-login-fixed.log`, `native-login-cancellation-fixed.log`, `native-login-final.log`.
+
+
+Final native sign-in component checks passed:
+
+- `native-login-final.xcresult`: five native Mac model tests and one native Mac UI test, zero failures. The model tests cover public registration validation/read-only access, scoped reference reservation, configuration changes during login, cancellation cleanup and native ownership release. The UI test verifies the missing-registration message and disabled Sign In control alongside persisted configuration editing. Its app-window screenshot was exported and visually inspected.
+- `login-plugins-mac.log`: all 82 Plugins tests passed on the Mac host using `swift test --package-path Packages/AgentDeskPlugins`.
+- `login-plugins-iphone.xcresult`: all 82 Plugins tests passed on iPhone 16 Pro / iOS 26.0 using the AgentDeskPlugins package scheme, primary Simulator destination, PluginsIPhone derived-data directory and disabled parallel testing.
+- `login-app-iphone.log`: ordinary iPhone app build passed. Native Mac application and test targets compiled during the successful native test run. Commands used Xcode 26.0 on macOS 26.5.2 and the previously documented project/scheme/destinations.
+- Documentation integrity/link and diff whitespace checks passed.
+
+This commits the native sign-in integration component, not full P3-05 acceptance. Synthetic model services and broker transports establish local behavior; the UI test does not open a real authorization browser or exercise a live account. Publisher registration, deployed broker, complete native authentication UI acceptance, refresh/logout/reset/test/health/permissions and broader display validation remain outstanding. No live credentials or external Jira mutation occurred.

@@ -21,11 +21,14 @@ public actor JiraOAuthLogin {
         self.configuration = configuration; self.broker = broker; self.adapter = adapter
         vault = try JiraCredentialVault(configuration: configuration, store: store)
     }
-    public func signIn(openBrowser: @escaping @Sendable (URL) async throws -> Void) async throws -> JiraCloudAccount {
+    public func signIn(validateConfiguration: @escaping @Sendable () async throws -> Void = {},
+                       openBrowser: @escaping @Sendable (URL) async throws -> Void) async throws -> JiraCloudAccount {
         guard !closed, active == nil, !loggingOut, configuration.enabled else { throw JiraServiceError.unavailable }
         let configuration = configuration, broker = broker, adapter = adapter, vault = vault
         let registration = broker.registrationFingerprint
         let job = Task {
+            try await validateConfiguration()
+            try Task.checkCancellation()
             let proof = try JiraOAuthClaimProof()
             let attempt = try await broker.start(proof: proof)
             var attemptedSave = false
@@ -37,9 +40,11 @@ public actor JiraOAuthLogin {
                     try Task.checkCancellation()
                     if let tokens = try await broker.claim(attempt, proof: proof, now: Date()) {
                         let account = try await adapter.validate(tokens, configuration: configuration)
+                        try await validateConfiguration()
                         try Task.checkCancellation()
                         attemptedSave = true
                         try await vault.save(tokens, registration: registration)
+                        try await validateConfiguration()
                         try Task.checkCancellation()
                         return account
                     }

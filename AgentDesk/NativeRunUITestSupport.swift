@@ -31,6 +31,19 @@ enum NativeRunUITestSupport {
         }
         _ = try await catalog.agentStore(in: project.scope).create(.init(name: "Synthetic reviewer",
             instructions: "Inspect synthetic files only."), in: project.scope)
+        if ProcessInfo.processInfo.environment["AGENTDESK_TEST_MUTATION_HISTORY"] == "seeded" {
+            guard let environment = try await setup.settings().project?.draft.environments.first?.id else { throw CatalogError.invalidConfiguration }
+            let directories = try NativeProjectStorage.prepare(root: applicationRoot, workspaceID: workspace.id)
+            let ledger = try MutationAttemptStore(database: directories.data.appendingPathComponent("operations.sqlite"),
+                scope: project.scope, environmentID: environment)
+            for acknowledged in [false, true] {
+                let action = try PolicyAction(scope: project.scope, environmentID: environment, runID: RunID(), operation: .externalMutation,
+                    resource: .canonical("Synthetic Jira issue"), payload: .canonical("Synthetic reviewed content"))
+                let approval = UUID(), instant = Date()
+                _ = try await ledger.begin(action, approvalID: approval, at: instant)
+                if acknowledged { _ = try await ledger.finish(action, approvalID: approval, outcome: .acknowledged, at: instant) }
+            }
+        }
         if let mode = ProcessInfo.processInfo.environment["AGENTDESK_TEST_BUG_REVIEW_MODE"], ["duplicate", "ambiguous"].contains(mode) {
             guard let environment = try await setup.settings().project?.draft.environments.first?.id else { throw CatalogError.invalidConfiguration }
             let requirements = try await catalog.requirementStore(in: project.scope), id = RequirementID(rawValue: "synthetic-refund")!

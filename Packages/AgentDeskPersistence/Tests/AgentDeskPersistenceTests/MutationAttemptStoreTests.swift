@@ -54,4 +54,33 @@ import XCTest
         catch { XCTAssertEqual(error as? OperationalStoreError, .invalidDatabase) }
     }
 
+    func testPaginationIsBoundedAndDoesNotCrossEnvironment() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let scope = ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID()), environment = EnvironmentID()
+        let location = root.appendingPathComponent("operations.sqlite")
+        let store = try MutationAttemptStore(database: location, scope: scope, environmentID: environment)
+        var actions: [UUID] = []
+        for _ in 0..<5 {
+            let action = try PolicyAction(scope: scope, environmentID: environment, operation: .externalMutation,
+                resource: .canonical("synthetic"), payload: .canonical("synthetic"))
+            actions.append(action.id)
+            _ = try await store.begin(action, approvalID: UUID(), at: Date(timeIntervalSince1970: 1000))
+        }
+        let first = try await store.page(limit: 2)
+        let second = try await store.page(after: XCTUnwrap(first.nextActionID), limit: 2)
+        let third = try await store.page(after: XCTUnwrap(second.nextActionID), limit: 2)
+        XCTAssertEqual(first.records.count, 2); XCTAssertEqual(second.records.count, 2)
+        XCTAssertEqual(third.records.count, 1); XCTAssertNil(third.nextActionID)
+        XCTAssertEqual((first.records + second.records + third.records).map(\.action.id), actions.sorted { $0.uuidString < $1.uuidString })
+        let foreign = try MutationAttemptStore(database: location, scope: scope, environmentID: EnvironmentID())
+        let empty = try await foreign.page()
+        XCTAssertTrue(empty.records.isEmpty); XCTAssertNil(empty.nextActionID)
+        for invalid in [0, 101] {
+            do { _ = try await store.page(limit: invalid); XCTFail("Unbounded query") }
+            catch { XCTAssertEqual(error as? AuthorizationError, .invalidInput) }
+        }
+    }
+
 }

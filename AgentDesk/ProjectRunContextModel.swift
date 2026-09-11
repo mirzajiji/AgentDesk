@@ -92,6 +92,24 @@ final class ProjectRunContextModel: ObservableObject {
         } catch { invalidate(); throw error }
     }
 
+    func mutationHistory() async throws -> (NativeMutationHistory, String) {
+        guard !isBusy, let services, let selectedAgentID else { throw ExecutionSetupError.staleContext }
+        let token = generation, setup = services.setup
+        let current = try await setup.preview(agentID: selectedAgentID, environmentID: selectedEnvironmentID)
+        guard token == generation else { throw ExecutionSetupError.staleContext }
+        let environment = current.configuration.environment.id
+        let scope = project.scope
+        let user = try PolicyAuthority(id: UUID(), kind: .localUser, scopes: [scope], environments: [environment],
+            operations: [.readEvidence], expiresAt: Date().addingTimeInterval(1800))
+        let service = try NativeMutationHistory(database: services.database, scope: scope, environmentID: environment,
+            policy: current.configuration.policy, user: user, currentPolicy: {
+                let fresh = try await setup.preview(agentID: selectedAgentID, environmentID: environment).configuration
+                guard fresh.scope == scope, fresh.environment.id == environment else { throw AuthorizationError.scopeMismatch }
+                return fresh.policy
+            })
+        return (service, try RunContextPresentation(current).environmentName)
+    }
+
     func archive() async throws -> NativeRunArchive {
         guard !isBusy, let services, let selectedAgentID else { throw ExecutionSetupError.staleContext }
         let token = generation, setup = services.setup

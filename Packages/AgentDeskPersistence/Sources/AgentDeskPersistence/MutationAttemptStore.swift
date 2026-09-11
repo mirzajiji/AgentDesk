@@ -13,6 +13,11 @@ public struct MutationAttemptRecord: Codable, Equatable, Sendable {
     public let outcome: MutationAttemptOutcome
 }
 
+public struct MutationAttemptPage: Sendable {
+    public let records: [MutationAttemptRecord]
+    public let nextActionID: UUID?
+}
+
 /// Operational evidence only. The caller must consume an exact approval before beginning.
 /// No remote response text or credentials are accepted by this ledger.
 public actor MutationAttemptStore {
@@ -26,19 +31,34 @@ public actor MutationAttemptStore {
         self.scope = scope; self.environmentID = environmentID
     }
     public func record(_ actionID: UUID) throws -> MutationAttemptRecord? {
-        try database.query("SELECT record_json FROM mutation_attempts WHERE workspace_id=? AND project_id=? AND environment_id=? AND action_id=?",
-            context + [.text(actionID.uuidString)]) { row in
-                let text = try SQLiteConnection.text(row, 0)
-                let value = try JSONDecoder().decode(MutationAttemptRecord.self, from: Data(text.utf8))
-                guard value.action.id == actionID, value.action.scope == scope,
-                      value.action.environmentID == environmentID,
-                      [.externalMutation, .destructiveAction].contains(value.action.operation),
-                      value.startedAt.timeIntervalSince1970.isFinite,
-                      value.updatedAt.timeIntervalSince1970.isFinite, value.updatedAt >= value.startedAt else {
-                    throw OperationalStoreError.invalidDatabase
-                }
-                return value
-            }.first
+        try database.query("SELECT action_id,record_json FROM mutation_attempts WHERE workspace_id=? AND project_id=? AND environment_id=? AND action_id=?",
+            context + [.text(actionID.uuidString)], map: decode).first
+    }
+    /// Stable key pagination, not chronological ordering. Refresh to include newly inserted keys
+    /// before the cursor; outcome changes do not shift existing records between pages.
+    public func page(after actionID: UUID? = nil, limit: Int = 50) throws -> MutationAttemptPage {
+        guard (1...100).contains(limit) else { throw AuthorizationError.invalidInput }
+        var sql = "SELECT action_id,record_json FROM mutation_attempts WHERE workspace_id=? AND project_id=? AND environment_id=?"
+        var values = context
+        if let actionID { sql += " AND action_id>?"; values.append(.text(actionID.uuidString)) }
+        sql += " ORDER BY action_id LIMIT ?"
+        values.append(.integer(Int64(limit + 1)))
+        let found = try database.query(sql, values, map: decode)
+        let records = Array(found.prefix(limit))
+        return MutationAttemptPage(records: records, nextActionID: found.count > limit ? records.last?.action.id : nil)
+    }
+    private func decode(_ row: OpaquePointer) throws -> MutationAttemptRecord {
+        guard let actionID = UUID(uuidString: try SQLiteConnection.text(row, 0)) else { throw OperationalStoreError.invalidDatabase }
+        let text = try SQLiteConnection.text(row, 1)
+        let value = try JSONDecoder().decode(MutationAttemptRecord.self, from: Data(text.utf8))
+        guard value.action.id == actionID, value.action.scope == scope,
+              value.action.environmentID == environmentID,
+              [.externalMutation, .destructiveAction].contains(value.action.operation),
+              value.startedAt.timeIntervalSince1970.isFinite,
+              value.updatedAt.timeIntervalSince1970.isFinite, value.updatedAt >= value.startedAt else {
+            throw OperationalStoreError.invalidDatabase
+        }
+        return value
     }
     public func begin(_ action: PolicyAction, approvalID: UUID, at now: Date) throws -> MutationAttemptRecord {
         guard action.scope == scope, action.environmentID == environmentID else { throw AuthorizationError.scopeMismatch }

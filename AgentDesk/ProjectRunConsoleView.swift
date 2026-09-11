@@ -15,6 +15,9 @@ struct ProjectRunConsoleView: View {
     @State private var taskText = ""
     @State private var confirmClose = false
     @State private var showKnowledge = false
+    @State private var showMutationHistory = false
+    @State private var mutationHistory: NativeMutationHistory?
+    @State private var mutationEnvironment = ""
     @State private var historyError: String?
     @Environment(\.dismiss) private var dismiss
 
@@ -134,6 +137,11 @@ struct ProjectRunConsoleView: View {
             }
         }
         .background(NativeRunWindowAnchor { session.presentWindow = $0 }.frame(width: 0, height: 0))
+        .sheet(isPresented: $showMutationHistory, onDismiss: { mutationHistory = nil }) {
+            if let mutationHistory {
+                MutationHistoryView(projectName: context.project.name, environmentName: mutationEnvironment, open: { mutationHistory })
+            }
+        }
         .sheet(isPresented: $showKnowledge) {
             if let snapshot = session.prepared?.knowledgeSnapshot { KnowledgeContextInspector(snapshot: snapshot) }
         }
@@ -164,6 +172,15 @@ struct ProjectRunConsoleView: View {
                             catch { historyError = NativeRunSession.message(error) }
                         }
                     }.disabled(context.selectedAgentID == nil).accessibilityIdentifier("run.history.open")
+                    Button("Mutation History") {
+                        historyError = nil
+                        Task {
+                            do {
+                                let result = try await context.mutationHistory()
+                                mutationHistory = result.0; mutationEnvironment = result.1; showMutationHistory = true
+                            } catch { historyError = NativeRunSession.message(error) }
+                        }
+                    }.disabled(context.selectedAgentID == nil || context.isBusy).accessibilityIdentifier("mutation.history.open")
                 }
                 if let bugReviewID {
                     Text("Codex will interpret only current ambiguous comparisons. Its result does not save a registry decision or change a ticket.").font(.callout)

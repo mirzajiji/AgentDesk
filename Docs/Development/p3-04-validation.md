@@ -155,3 +155,47 @@ The updated runtime passed on iPhone 16 Pro / iOS 26.0: `xcodebuild -scheme Agen
 Native Mac runtime tests passed 159 tests on macOS 26.5.2 / Xcode 26.0: from `Packages/AgentDeskRuntime`, `xcodebuild -scheme AgentDeskRuntime -destination 'platform=macOS' -derivedDataPath ../../TestResults/p3-04/RuntimeMac -resultBundlePath ../../TestResults/p3-04/ledger-runtime-mac.xcresult -parallel-testing-enabled NO test`. The iPhone run above passed 78 supported tests. Existing SQLite fixture-cleanup warnings persist.
 
 Both app builds passed with the ledger: `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build` and the equivalent iPhone 16 Pro Simulator destination with `TestResults/p1-08b/FilteredIPhone`. Logs: `TestResults/p3-04/ledger-app-mac.log` and `ledger-app-iphone.log`. Documentation and diff checks passed. This checkpoint persists operational outcomes; native outcome browsing/reconciliation and the remaining P3-04 operations are still incomplete.
+
+### Mutation history pagination
+
+Added bounded (1–100 records) key-based history pagination, ordered by action UUID. It retains scope/environment predicates and validates embedded record identity on every page. This is not chronological ordering or snapshot isolation: refreshing is required to see later insertions whose keys sort before the cursor. Tests cover three pages without duplicates, page limits and empty foreign-environment results. `swift test --package-path Packages/AgentDeskPersistence` passed 50 tests (`TestResults/p3-04/ledger-pagination.log`). Native history UI and its validation are still pending; no additional native coverage is claimed for this change yet.
+
+### Local-user history authorization service
+
+Added `NativeMutationHistory` for project/environment operational browsing with local-user authority, read-policy checks before and after storage access, policy updates and explicit close/cancellation checks. Agent authority cannot open this local-user service. The native screen is not wired yet. `swift test --package-path Packages/AgentDeskRuntime --filter NativeMutationHistoryTests` passed the read/revocation/close/agent-denial regression (`TestResults/p3-04/history-policy-tests.log`). The first compilation missed an AgentDeskSecurity import; fixed it, then the existing Jira edit regression also passed (`history-service-build-final.log`). Native and full integration checks remain due.
+
+### Native mutation-history model
+
+Added the Mac history model with bounded pagination, duplicate-load suppression, retry after failed open, and generation-based rejection of results arriving after close. Errors clear displayed rows rather than retaining potentially unauthorized history. The model compiles in the Mac app (`TestResults/p3-04/history-model-build.log`). Two native Mac tests passed using `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac -resultBundlePath TestResults/p3-04/history-model-tests.xcresult -only-testing:AgentDeskTests/MutationHistoryModelTests -parallel-testing-enabled NO test`: retry/error state and late failure after close. Native screen/navigation wiring remains incomplete.
+
+### Native history sheet in progress
+
+Added a top-aligned Mac sheet with project/environment labels, refresh, bounded load-more, empty/error/loading states, scrollable action/approval/run details, and explicit unresolved-versus-acknowledged outcome wording. It does not offer retry or imply that acknowledgment freezes remote state. The initial sheet build failed for a missing AgentDeskCore import (`TestResults/p3-04/history-view-build.log`); the import was added and validation rerun. Entry-point wiring and native UI behavior tests remain required; compilation alone does not complete the feature.
+
+The corrected Mac sheet build passed (`TestResults/p3-04/history-view-build-final.log`).
+
+### History navigation and locked-screen validation
+
+Wired Mutation History into the run console using the selected environment. The factory resolves current project configuration and supplies a policy reload before and after every history read. The Mac application build passed (`TestResults/p3-04/history-navigation-build.log`).
+
+The native UI test `NativeRunsUITests/testMutationHistoryOpensWithCompactHeaderAndCloses` failed during app launch after 61 seconds (`TestResults/p3-04/history-navigation-ui.xcresult` and matching log). Computer-use inspection reported that the Mac was locked and automatic unlock failed. The test process terminated before the attempted interrupt; no UI assertions or screenshot verification are claimed. This check requires the user to unlock the Mac. Non-UI policy validation can continue; the feature remains uncommitted and incomplete.
+
+### Current-policy history regression
+
+Extended the history-service regression to change policy from allow to deny between the two checks surrounding storage access. No history is returned. A current-configuration lookup failure also fails closed rather than using cached policy. `swift test --package-path Packages/AgentDeskRuntime --filter NativeMutationHistoryTests` passed (`TestResults/p3-04/history-policy-refresh.log`), followed by all 160 runtime host tests (`history-runtime-full.log`). These non-UI checks do not replace the blocked native navigation test.
+
+### Shared history Simulator validation
+
+The runtime suite passed 79 tests on iPhone 16 Pro / iOS 26.0 (`TestResults/p3-04/history-runtime-iphone.xcresult` and matching log), using the standard AgentDeskRuntime xcodebuild test command, primary Simulator UUID, `RuntimeIPhone` derived-data directory and disabled parallel testing. This tests the shared service, not a mobile history UI. Added native-interface documentation covering context, status interpretation, ordering and the incomplete visual acceptance. Documentation validation passed with 474 local links. Mac UI verification still requires an unlocked session.
+
+### Locked-screen gate and resume
+
+Added a Debug-only populated history fixture guarded by the existing UUID test-container and run-mode checks. It writes only synthetic unresolved/acknowledged attempts. The new UI test checks both labels and retains a screenshot. `xcodebuild ... build-for-testing` passed (`TestResults/p3-04/history-fixture-build.log`); this is compilation, not a UI pass. The iPhone companion build also passed (`TestResults/p3-04/history-app-iphone.log`).
+
+Computer-use inspection again confirmed the Mac is locked. The same gate has persisted across multiple continuation turns while non-UI validation was completed. The history task remains uncommitted under the repository's native-validation/commit gate. Resume after manually unlocking the Mac: run both `NativeRunsUITests/testMutationHistoryOpensWithCompactHeaderAndCloses` and `NativeRunsUITests/testMutationHistoryShowsConfirmedAndUnresolvedAttempts` on macOS, inspect their screenshots, address any layout/behavior failures, review the focused diff, commit and push. Preserve the three unrelated Xcode/project handoff edits. No new repository or access reset is needed.
+
+### Resumed native history acceptance — 2026-09-12
+
+The Mac was unlocked. Both pending native UI tests passed using the same macOS AgentDesk scheme and NativeMac derived-data directory, with result bundle `TestResults/p3-04/history-ui-resumed.xcresult`. The command selected `NativeRunsUITests/testMutationHistoryOpensWithCompactHeaderAndCloses` and `NativeRunsUITests/testMutationHistoryShowsConfirmedAndUnresolvedAttempts`, with parallel testing disabled. Exported and visually inspected both screenshots: the header/actions remain visible, empty guidance fills the body, and acknowledged/unresolved rows fit without clipping. Export directory: `TestResults/p3-04/history-ui-resumed-shots`. Screenshots include unrelated desktop background and remain ignored test artifacts, not committed documentation.
+
+This resolves the locked-screen validation gate for the history component. Existing evidence includes 50 persistence tests, 160 runtime host tests, 79 iPhone 16 Pro / iOS 26.0 runtime tests, two Mac model tests and both application builds. Native history provides observation only; remote reconciliation and remaining Jira mutation operations keep P3-04 incomplete.

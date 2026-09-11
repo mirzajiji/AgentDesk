@@ -3,6 +3,49 @@ import XCTest
 
 final class NativeRunsUITests: XCTestCase {
     @MainActor
+    func testMutationHistoryShowsConfirmedAndUnresolvedAttempts() {
+        continueAfterFailure = false
+        let app = fixture()
+        app.launchEnvironment["AGENTDESK_TEST_MUTATION_HISTORY"] = "seeded"
+        app.launch()
+        let run = app.buttons["project.run.Synthetic run project"]
+        XCTAssertTrue(run.waitForExistence(timeout: 10)); run.click()
+        XCTAssertTrue(app.popUpButtons["run.agent"].waitForExistence(timeout: 5))
+        app.popUpButtons["run.agent"].click(); app.menuItems["Synthetic reviewer"].click()
+        app.buttons["mutation.history.open"].click()
+        XCTAssertTrue(app.staticTexts["Acknowledged by Jira"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Unresolved — verify Jira state"].exists)
+        XCTAssertFalse(app.staticTexts["mutation.history.error"].exists)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "Mutation history outcomes"; attachment.lifetime = .keepAlways; add(attachment)
+        app.buttons["mutation.history.done"].click()
+    }
+
+    @MainActor
+    func testMutationHistoryOpensWithCompactHeaderAndCloses() {
+        continueAfterFailure = false
+        let app = fixture(); app.launch()
+        let run = app.buttons["project.run.Synthetic run project"]
+        XCTAssertTrue(run.waitForExistence(timeout: 10)); run.click()
+        XCTAssertTrue(app.popUpButtons["run.agent"].waitForExistence(timeout: 5))
+        app.popUpButtons["run.agent"].click(); app.menuItems["Synthetic reviewer"].click()
+        let history = app.buttons["mutation.history.open"]
+        XCTAssertTrue(history.waitForExistence(timeout: 5)); history.click()
+        let title = app.staticTexts["mutation.history.title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["No mutation attempts"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["mutation.history.error"].exists)
+        let done = app.buttons["mutation.history.done"]
+        XCTAssertTrue(done.isHittable)
+        XCTAssertLessThan(abs(title.frame.minY - done.frame.minY), 45)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "Mutation history empty state"; attachment.lifetime = .keepAlways; add(attachment)
+        done.click()
+        XCTAssertTrue(title.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["run.console.done"].isHittable)
+    }
+
+    @MainActor
     func testRunsPageOpensScopedConsoleAndEmptyHistory() {
         continueAfterFailure = false
         let app = fixture(); app.launch()

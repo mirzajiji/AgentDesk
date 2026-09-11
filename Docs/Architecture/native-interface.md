@@ -92,3 +92,10 @@ Cancel Sign-In and leaving the project cancel the active task. Transport cleanup
 A credential-bearing connection exposes Log Out. It removes the exact scoped Keychain reference, retains immutable configuration history and the reference for later sign-in, and does not contact the broker or change browser sessions/Atlassian consent. An enabled connection and a currently listed environment are not prerequisites for removing a grant. The latest persisted configuration must match the selected row before deletion.
 
 Logout shares native ownership with sign-in; an active login in another window causes a retryable local error rather than racing its credential save. In the same window, cancel sign-in before logging out. Fixed local errors distinguish a failed cleanup from successful grant removal. Existing runtime checks reject subsequent use of a missing grant; logout does not retract requests already dispatched to Jira. The ownership gate covers this app process, not external editors or other processes.
+
+
+### Testing a Jira connection
+
+Test Connection is available for enabled credential-bearing configurations. It restores the scoped grant through the existing Jira adapter, verifies accessible site/account data, copies the implemented capability set and closes the temporary session. It shares native ownership with sign-in/logout. Fresh project/environment/configuration checks surround the probe; errors, configuration changes or closing the project cannot publish a success result. Closing also cancels outstanding diagnostic work.
+
+Successful rows show a check timestamp and available implementations. These are diagnostic observations, not policy grants or continuous health monitoring. Raw account responses and errors are not displayed. Refresh, local edits, sign-in and logout invalidate cached diagnostic observations. Expired/missing authentication has distinct guidance. Live-account diagnostic acceptance is still pending.

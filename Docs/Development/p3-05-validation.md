@@ -75,3 +75,15 @@ Added native Log Out for credential-bearing configurations with scoped Keychain 
 `native-logout.xcresult` passed six native Mac model tests and the existing connection configuration UI test, zero failures, using Xcode 26.0 on macOS 26.5.2. The UI regression verifies existing configuration navigation; it does not simulate a live authenticated account or click logout against one. Added a direct model assertion that active native sign-in ownership causes zero deletion calls; its focused result is `native-logout-ownership.xcresult`. This Mac-only change does not alter shared or iPhone code; the prior 82-test iPhone run is not claimed as new coverage.
 
 The focused ownership regression passed (one test, zero failures). Documentation and diff checks passed. Local logout is complete as a component; live-account lifecycle acceptance and remaining P3-05 controls are still open.
+
+
+## Native connection diagnostics
+
+Added Test Connection with scoped grant restoration via the existing Jira adapter, temporary transport cleanup, shared native operation ownership, pre/post configuration validation and cancellation on project close. The model stores only typed capabilities, configuration revision and observation time; UI guidance distinguishes discovery from runtime authorization.
+
+`native-probe-build.log`: native Mac build passed. Added model scenarios for success, expired authentication, configuration mutation during the probe, close/cancellation and invalidation on refresh. Results are in `native-probe.xcresult` / `native-probe.log` when complete. Tests inject synthetic probes; no live Jira account was contacted.
+
+
+`native-probe.xcresult` passed seven native Mac model tests and one configuration UI regression, zero failures (Xcode 26.0, macOS 26.5.2). The final status label now distinguishes a checked connection from authentication-not-checked; its UI rerun is `native-probe-ui.xcresult`. All probes in model tests are synthetic. The existing UI test does not exercise a live authenticated diagnostic result. Native full-account/scope/health UI acceptance remains pending. This component changes only Mac code; no new iPhone execution is claimed.
+
+The final native UI rerun passed (one test, zero failures). Documentation and diff checks passed. Connection testing is implemented as a component; P3-05 remains open for full lifecycle, permissions, account presentation and live acceptance.

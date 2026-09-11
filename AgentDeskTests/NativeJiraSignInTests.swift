@@ -106,6 +106,50 @@ import XCTest
         }
     }
 
+    func testConnectionProbeRejectsFailureChangedConfigurationAndClose() async throws {
+        for mode in 0...3 {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let catalog = try WorkspaceCatalog(container: root)
+            let workspace = try await catalog.createWorkspace(name: "Synthetic")
+            let project = try await catalog.createProject(in: workspace.id, name: "Probe")
+            let environment = ProjectEnvironment(scope: project.scope, name: "Development")
+            let scope = try SecretScope(workspaceID: workspace.id, projectID: project.id, environmentID: environment.id)
+            let store = try await catalog.pluginConfigurationStore(for: JiraConnectionConfiguration.self, in: project.scope)
+            let value = try JiraConnectionConfiguration(scope: project.scope, environmentID: environment.id,
+                instance: URL(string: "https://synthetic.atlassian.net")!, credential: SecretReference(scope: scope), enabled: true)
+            let first = try await store.save(value, in: project.scope, expectedRevision: nil)
+            let started = Mutex(false)
+            let model = ProjectJiraConnectionsModel(project: project, probe: { configuration in
+                XCTAssertEqual(configuration, value)
+                started.withLock { $0 = true }
+                if mode == 1 { throw PluginConnectionError.authenticationExpired }
+                if mode == 2 { _ = try await store.save(value, in: project.scope, expectedRevision: first.revision) }
+                if mode == 3 { try await Task.sleep(for: .seconds(60)) }
+                return [.issuesRead]
+            }, open: { NativeJiraConfigurationServices(store: store, environments: [environment]) })
+            let operation = Task { await model.testConnection(first) }
+            if mode == 3 {
+                let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+                while !started.withLock({ $0 }), ContinuousClock.now < deadline { await Task.yield() }
+                XCTAssertTrue(started.withLock { $0 })
+                model.close()
+            }
+            await operation.value
+            XCTAssertFalse(model.busy)
+            XCTAssertEqual(model.checks[value.id] != nil, mode == 0)
+            XCTAssertEqual(model.error != nil, mode == 1 || mode == 2)
+            if mode == 0 {
+                XCTAssertEqual(model.checks[value.id]?.revision, first.revision)
+                XCTAssertEqual(model.checks[value.id]?.capabilities, [.issuesRead])
+                await model.load()
+                XCTAssertTrue(model.checks.isEmpty, "Refresh must not retain a stale health claim")
+            }
+            model.close()
+        }
+    }
+
     func testOwnershipRejectsSecondWindowAndReleases() async throws {
         let ownership = NativeJiraLoginOwnership(), id = UUID()
         try await ownership.acquire(id)

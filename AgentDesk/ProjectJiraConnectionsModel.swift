@@ -10,6 +10,12 @@ struct NativeJiraConfigurationServices {
     let environments: [ProjectEnvironment]
 }
 
+struct NativeJiraCheck: Sendable {
+    let revision: Int
+    let capabilities: Set<PluginCapability>
+    let checkedAt: Date
+}
+
 @MainActor
 final class ProjectJiraConnectionsModel: ObservableObject {
     let project: ProjectRecord
@@ -19,6 +25,9 @@ final class ProjectJiraConnectionsModel: ObservableObject {
     @Published private(set) var error: String?
     @Published private(set) var hasMore = false
     @Published private(set) var authenticationMessage: String?
+    @Published private(set) var checks: [UUID: NativeJiraCheck] = [:]
+    private let probe: @Sendable (JiraConnectionConfiguration) async throws -> Set<PluginCapability>
+    private var checkTask: Task<Set<PluginCapability>, any Error>?
     private var loginTask: Task<Void, Never>?
     private let makeLogin: (JiraConnectionConfiguration, JiraOAuthRegistration) throws -> any NativeJiraLogin
     private let removeGrant: @Sendable (SecretReference) async throws -> Void
@@ -33,13 +42,21 @@ final class ProjectJiraConnectionsModel: ObservableObject {
                                        store: KeychainSecretStore(scope: reference.scope))
          }, removeGrant: @escaping @Sendable (SecretReference) async throws -> Void = { reference in
              try await KeychainSecretStore(scope: reference.scope).delete(reference)
+         }, probe: @escaping @Sendable (JiraConnectionConfiguration) async throws -> Set<PluginCapability> = { configuration in
+             guard let reference = configuration.credential else { throw PluginConnectionError.notConfigured }
+             let adapter = JiraCloudAdapter(store: KeychainSecretStore(scope: reference.scope))
+             let session = try await adapter.connect(configuration)
+             let capabilities = session.capabilities
+             await session.close()
+             try Task.checkCancellation()
+             return capabilities
          }, open: @escaping () async throws -> NativeJiraConfigurationServices) {
-        self.project = project; self.open = open; self.makeLogin = makeLogin; self.removeGrant = removeGrant
+        self.project = project; self.open = open; self.makeLogin = makeLogin; self.removeGrant = removeGrant; self.probe = probe
     }
     func load(more: Bool = false) async {
         guard !busy, !more || hasMore else { return }
         let current = generation
-        busy = true; error = nil
+        busy = true; error = nil; checks = [:]
         defer { if generation == current { busy = false } }
         do {
             let services = try await open()
@@ -60,7 +77,7 @@ final class ProjectJiraConnectionsModel: ObservableObject {
               existing: PluginConfigurationRevision<JiraConnectionConfiguration>?) async throws {
         guard !busy else { throw PluginStorageError.staleRevision }
         let current = generation
-        busy = true
+        busy = true; checks = [:]
         defer { if generation == current { busy = false } }
         let services = try await open()
         try Task.checkCancellation()
@@ -91,6 +108,7 @@ final class ProjectJiraConnectionsModel: ObservableObject {
                 openBrowser: @escaping @Sendable (URL) async throws -> Void) {
         guard !busy else { return }
         let current = generation
+        checks[record.configuration.id] = nil
         busy = true; authenticationMessage = "Waiting for Jira sign-in…"; error = nil
         loginTask = Task { [weak self] in
             guard let self else { return }
@@ -151,9 +169,37 @@ final class ProjectJiraConnectionsModel: ObservableObject {
             }
         }
     }
+    func testConnection(_ record: PluginConfigurationRevision<JiraConnectionConfiguration>) async {
+        guard !busy else { return }
+        let current = generation, id = record.configuration.id
+        busy = true; error = nil; authenticationMessage = nil; checks[id] = nil
+        var owned = false
+        do {
+            try await NativeJiraLoginOwnership.shared.acquire(id); owned = true
+            try await validate(record, generation: current)
+            guard record.configuration.credential != nil else { throw PluginConnectionError.notConfigured }
+            let probe = probe, configuration = record.configuration
+            let operation = Task { try await probe(configuration) }
+            checkTask = operation
+            let capabilities = try await withTaskCancellationHandler { try await operation.value } onCancel: { operation.cancel() }
+            try await validate(record, generation: current)
+            checks[id] = NativeJiraCheck(revision: record.revision, capabilities: capabilities, checkedAt: Date())
+        } catch {
+            if generation == current {
+                if error as? PluginConnectionError == .authenticationExpired {
+                    self.error = "The Jira grant is missing or expired. Sign in again."
+                } else {
+                    self.error = "Jira connection test failed. Check configuration and authentication, then try again."
+                }
+            }
+        }
+        if owned { await NativeJiraLoginOwnership.shared.release(id) }
+        if generation == current { checkTask = nil; busy = false }
+    }
+
     func logout(_ record: PluginConfigurationRevision<JiraConnectionConfiguration>) async {
         guard !busy else { return }
-        busy = true; error = nil; authenticationMessage = nil
+        busy = true; error = nil; authenticationMessage = nil; checks[record.configuration.id] = nil
         let current = generation, id = record.configuration.id
         var owned = false
         do {
@@ -193,6 +239,6 @@ final class ProjectJiraConnectionsModel: ObservableObject {
         guard generation == expected else { throw CancellationError() }
     }
     func cancelSignIn() { loginTask?.cancel() }
-    func close() { loginTask?.cancel(); authenticationMessage = nil; generation = UUID(); records = []; environments = []; cursor = nil; hasMore = false; busy = false }
+    func close() { checkTask?.cancel(); checks = [:]; loginTask?.cancel(); authenticationMessage = nil; generation = UUID(); records = []; environments = []; cursor = nil; hasMore = false; busy = false }
 }
 #endif

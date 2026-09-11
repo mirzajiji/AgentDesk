@@ -84,9 +84,17 @@ struct ProjectJiraConnectionsView: View {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(record.configuration.instance.host ?? "Jira").font(.headline)
                                     Text(model.environments.first(where: { $0.id == record.configuration.environmentID })?.name ?? "Unavailable environment")
-                                    Text(record.configuration.enabled ? "Enabled · Authentication not checked" : "Disabled")
+                                    Text(!record.configuration.enabled ? "Disabled" :
+                                        model.checks[record.configuration.id]?.revision == record.revision ? "Enabled · Connection checked" : "Enabled · Authentication not checked")
                                         .foregroundStyle(.secondary)
                                     Text("Configuration version \(record.revision)").font(.caption).foregroundStyle(.secondary)
+                                    if let check = model.checks[record.configuration.id], check.revision == record.revision {
+                                        Text("Connection verified at \(check.checkedAt.formatted(date: .omitted, time: .shortened))")
+                                            .accessibilityIdentifier("connection.check.\(record.configuration.id)")
+                                        Text("Available implementations: " + check.capabilities.map(\.rawValue).sorted().joined(separator: ", "))
+                                            .font(.caption).foregroundStyle(.secondary)
+                                        Text("Runtime policy still authorizes each operation.").font(.caption).foregroundStyle(.secondary)
+                                    }
                                 }
                                 Spacer()
                                 Button("Sign In") {
@@ -98,6 +106,9 @@ struct ProjectJiraConnectionsView: View {
                                 }.disabled(model.busy || !record.configuration.enabled || registration == nil)
                                     .accessibilityIdentifier("connection.login.\(record.configuration.id)")
                                 if record.configuration.credential != nil {
+                                    Button("Test Connection") { Task { await model.testConnection(record) } }
+                                        .disabled(model.busy || !record.configuration.enabled)
+                                        .accessibilityIdentifier("connection.test.\(record.configuration.id)")
                                     Button("Log Out") { Task { await model.logout(record) } }.disabled(model.busy)
                                         .accessibilityIdentifier("connection.logout.\(record.configuration.id)")
                                 }

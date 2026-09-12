@@ -167,3 +167,9 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: passed (`TestResults/p3-06-repository-lifetime-mac-build.log`).
 - An initial compile exposed an incorrect URL property name; corrected to the existing `RepositoryAccess.directory` before the passing runs.
 - This change is compiled only on macOS. No new iPhone Simulator coverage is claimed. Native MCP lifecycle UI remains outstanding.
+
+## Native MCP lifecycle entry point
+
+`NativeMCPConnection` exposes the runtime lifecycle to the native host: independent launch and credential reviews, approved startup, redacted server presentation, ping and awaited close. It acquires the project repository through `ProjectRepositoryRegistry`, rejecting remote authorities before acquiring folder access. A cancelled open closes the prepared session. The host must await close when dismissing its owner or switching projects. Start/Stop UI and discovery remain incomplete.
+
+Validation: `swift test --package-path Packages/AgentDeskRuntime` passed all 191 tests (`TestResults/p3-06-native-lifecycle.log`). The new integration uses an isolated synthetic Git repository and a real Python stdio MCP fixture: unapproved launch fails, reviewed startup negotiates modern MCP, ping succeeds, and repeated close releases the folder grant and registration lock. No company service or live MCP installation is used. The signed Mac app build passed with the same command as the preceding record (`TestResults/p3-06-native-lifecycle-mac-build.log`). macOS-only change; no new Simulator run claimed. Documentation and whitespace checks pass.

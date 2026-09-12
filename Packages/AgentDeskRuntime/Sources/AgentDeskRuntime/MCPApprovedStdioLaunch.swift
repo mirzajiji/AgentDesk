@@ -6,13 +6,13 @@ import AgentDeskSecurity
 import Foundation
 
 /// Scoped, redacted server claims for presentation; capabilities do not grant permissions.
-struct MCPServerPresentation: Sendable {
-    let mode: MCPProtocolMode
-    let name: RedactedText?
-    let version: RedactedText?
-    let tools: Bool
-    let resources: Bool
-    let prompts: Bool
+public struct MCPServerPresentation: Sendable {
+    public let mode: MCPProtocolMode
+    public let name: RedactedText?
+    public let version: RedactedText?
+    public let tools: Bool
+    public let resources: Bool
+    public let prompts: Bool
 }
 
 /// Internal Mac integration. The host retains registered filesystem access for this lifetime.

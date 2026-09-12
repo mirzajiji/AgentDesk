@@ -104,6 +104,50 @@ final class ProjectRepositoryRegistryTests: XCTestCase {
         XCTAssertEqual(f.codec.state.withLock { $0.active }, 0)
         try await f.registry.remove(in: f.scope, expectedRevision: 1)
     }
+    func testNativeMCPReviewsStartsPingsAndReleasesRegisteredGrant() async throws {
+        let f = try await Fixture.make(); defer { f.remove() }
+        _ = try await f.registry.register(f.repository, in: f.scope, expectedRevision: nil)
+        let environment = EnvironmentID(), id = UUID()
+        let configurations = try await f.catalog.mcpConfigurationStore(for: MCPStdioConfiguration.self, in: f.scope)
+        _ = try await configurations.save(MCPStdioConfiguration(id: id, scope: f.scope, environmentID: environment,
+            name: "Synthetic", executable: "/usr/bin/python3", arguments: ["-u", "-c", """
+            import json, sys
+            for line in sys.stdin:
+                r = json.loads(line)
+                if 'id' not in r: continue
+                result = {'resultType':'complete'}
+                if r['method'] == 'server/discover':
+                    result.update({'supportedVersions':['2026-07-28'],'capabilities':{}})
+                print(json.dumps({'jsonrpc':'2.0','id':r['id'],'result':result}), flush=True)
+            """], workingDirectory: nil,
+            enabled: true, directoryBase: .registeredRepository), in: f.scope, expectedRevision: nil)
+        let rules = [PolicyRule(.runShell, .approval)]
+        let policy = try PolicySnapshot(
+            workspace: PolicyDocument(level: .workspace, workspaceID: f.scope.workspaceID, rules: rules),
+            project: PolicyDocument(level: .project, workspaceID: f.scope.workspaceID, projectID: f.scope.projectID, rules: rules),
+            environment: PolicyDocument(level: .environment, workspaceID: f.scope.workspaceID, projectID: f.scope.projectID,
+                environmentID: environment, rules: rules), environmentKind: .test)
+        let user = try PolicyAuthority(id: UUID(), kind: .localUser, scopes: [f.scope], environments: [environment],
+            operations: [.runShell], canApprove: true, expiresAt: Date().addingTimeInterval(600))
+        let approvals = try ApprovalStore(database: f.root.appendingPathComponent("operations.sqlite"), scope: f.scope, environmentID: environment)
+        let launch = try await NativeMCPConnection.open(configurations: configurations, connectionID: id,
+            scope: f.scope, environmentID: environment, workspaceRoot: f.root, repositories: f.registry,
+            authorities: [user], requesterID: user.id, approvals: approvals, currentPolicy: { policy })
+        guard case .approval(let pending) = try await launch.prepare() else { return XCTFail("Missing process review") }
+        do { _ = try await launch.start(approvalID: pending.id); XCTFail("Unreviewed launch succeeded") }
+        catch { XCTAssertTrue(error is AuthorizationError) }
+        _ = try await launch.review(pending.id, approve: true, expectedSequence: pending.sequence)
+        let server = try await launch.start(approvalID: pending.id)
+        XCTAssertEqual(server.mode, .modern)
+        try await launch.ping()
+        XCTAssertEqual(f.codec.state.withLock { $0.active }, 1)
+        do { try await f.registry.remove(in: f.scope, expectedRevision: 1); XCTFail("Lost MCP repository lease") }
+        catch { XCTAssertEqual(error as? RepositoryRegistrationError, .busy) }
+        await launch.close()
+        await launch.close()
+        XCTAssertEqual(f.codec.state.withLock { $0.active }, 0)
+        try await f.registry.remove(in: f.scope, expectedRevision: 1)
+    }
     func testNativeServiceRetainsRegistrationUntilShutdownWithoutStartingCodex() async throws {
         let f = try await Fixture.make(); defer { f.remove() }
         _ = try await f.registry.register(f.repository, in: f.scope, expectedRevision: nil)

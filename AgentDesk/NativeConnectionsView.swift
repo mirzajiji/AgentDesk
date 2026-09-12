@@ -99,6 +99,10 @@ struct ProjectJiraConnectionsView: View {
                                     if let check = model.checks[record.configuration.id], check.revision == record.revision {
                                         Text("Connection verified at \(check.checkedAt.formatted(date: .omitted, time: .shortened))")
                                             .accessibilityIdentifier("connection.check.\(record.configuration.id)")
+                                        Text("Signed in as: " + check.identity.account)
+                                            .accessibilityIdentifier("connection.account.\(record.configuration.id)")
+                                        Text("OAuth scopes: " + check.identity.grantedScopes).font(.caption)
+                                        Text("Site scopes: " + check.identity.siteScopes).font(.caption)
                                         Text("Available implementations: " + check.capabilities.map(\.rawValue).sorted().joined(separator: ", "))
                                             .font(.caption).foregroundStyle(.secondary)
                                         Text("Runtime policy still authorizes each operation.").font(.caption).foregroundStyle(.secondary)

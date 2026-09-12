@@ -10,10 +10,18 @@ struct NativeJiraConfigurationServices {
     let environments: [ProjectEnvironment]
 }
 
+struct NativeJiraProbe: Sendable {
+    let capabilities: Set<PluginCapability>
+    let account: String
+    let grantedScopes: String
+    let siteScopes: String
+}
+
 struct NativeJiraCheck: Sendable {
     let revision: Int
     let capabilities: Set<PluginCapability>
     let checkedAt: Date
+    let identity: NativeJiraProbe
 }
 
 @MainActor
@@ -26,8 +34,8 @@ final class ProjectJiraConnectionsModel: ObservableObject {
     @Published private(set) var hasMore = false
     @Published private(set) var authenticationMessage: String?
     @Published private(set) var checks: [UUID: NativeJiraCheck] = [:]
-    private let probe: @Sendable (JiraConnectionConfiguration) async throws -> Set<PluginCapability>
-    private var checkTask: Task<Set<PluginCapability>, any Error>?
+    private let probe: @Sendable (JiraConnectionConfiguration) async throws -> NativeJiraProbe
+    private var checkTask: Task<NativeJiraProbe, any Error>?
     private var loginTask: Task<Void, Never>?
     private let makeLogin: (JiraConnectionConfiguration, JiraOAuthRegistration) throws -> any NativeJiraLogin
     private let removeGrant: @Sendable (SecretReference) async throws -> Void
@@ -42,14 +50,19 @@ final class ProjectJiraConnectionsModel: ObservableObject {
                                        store: KeychainSecretStore(scope: reference.scope))
          }, removeGrant: @escaping @Sendable (SecretReference) async throws -> Void = { reference in
              try await KeychainSecretStore(scope: reference.scope).delete(reference)
-         }, probe: @escaping @Sendable (JiraConnectionConfiguration) async throws -> Set<PluginCapability> = { configuration in
+         }, probe: @escaping @Sendable (JiraConnectionConfiguration) async throws -> NativeJiraProbe = { configuration in
              guard let reference = configuration.credential else { throw PluginConnectionError.notConfigured }
              let adapter = JiraCloudAdapter(store: KeychainSecretStore(scope: reference.scope))
              let session = try await adapter.connect(configuration)
-             let capabilities = session.capabilities
-             await session.close()
-             try Task.checkCancellation()
-             return capabilities
+             do {
+                 guard let jira = session as? JiraCloudSession else { throw JiraServiceError.unavailable }
+                 let context = RedactionContext(scope: configuration.scope, environmentID: configuration.environmentID, runID: RunID())
+                 let diagnostics = try await jira.diagnostics(context: context)
+                 let result = NativeJiraProbe(capabilities: session.capabilities, account: diagnostics.account.text,
+                    grantedScopes: diagnostics.grantedScopes.text, siteScopes: diagnostics.siteScopes.text)
+                 await session.close(); try Task.checkCancellation()
+                 return result
+             } catch { await session.close(); throw error }
          }, open: @escaping () async throws -> NativeJiraConfigurationServices) {
         self.project = project; self.open = open; self.makeLogin = makeLogin; self.removeGrant = removeGrant; self.probe = probe
     }
@@ -213,9 +226,9 @@ final class ProjectJiraConnectionsModel: ObservableObject {
             let probe = probe, configuration = record.configuration
             let operation = Task { try await probe(configuration) }
             checkTask = operation
-            let capabilities = try await withTaskCancellationHandler { try await operation.value } onCancel: { operation.cancel() }
+            let result = try await withTaskCancellationHandler { try await operation.value } onCancel: { operation.cancel() }
             try await validate(record, generation: current)
-            checks[id] = NativeJiraCheck(revision: record.revision, capabilities: capabilities, checkedAt: Date())
+            checks[id] = NativeJiraCheck(revision: record.revision, capabilities: result.capabilities, checkedAt: Date(), identity: result)
         } catch {
             if generation == current {
                 if error as? PluginConnectionError == .authenticationExpired {

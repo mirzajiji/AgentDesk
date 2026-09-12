@@ -237,3 +237,15 @@ Command: `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination
 
 
 Final Release verification passed: `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -configuration Release -destination 'platform=macOS' -derivedDataPath TestResults/p1-13c2/ReleaseMac build` (`native-issue-approval-release.log`). Byte inspection of the resulting executable confirms absence of the fixture type name and `AGENTDESK_TEST_JIRA_ISSUE` selector. Documentation and diff checks pass. Counts unchanged: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+
+## Authenticated account and scope diagnostics
+
+Test Connection now returns the authenticated account display name, token-granted scopes, and site scopes alongside implemented capabilities. These values remain bound to the checked configuration revision and are discarded on refresh, configuration changes, cancellation or failed checks. The native row distinguishes OAuth/site access from runtime operation permissions.
+
+The session diagnostic API validates project/environment scope, reloads the current grant, checks expiry and masks known access/refresh token values before returning text. It performs no issue request. A synthetic regression verifies foreign-environment rejection, token redaction in an account name, granted/site scope output, missing grant rejection and closed-session rejection. Native model coverage verifies account/scope propagation while retaining stale-result and cancellation assertions.
+
+Focused host plugin tests pass (2 tests, `swift test --package-path Packages/AgentDeskPlugins --filter JiraAttachmentGrantTests`, `diagnostic-identity-plugin.log`). Native Mac model tests pass (`diagnostic-identity-native.xcresult`). Remaining platform/build checks pending. No live account was accessed.
+
+
+Final checks passed: nine native Mac model tests; two focused Plugins tests on iPhone 16 Pro / iOS 26.0; normal Mac and iPhone application builds. Mac tests used `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac -resultBundlePath TestResults/p3-05/diagnostic-identity-native.xcresult -only-testing:AgentDeskTests/NativeJiraSignInTests -only-testing:AgentDeskTests/ProjectJiraConnectionsModelTests -parallel-testing-enabled NO test`. Simulator tests ran from `Packages/AgentDeskPlugins` with scheme `AgentDeskPlugins`, primary Simulator destination, `../../TestResults/p3-04/PluginsIPhone` derived data, `../../TestResults/p3-05/diagnostic-identity-iphone.xcresult`, and `-only-testing:AgentDeskPluginsTests/JiraAttachmentGrantTests -parallel-testing-enabled NO test`. Builds used the existing AgentDesk scheme and documented normal Mac/iPhone destinations and derived-data paths (`diagnostic-identity-app-mac.log`, `diagnostic-identity-app-iphone.log`). macOS 26.5.2 / Xcode 26.0. Documentation and diff checks pass. No live account or new populated-diagnostics UI screenshot is claimed. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

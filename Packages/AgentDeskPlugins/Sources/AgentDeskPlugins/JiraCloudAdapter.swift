@@ -81,6 +81,20 @@ public actor JiraCloudSession: PluginConnectionSession {
         self.account = account; self.transport = transport; self.configuration = configuration
         self.resource = resource; self.tokens = tokens; self.vault = vault; self.now = now
     }
+    /// Local connection diagnostics only; no issue data request or operational authorization.
+    public func diagnostics(context: RedactionContext) async throws -> JiraConnectionDiagnostics {
+        guard context.scope == configuration.scope, context.environmentID == configuration.environmentID else {
+            throw AuthorizationError.scopeMismatch
+        }
+        let current = try await currentGrant()
+        guard current.expiresAt > now() else { throw PluginConnectionError.authenticationExpired }
+        let redactor = try ContentRedactor(context: context).includingKnownSecrets(
+            [current.accessToken] + (current.refreshToken.map { [$0] } ?? []), in: context)
+        return JiraConnectionDiagnostics(account: try redactor.redactText(account.displayName, in: context),
+            grantedScopes: try redactor.redactText(current.scopes.sorted().joined(separator: ", "), in: context),
+            siteScopes: try redactor.redactText(resource.scopes.sorted().joined(separator: ", "), in: context))
+    }
+
     /// Scope discovery describes available implementations; runtime policy still authorizes each call.
     static func availableCapabilities(tokenScopes: Set<String>, siteScopes: Set<String>) -> Set<PluginCapability> {
         var result: Set<PluginCapability> = []
@@ -343,4 +357,10 @@ public enum JiraReadResult: Sendable {
     case comments(content: RedactedText, nextStartAt: Int?)
     case attachment(JiraAttachmentBytes)
     case attachmentSettings(JiraAttachmentSettings)
+}
+
+public struct JiraConnectionDiagnostics: Sendable {
+    public let account: RedactedText
+    public let grantedScopes: RedactedText
+    public let siteScopes: RedactedText
 }

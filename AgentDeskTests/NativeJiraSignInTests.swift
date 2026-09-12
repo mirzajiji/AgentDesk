@@ -127,7 +127,7 @@ import XCTest
                 if mode == 1 { throw PluginConnectionError.authenticationExpired }
                 if mode == 2 { _ = try await store.save(value, in: project.scope, expectedRevision: first.revision) }
                 if mode == 3 { try await Task.sleep(for: .seconds(60)) }
-                return [.issuesRead]
+                return NativeJiraProbe(capabilities: [.issuesRead], account: "Synthetic account", grantedScopes: "read:jira-work", siteScopes: "read:jira-work")
             }, open: { NativeJiraConfigurationServices(store: store, environments: [environment]) })
             let operation = Task { await model.testConnection(first) }
             if mode == 3 {
@@ -143,6 +143,8 @@ import XCTest
             if mode == 0 {
                 XCTAssertEqual(model.checks[value.id]?.revision, first.revision)
                 XCTAssertEqual(model.checks[value.id]?.capabilities, [.issuesRead])
+                XCTAssertEqual(model.checks[value.id]?.identity.account, "Synthetic account")
+                XCTAssertEqual(model.checks[value.id]?.identity.grantedScopes, "read:jira-work")
                 await model.load()
                 XCTAssertTrue(model.checks.isEmpty, "Refresh must not retain a stale health claim")
             }

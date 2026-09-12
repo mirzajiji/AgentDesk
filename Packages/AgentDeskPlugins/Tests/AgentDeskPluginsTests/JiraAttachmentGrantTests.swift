@@ -6,6 +6,31 @@ import XCTest
 @testable import AgentDeskPlugins
 
 final class JiraAttachmentGrantTests: XCTestCase {
+    func testDiagnosticsAreScopedRedactedAndRejectMissingGrant() async throws {
+        let scope = ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID()), environment = EnvironmentID()
+        let secretScope = try SecretScope(workspaceID: scope.workspaceID, projectID: scope.projectID, environmentID: environment)
+        let config = try JiraConnectionConfiguration(scope: scope, environmentID: environment, instance: URL(string: "https://synthetic.atlassian.net")!, credential: SecretReference(scope: secretScope), enabled: true)
+        let vault = try JiraCredentialVault(configuration: config, store: DisappearingGrant(scope: secretScope))
+        let tokens = try JiraOAuthTokens(accessToken: SecretValue(Data("synthetic-access".utf8)), refreshToken: nil, expiresAt: Date().addingTimeInterval(600), scopes: ["read:jira-work"])
+        try await vault.save(tokens)
+        let resource = JiraCloudResource(id: UUID(), scopes: ["read:jira-work"])
+        let transport = try JiraHTTPTransport(origin: resource.apiOrigin, protocolClasses: [GrantProtocol.self])
+        let account = try JiraCloudAccount.decode(.init(status: 200, body: Data(#"{"accountId":"synthetic","displayName":"synthetic-access","active":true}"#.utf8)))
+        let session = JiraCloudSession(account: account, transport: transport, configuration: config, resource: resource, tokens: tokens, vault: vault, now: { Date() })
+        let context = RedactionContext(scope: scope, environmentID: environment, runID: RunID())
+        let foreign = RedactionContext(scope: scope, environmentID: EnvironmentID(), runID: RunID())
+        do { _ = try await session.diagnostics(context: foreign); XCTFail("Foreign diagnostics accepted") }
+        catch { XCTAssertEqual(error as? AuthorizationError, .scopeMismatch) }
+        let diagnostics = try await session.diagnostics(context: context)
+        XCTAssertEqual(diagnostics.account.text, "[REDACTED]")
+        XCTAssertEqual(diagnostics.grantedScopes.text, "read:jira-work")
+        XCTAssertEqual(diagnostics.siteScopes.text, "read:jira-work")
+        do { _ = try await session.diagnostics(context: context); XCTFail("Missing grant accepted") }
+        catch { XCTAssertEqual(error as? PluginConnectionError, .authenticationExpired) }
+        await session.close()
+        do { _ = try await session.diagnostics(context: context); XCTFail("Closed connection accepted") }
+        catch { XCTAssertEqual(error as? JiraTransportError, .closed) }
+    }
     func testMissingGrantAfterMetadataPreventsContentRequest() async throws {
         let scope = ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID()), environment = EnvironmentID()
         let secretScope = try SecretScope(workspaceID: scope.workspaceID, projectID: scope.projectID, environmentID: environment)

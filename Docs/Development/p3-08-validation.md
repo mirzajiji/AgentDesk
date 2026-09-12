@@ -68,3 +68,11 @@ xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform
 ```
 
 Passed on macOS 26.5.2 / Xcode 26.0: six lifecycle unit tests and one real-process native UI test. Normal signed Mac build passed (`TestResults/p3-08-cleanup-build.log`); documentation/diff checks pass. No new iPhone coverage is claimed for this Mac-only model fix. Task counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Scoped credential configuration service
+
+`NativeMCPCredentialEditor` adds the local administrative set/replace operation needed by the native credential editor. It validates project/environment scope, variable syntax and process-compatible UTF-8 values before secret writes. Each change allocates a new SecretReference, stores the SecretValue through the scoped SecretStore, then publishes an immutable configuration revision using compare-and-swap. No value is encoded in configuration. Existing references are retained for immutable history; replacement is not revocation, and deleting historical credentials requires a separate operation.
+
+If secret storage or configuration publication fails, cleanup attempts to delete the newly allocated reference even when the calling UI task was cancelled. If cleanup itself fails, the typed error carries only the reference that needs recovery. This is an internal native administrative capability, not an MCP tool, mobile operation or completed credential-entry UI. Runtime reads still require their independent readSecret policy decision.
+
+Validation on macOS 26.5.2 / Xcode 26.0: `swift test --package-path Packages/AgentDeskRuntime` passed all 197 tests (`TestResults/p3-08-credential-runtime.log`). Six new isolated tests cover replacement/history, malformed values and variable names, stale writes, a competing configuration update after secret creation, cancellation-safe rollback, partial-write cleanup failure and foreign SecretStore rejection. Tests use a synthetic SecretStore; no live Keychain credential was written. Normal signed Mac build passed (`TestResults/p3-08-credential-build.log`). Documentation and whitespace checks pass. Mac-only API; no new Simulator run claimed. P3-08 remains in progress; counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

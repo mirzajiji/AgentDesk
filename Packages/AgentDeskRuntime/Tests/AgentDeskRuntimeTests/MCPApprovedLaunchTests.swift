@@ -45,7 +45,7 @@ import XCTest
         catch { XCTAssertTrue(error is CancellationError || error is AuthorizationError) }
     }
     func testCredentialPolicyControlsSecretReadsAndProcessStartup() async throws {
-        for disposition: PolicyDisposition in [.allow, .deny, .approval] {
+        for (disposition, review): (PolicyDisposition, Bool) in [(.allow, false), (.deny, false), (.approval, false), (.approval, true)] {
         let script = """
         import json, sys, os
         assert os.environ.get("SYNTHETIC_TOKEN") == "fixture-value"
@@ -88,16 +88,26 @@ import XCTest
         catch { XCTAssertTrue(error is AuthorizationError) }
         guard case .approval(let pending) = try await launch.prepare() else { return XCTFail("Missing approval") }
         _ = try await launch.review(pending.id, approve: true, expectedSequence: pending.sequence)
+        var credentialApprovalID: UUID?
+        if review {
+            do {
+                _ = try await launch.reviewCredentials(pending.id, approve: true, expectedSequence: pending.sequence)
+                XCTFail("Launch approval accepted as credential approval")
+            } catch { XCTAssertTrue(error is AuthorizationError) }
+            guard case .approval(let credentials) = try await launch.prepareCredentials() else { return XCTFail("Missing credential approval") }
+            _ = try await launch.reviewCredentials(credentials.id, approve: true, expectedSequence: credentials.sequence)
+            credentialApprovalID = credentials.id
+        }
         do {
-            let server = try await launch.start(approvalID: pending.id)
-            XCTAssertEqual(disposition, .allow)
+            let server = try await launch.start(approvalID: pending.id, credentialApprovalID: credentialApprovalID)
+            XCTAssertTrue(disposition == .allow || review)
             XCTAssertEqual(server.mode, .modern)
             try await launch.ping()
         } catch {
             XCTAssertEqual(error as? AuthorizationError, disposition == .deny ? .denied : .approvalRequired)
         }
         let reads = await secrets.reads
-        XCTAssertEqual(reads, disposition == .allow ? 1 : 0)
+        XCTAssertEqual(reads, (disposition == .allow || review) ? 1 : 0)
         await launch.close()
         do { try await launch.ping(); XCTFail("Closed connection remained usable") }
         catch { XCTAssertEqual(error as? MCPProcessError, .closed) }

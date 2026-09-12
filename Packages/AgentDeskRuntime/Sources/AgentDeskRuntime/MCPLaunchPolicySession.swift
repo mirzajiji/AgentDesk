@@ -11,6 +11,7 @@ actor MCPLaunchPolicySession {
     private let configuration: MCPStdioConfiguration
     private let gate: PolicyGate
     private let action: PolicyAction
+    private let credentialAction: PolicyAction
     private let requesterID: UUID
     private let policyFingerprint: ActionFingerprint
     private let validate: @Sendable () async throws -> (PolicyAction, PolicySnapshot)
@@ -21,6 +22,8 @@ actor MCPLaunchPolicySession {
         guard let requester = authorities.first(where: { $0.id == requesterID }), case .localUser = requester.kind else {
             throw AuthorizationError.denied
         }
+        credentialAction = try PolicyAction(scope: action.scope, environmentID: action.environmentID, operation: .readSecret,
+            resource: action.resource, payload: action.payload)
         self.configuration = configuration
         self.action = action; self.requesterID = requesterID; self.validate = validate
         policyFingerprint = try policy.fingerprint
@@ -79,16 +82,24 @@ actor MCPLaunchPolicySession {
             return try await launch()
         }
     }
+    func prepareCredentials() async throws -> PolicyPreparation {
+        try await check()
+        guard !configuration.secretEnvironment.isEmpty else { throw AuthorizationError.invalidInput }
+        return try await gate.prepare(credentialAction, requesterID: requesterID)
+    }
+    func reviewCredentials(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        try await check()
+        return try await gate.review(id, expectedAction: credentialAction, requesterID: requesterID, reviewerID: requesterID,
+            approve: approve, expectedSequence: expectedSequence)
+    }
     /// Used only inside an approved launch. Credential reads still cross their own policy boundary.
-    func environment(store: any SecretStore) async throws -> [String: String] {
+    func environment(store: any SecretStore, approvalID: UUID? = nil) async throws -> [String: String] {
         try await check()
         guard configuration.scope == action.scope, configuration.environmentID == action.environmentID,
               store.scope.workspaceID == action.scope.workspaceID, store.scope.projectID == action.scope.projectID,
               store.scope.environmentID == action.environmentID else { throw AuthorizationError.scopeMismatch }
         let configuration = configuration
-        let read = try PolicyAction(scope: action.scope, environmentID: action.environmentID, operation: .readSecret,
-            resource: action.resource, payload: action.payload)
-        let result = try await gate.execute(read, requesterID: requesterID) { _ in
+        let result = try await gate.execute(credentialAction, requesterID: requesterID, approvalID: approvalID) { _ in
             try await self.check()
             var values: [String: String] = [:]
             var bytes = 0

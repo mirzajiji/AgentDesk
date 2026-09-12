@@ -47,7 +47,11 @@ actor MCPApprovedStdioLaunch {
     func review(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
         try await gate.review(id, approve: approve, expectedSequence: expectedSequence)
     }
-    func start(approvalID: UUID) async throws -> MCPServerDescription {
+    func prepareCredentials() async throws -> PolicyPreparation { try await gate.prepareCredentials() }
+    func reviewCredentials(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        try await gate.reviewCredentials(id, approve: approve, expectedSequence: expectedSequence)
+    }
+    func start(approvalID: UUID, credentialApprovalID: UUID? = nil) async throws -> MCPServerDescription {
         guard !closed, !starting, connection == nil else { throw AuthorizationError.denied }
         starting = true
         defer { starting = false; launchTask = nil }
@@ -59,7 +63,7 @@ actor MCPApprovedStdioLaunch {
             if configuration.secretEnvironment.isEmpty { environment = [:] }
             else {
                 guard let secrets else { throw AuthorizationError.denied }
-                environment = try await gate.environment(store: secrets)
+                environment = try await gate.environment(store: secrets, approvalID: credentialApprovalID)
             }
             let resolved = try MCPLaunchResource.resolve(configuration, scope: configuration.scope,
                 workspaceRoot: workspaceRoot, projectRoot: projectRoot)

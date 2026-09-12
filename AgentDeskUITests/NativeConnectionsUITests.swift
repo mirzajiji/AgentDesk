@@ -2,6 +2,37 @@
 import XCTest
 
 final class NativeConnectionsUITests: XCTestCase {
+    @MainActor func testIssueApprovalAndCancellationDisplayOnlyReviewedResult() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchEnvironment["AGENTDESK_TEST_RUN_MODE"] = "success"
+        app.launchEnvironment["AGENTDESK_TEST_JIRA_LAYOUT"] = "reference-only"
+        app.launchEnvironment["AGENTDESK_TEST_JIRA_ISSUE"] = "approval"
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Connections"].firstMatch.waitForExistence(timeout: 10))
+        app.staticTexts["Connections"].firstMatch.click()
+        let issue = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "connection.issue.")).firstMatch
+        XCTAssertTrue(issue.waitForExistence(timeout: 10)); issue.click()
+        let key = app.textFields["jira.issue.key"]
+        XCTAssertTrue(key.waitForExistence(timeout: 5)); key.click(); key.typeText("SYN-1")
+        app.buttons["jira.issue.lookup"].click()
+        let approve = app.buttons["jira.issue.approve"]
+        XCTAssertTrue(approve.waitForExistence(timeout: 5)); XCTAssertFalse(key.isEnabled)
+        XCTAssertFalse((app.staticTexts["jira.issue.content"].value as? String ?? "").contains("Synthetic issue"))
+        app.buttons["jira.issue.cancel"].click()
+        XCTAssertFalse(approve.exists); XCTAssertTrue(key.isEnabled)
+        app.buttons["jira.issue.lookup"].click()
+        XCTAssertTrue(approve.waitForExistence(timeout: 5)); approve.click()
+        let content = app.staticTexts["jira.issue.content"]
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", "Synthetic issue"), object: content)], timeout: 5), .completed)
+        XCTAssertFalse((content.value as? String ?? "").contains("private-test-value"))
+        XCTAssertFalse(approve.exists); XCTAssertTrue(key.isEnabled)
+        let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        shot.name = "Approved synthetic Jira issue result"; shot.lifetime = .keepAlways; add(shot)
+    }
+
     @MainActor func testCredentialActionsFitCompactWindow() {
         continueAfterFailure = false
         let app = XCUIApplication()

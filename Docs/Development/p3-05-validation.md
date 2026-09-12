@@ -225,3 +225,15 @@ The initial test used the wrong redactor method name; the corrected `redactText`
 
 
 Final results: five native model tests and one compact native UI test passed, zero failures. Command: `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac -resultBundlePath TestResults/p3-05/native-issue-approval-final.xcresult -only-testing:AgentDeskTests/NativeJiraIssueModelTests -only-testing:AgentDeskUITests/NativeConnectionsUITests/testCredentialActionsFitCompactWindow -parallel-testing-enabled NO test`. Normal signed Mac build passed with the same project/scheme/destination/derived data and `build` (`native-issue-approval-build.log`). Documentation and diff checks passed. Xcode 26.0 / macOS 26.5.2; Mac-only code, no new iPhone coverage. Counts unchanged: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+
+## Native issue approval UI acceptance
+
+Added a synthetic read-review fixture behind `DEBUG`, the existing UUID-scoped native UI-test mode, and explicit `AGENTDESK_TEST_JIRA_ISSUE=approval`. It has no network/Keychain implementation and is not selected during normal use. Production continues to construct the runtime-backed session. The fixture checks the approval identity/sequence and rejects execution before review, after close, or more than once.
+
+The native UI test `testIssueApprovalAndCancellationDisplayOnlyReviewedResult` passes: issue input locks while awaiting review; no synthetic result appears before approval; Cancel Review restores editing; a second lookup and Approve Read reveals redacted content; the private fixture value is absent and approval controls disappear. The exported result screenshot was visually inspected. This closes the synthetic approval-button UI coverage gap, not live OAuth/Jira acceptance.
+
+Command: `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac -resultBundlePath TestResults/p3-05/native-issue-approval-ui.xcresult -only-testing:AgentDeskUITests/NativeConnectionsUITests/testIssueApprovalAndCancellationDisplayOnlyReviewedResult -parallel-testing-enabled NO test`. macOS 26.5.2, Xcode 26.0. No iPhone behavior changed. Release build check pending.
+
+
+Final Release verification passed: `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -configuration Release -destination 'platform=macOS' -derivedDataPath TestResults/p1-13c2/ReleaseMac build` (`native-issue-approval-release.log`). Byte inspection of the resulting executable confirms absence of the fixture type name and `AGENTDESK_TEST_JIRA_ISSUE` selector. Documentation and diff checks pass. Counts unchanged: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

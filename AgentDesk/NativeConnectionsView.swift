@@ -122,7 +122,13 @@ struct ProjectJiraConnectionsView: View {
         .sheet(item: $issue) { request in
             if let record = request.existing, let openIssue {
                 NativeJiraIssueView(site: record.configuration.instance.host ?? "Jira", open: { key in
-                    NativeJiraIssueSession(try await openIssue(record, key))
+                    #if DEBUG
+                    if NativeRunUITestSupport.mode() != nil,
+                       ProcessInfo.processInfo.environment["AGENTDESK_TEST_JIRA_ISSUE"] == "approval" {
+                        return try NativeJiraIssueUITestReview()
+                    }
+                    #endif
+                    return NativeJiraIssueSession(try await openIssue(record, key))
                 })
             }
         }

@@ -201,3 +201,17 @@ Core tests compare native and execution policy, reject foreign/unknown environme
 
 
 Final checks: 23 tests passed on iPhone 16 Pro / iOS 26.0. Command from `Packages/AgentDeskCore`: `xcodebuild -scheme AgentDeskCore -destination 'platform=iOS Simulator,id=C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE' -derivedDataPath ../../TestResults/p3-05/CoreIPhone -resultBundlePath ../../TestResults/p3-05/administrative-policy-iphone.xcresult -only-testing:AgentDeskCoreTests/ProjectExecutionSetupTests -only-testing:AgentDeskCoreTests/ExecutionConfigurationTests -parallel-testing-enabled NO test`. Both normal application builds passed, using the preceding native-read-review build commands with logs `administrative-policy-app-mac.log` and `administrative-policy-app-iphone.log`. Xcode 26.0 / macOS 26.5.2. Documentation and diff checks pass. No UI change or live Jira acceptance is claimed. This does not complete a parent architecture task.
+
+
+## Native Jira issue lookup
+
+Connections now offers Look Up Issue for an enabled connection with a credential reference. The sheet opens a dedicated authenticated connection, verifies the saved revision/configuration and environment policy, and uses `NativeJiraReadReview` for issue-content dispatch. It shows required approval explicitly, displays only redacted results, handles denied/dry-run/error states, and cancels owned work on dismissal. The model ignores late completion after cancellation; completed/error sessions close their connection. Account/site discovery belongs to authenticated connection establishment, before the separate issue read gate. No arbitrary request URL is accepted.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- Normal signed Mac build passed (`xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`, `native-issue-build-fixed.log`). Initial compilation caught use of equality on a non-Equatable revision wrapper; the fix compares the exact configuration and revision.
+- Two native model tests pass for empty input/no opening, trimmed lookup, fixed non-sensitive error messages, cancellation and suppression of late failure.
+- One native UI test passes: eight connection actions fit a compact Mac window, issue sheet opens, empty input is rejected without approval, Done dismisses, and reset cancel/confirm remains functional. The exported issue-sheet screenshot was visually inspected.
+- Native test command: `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac -resultBundlePath TestResults/p3-05/native-issue-ui.xcresult -only-testing:AgentDeskTests/NativeJiraIssueModelTests -only-testing:AgentDeskUITests/NativeConnectionsUITests/testCredentialActionsFitCompactWindow -parallel-testing-enabled NO test`.
+
+Logs and screenshots are ignored in `TestResults/p3-05`. Existing Runtime HTTP tests cover approved execution, denial, replay and configuration revocation; this native UI run did not exercise a successful live issue response or approval-click path. Live acceptance remains unavailable without publisher OAuth registration. This Mac-only change adds no iPhone behavior; no new Simulator coverage is claimed. Broader P3-05 lifecycle and full native Jira acceptance remain open. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

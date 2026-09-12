@@ -2,6 +2,7 @@
 import AgentDeskCore
 import AgentDeskDesign
 import AgentDeskPlugins
+import AgentDeskRuntime
 import SwiftUI
 import AppKit
 
@@ -24,7 +25,9 @@ struct NativeConnectionsView: View {
             }
             if let error = catalog.errorMessage { Text(error).foregroundStyle(.orange) }
             if let project = catalog.projects.first(where: { $0.id == projectID }) {
-                ProjectJiraConnectionsView(project: project, open: { try await catalog.jiraConfigurationServices(for: project) })
+                ProjectJiraConnectionsView(project: project, openIssue: { record, key in
+                    try await catalog.openJiraIssue(project: project, record: record, identifier: key)
+                }, open: { try await catalog.jiraConfigurationServices(for: project) })
                     .id(project.scope)
             } else {
                 ContentUnavailableView("Choose a project", systemImage: "point.3.connected.trianglepath.dotted",
@@ -46,9 +49,12 @@ struct ProjectJiraConnectionsView: View {
     @StateObject private var model: ProjectJiraConnectionsModel
     @State private var editor: JiraEditorRequest?
     @State private var permissions: JiraEditorRequest?
+    @State private var issue: JiraEditorRequest?
+    private let openIssue: ((PluginConfigurationRevision<JiraConnectionConfiguration>, String) async throws -> NativeJiraReadReview)?
     @State private var reset: PluginConfigurationRevision<JiraConnectionConfiguration>?
     private let registration = try? NativeJiraRegistration.load()
-    init(project: ProjectRecord, open: @escaping () async throws -> NativeJiraConfigurationServices) {
+    init(project: ProjectRecord, openIssue: ((PluginConfigurationRevision<JiraConnectionConfiguration>, String) async throws -> NativeJiraReadReview)? = nil, open: @escaping () async throws -> NativeJiraConfigurationServices) {
+        self.openIssue = openIssue
         _model = StateObject(wrappedValue: ProjectJiraConnectionsModel(project: project, open: open))
     }
     var body: some View {
@@ -113,6 +119,13 @@ struct ProjectJiraConnectionsView: View {
         .task { await model.load() }
         .onDisappear { model.close() }
         .sheet(item: $editor) { request in JiraConnectionEditor(model: model, existing: request.existing) }
+        .sheet(item: $issue) { request in
+            if let record = request.existing, let openIssue {
+                NativeJiraIssueView(site: record.configuration.instance.host ?? "Jira", open: { key in
+                    try await openIssue(record, key)
+                })
+            }
+        }
         .sheet(item: $permissions) { request in
             if let record = request.existing { JiraPermissionEditor(model: model, record: record) }
         }
@@ -143,6 +156,11 @@ struct ProjectJiraConnectionsView: View {
                 .accessibilityIdentifier("connection.test.\(record.configuration.id)")
             Button("Log Out") { Task { await model.logout(record) } }.disabled(model.busy)
                 .accessibilityIdentifier("connection.logout.\(record.configuration.id)")
+        }
+        if openIssue != nil {
+            Button("Look Up Issue") { issue = .init(existing: record) }
+                .disabled(model.busy || !record.configuration.enabled || record.configuration.credential == nil)
+                .accessibilityIdentifier("connection.issue.\(record.configuration.id)")
         }
         Button("Permissions") { permissions = .init(existing: record) }.disabled(model.busy)
             .accessibilityIdentifier("connection.permissions.\(record.configuration.id)")

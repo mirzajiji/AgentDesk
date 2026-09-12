@@ -17,7 +17,7 @@ final class NativeConnectionsUITests: XCTestCase {
         let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -2, dy: -2))
         corner.press(forDuration: 0.2, thenDragTo: window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 908, dy: 718)))
         XCTAssertLessThanOrEqual(window.frame.width, 950)
-        for prefix in ["login", "refresh-grant", "test", "logout", "reset", "edit"] {
+        for prefix in ["login", "refresh-grant", "test", "logout", "issue", "permissions", "reset", "edit"] {
             let action = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "connection." + prefix + ".")).firstMatch
             XCTAssertTrue(action.exists)
             XCTAssertGreaterThan(action.frame.width, 35)
@@ -27,6 +27,15 @@ final class NativeConnectionsUITests: XCTestCase {
         }
         let attachment = XCTAttachment(screenshot: window.screenshot())
         attachment.name = "Compact Jira lifecycle actions"; attachment.lifetime = .keepAlways; add(attachment)
+        let issue = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "connection.issue.")).firstMatch
+        issue.click()
+        XCTAssertTrue(app.textFields["jira.issue.key"].waitForExistence(timeout: 5))
+        app.buttons["jira.issue.lookup"].click()
+        XCTAssertEqual(app.staticTexts["jira.issue.message"].value as? String, "Enter a Jira issue key.")
+        XCTAssertFalse(app.buttons["jira.issue.approve"].exists)
+        let issueShot = XCTAttachment(screenshot: window.screenshot())
+        issueShot.name = "Native Jira issue lookup"; issueShot.lifetime = .keepAlways; add(issueShot)
+        app.sheets.firstMatch.buttons["Done"].click()
         let reset = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "connection.reset.")).firstMatch
         reset.click()
         XCTAssertTrue(app.sheets.firstMatch.buttons["Reset Connection"].waitForExistence(timeout: 5))

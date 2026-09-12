@@ -9,6 +9,7 @@ actor MCPStdioSession {
         let continuation: CheckedContinuation<MCPMessage, any Error>
         let deadline: Task<Void, Never>
         let cancelOnWire: Bool
+        let send: Task<Bool, Never>
     }
     private let transport: MCPStdioTransport
     private let tracker: MCPRequestTracker
@@ -37,8 +38,8 @@ actor MCPStdioSession {
                     catch { return }
                     await self?.cancel(ticket.id, error: MCPRequestError.timedOut, fromDeadline: true)
                 }
-                pending[ticket.id] = Pending(continuation: continuation, deadline: deadline, cancelOnWire: method != "initialize")
-                Task { [weak self] in await self?.send(message, id: ticket.id) }
+                let send = Task { [weak self] in await self?.send(message, id: ticket.id) ?? false }
+                pending[ticket.id] = Pending(continuation: continuation, deadline: deadline, cancelOnWire: method != "initialize", send: send)
             }
         } onCancel: { Task { await self.cancel(ticket.id, error: CancellationError()) } }
     }
@@ -57,10 +58,10 @@ actor MCPStdioSession {
             } catch { await self?.fail(error) }
         }
     }
-    private func send(_ message: MCPMessage, id: MCPRequestID) async {
-        guard !closed, pending[id] != nil else { return }
-        do { try await transport.send(message) }
-        catch { await fail(error) }
+    private func send(_ message: MCPMessage, id: MCPRequestID) async -> Bool {
+        guard !closed, pending[id] != nil else { return false }
+        do { try await transport.send(message); return true }
+        catch { await fail(error); return false }
     }
     private func receive(_ message: MCPMessage) async {
         guard !closed else { return }
@@ -81,7 +82,8 @@ actor MCPStdioSession {
         if !fromDeadline { call.deadline.cancel() }
         await tracker.cancel(id)
         call.continuation.resume(throwing: error)
-        guard call.cancelOnWire else { return }
+        // Await any in-flight enqueue before cancellation; a skipped/failed send has nothing to cancel.
+        guard call.cancelOnWire, await call.send.value, !closed else { return }
         // Cancellation is best-effort on the wire. Failure closes the connection and resolves other waiters.
         do {
             let encoded = try JSONEncoder().encode(id)

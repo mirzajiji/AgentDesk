@@ -10,11 +10,15 @@ final class MCPStdioSessionTests: XCTestCase {
         let script = """
         import json, sys
         cancellations = 0
+        issued = set()
         for line in sys.stdin:
             request = json.loads(line)
             if 'id' not in request:
-                if request['method'] == 'notifications/cancelled': cancellations += 1
+                if request['method'] == 'notifications/cancelled':
+                    assert request['params']['requestId'] in issued
+                    cancellations += 1
                 continue
+            issued.add(request['id'])
             if request['method'] == 'initialize': continue
             if request['method'] == 'cancellationCount':
                 print(json.dumps({'jsonrpc':'2.0','id':request['id'],'result':{'count':cancellations}}), flush=True)
@@ -47,6 +51,18 @@ final class MCPStdioSessionTests: XCTestCase {
         catch { XCTAssertTrue(error is CancellationError) }
         let result = try await session.request(method: "ping")
         XCTAssertEqual(result.kind, .result)
+        await session.close()
+    }
+    func testImmediateDeadlinesNeverCancelBeforeIssuingRequest() async throws {
+        let session = try session()
+        _ = try await session.request(method: "ping")
+        for _ in 0..<20 {
+            do { _ = try await session.request(method: "hold", timeout: .nanoseconds(1)); XCTFail("No timeout") }
+            catch { XCTAssertEqual(error as? MCPRequestError, .timedOut) }
+        }
+        // The fixture terminates on any cancellation whose request has not arrived.
+        let probe = try await session.request(method: "ping")
+        XCTAssertEqual(probe.kind, .result)
         await session.close()
     }
     func testInitializeTimeoutDoesNotSendWireCancellation() async throws {

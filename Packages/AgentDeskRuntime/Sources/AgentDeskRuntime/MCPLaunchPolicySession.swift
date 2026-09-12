@@ -8,6 +8,7 @@ import Foundation
 /// Trusted Mac host boundary. Resource resolution must validate physical project/executable identity.
 /// Neither configuration nor the resource fingerprint is itself launch authority.
 actor MCPLaunchPolicySession {
+    private let configuration: MCPStdioConfiguration
     private let gate: PolicyGate
     private let action: PolicyAction
     private let requesterID: UUID
@@ -15,11 +16,12 @@ actor MCPLaunchPolicySession {
     private let validate: @Sendable () async throws -> (PolicyAction, PolicySnapshot)
     private var closed = false
 
-    private init(action: PolicyAction, policy: PolicySnapshot, authorities: [PolicyAuthority], requesterID: UUID,
+    private init(configuration: MCPStdioConfiguration, action: PolicyAction, policy: PolicySnapshot, authorities: [PolicyAuthority], requesterID: UUID,
                  approvals: ApprovalStore, validate: @escaping @Sendable () async throws -> (PolicyAction, PolicySnapshot)) throws {
         guard let requester = authorities.first(where: { $0.id == requesterID }), case .localUser = requester.kind else {
             throw AuthorizationError.denied
         }
+        self.configuration = configuration
         self.action = action; self.requesterID = requesterID; self.validate = validate
         policyFingerprint = try policy.fingerprint
         gate = try PolicyGate(policy: policy, authorities: authorities, store: approvals)
@@ -48,7 +50,9 @@ actor MCPLaunchPolicySession {
             return (action, policy)
         }
         let (action, policy) = try await validate()
-        return try Self(action: action, policy: policy, authorities: authorities, requesterID: requesterID,
+        guard let record = try await configurations.read(id: connectionID, in: scope),
+              try ActionFingerprint.canonical(record) == action.payload else { throw AuthorizationError.stalePolicy }
+        return try Self(configuration: record.configuration, action: action, policy: policy, authorities: authorities, requesterID: requesterID,
             approvals: approvals, validate: validate)
     }
     private func check() async throws {
@@ -74,6 +78,36 @@ actor MCPLaunchPolicySession {
             try await self.check()
             return try await launch()
         }
+    }
+    /// Used only inside an approved launch. Credential reads still cross their own policy boundary.
+    func environment(store: any SecretStore) async throws -> [String: String] {
+        try await check()
+        guard configuration.scope == action.scope, configuration.environmentID == action.environmentID,
+              store.scope.workspaceID == action.scope.workspaceID, store.scope.projectID == action.scope.projectID,
+              store.scope.environmentID == action.environmentID else { throw AuthorizationError.scopeMismatch }
+        let configuration = configuration
+        let read = try PolicyAction(scope: action.scope, environmentID: action.environmentID, operation: .readSecret,
+            resource: action.resource, payload: action.payload)
+        let result = try await gate.execute(read, requesterID: requesterID) { _ in
+            try await self.check()
+            var values: [String: String] = [:]
+            var bytes = 0
+            for (name, reference) in configuration.secretEnvironment.sorted(by: { $0.key < $1.key }) {
+                try Task.checkCancellation()
+                guard let secret = try await store.get(reference) else { throw SecretStoreError.invalidValue }
+                let value = try secret.withBytes { data -> String in
+                    guard let text = String(data: data, encoding: .utf8), !text.utf8.contains(0) else { throw SecretStoreError.invalidValue }
+                    return text
+                }
+                bytes += name.utf8.count + value.utf8.count
+                guard bytes <= 65_536 else { throw SecretStoreError.invalidValue }
+                values[name] = value
+            }
+            try await self.check()
+            return values
+        }
+        guard case .executed(let values) = result else { throw AuthorizationError.denied }
+        return values
     }
     func close() async { closed = true; await gate.removeAuthority(requesterID) }
 }

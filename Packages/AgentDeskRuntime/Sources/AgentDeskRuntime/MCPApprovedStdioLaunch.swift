@@ -6,8 +6,9 @@ import AgentDeskSecurity
 import Foundation
 
 /// Internal Mac integration. The host must retain registered filesystem access for this lifetime.
-/// Secret-bearing launches remain unavailable until credential-read policy is integrated.
+/// Credential reads require independent readSecret policy permission.
 actor MCPApprovedStdioLaunch {
+    private let secrets: (any SecretStore)?
     private let gate: MCPLaunchPolicySession
     private let configuration: MCPStdioConfiguration
     private let workspaceRoot: URL
@@ -18,19 +19,20 @@ actor MCPApprovedStdioLaunch {
     private var starting = false
     private var launchTask: Task<PolicyExecutionResult<MCPNegotiatedStdioConnection>, any Error>?
 
-    private init(gate: MCPLaunchPolicySession, configuration: MCPStdioConfiguration,
+    private init(secrets: (any SecretStore)?, gate: MCPLaunchPolicySession, configuration: MCPStdioConfiguration,
                  workspaceRoot: URL, projectRoot: URL, resource: ActionFingerprint) {
+        self.secrets = secrets
         self.gate = gate; self.configuration = configuration; self.workspaceRoot = workspaceRoot
         self.projectRoot = projectRoot; self.resource = resource
     }
     static func open(configurations: ProjectMCPConfigurationStore<MCPStdioConfiguration>, connectionID: UUID,
                      scope: ProjectScope, environmentID: EnvironmentID, workspaceRoot: URL, projectRoot: URL,
                      authorities: [PolicyAuthority], requesterID: UUID, approvals: ApprovalStore,
-                     currentPolicy: @escaping @Sendable () async throws -> PolicySnapshot) async throws -> Self {
+                     secrets: (any SecretStore)? = nil, currentPolicy: @escaping @Sendable () async throws -> PolicySnapshot) async throws -> Self {
         guard let requester = authorities.first(where: { $0.id == requesterID }), case .localUser = requester.kind,
               let record = try await configurations.read(id: connectionID, in: scope), record.configuration.enabled,
               record.configuration.environmentID == environmentID,
-              record.configuration.secretEnvironment.isEmpty else { throw AuthorizationError.denied }
+              (record.configuration.secretEnvironment.isEmpty || secrets != nil) else { throw AuthorizationError.denied }
         let configuration = record.configuration
         let resource = try MCPLaunchResource.resolve(configuration, scope: scope, workspaceRoot: workspaceRoot, projectRoot: projectRoot)
         let gate = try await MCPLaunchPolicySession.open(configurations: configurations, connectionID: connectionID,
@@ -39,7 +41,7 @@ actor MCPApprovedStdioLaunch {
                 guard current == configuration else { throw AuthorizationError.stalePolicy }
                 return try MCPLaunchResource.resolve(current, scope: scope, workspaceRoot: workspaceRoot, projectRoot: projectRoot).fingerprint
             })
-        return Self(gate: gate, configuration: configuration, workspaceRoot: workspaceRoot, projectRoot: projectRoot, resource: resource.fingerprint)
+        return Self(secrets: secrets, gate: gate, configuration: configuration, workspaceRoot: workspaceRoot, projectRoot: projectRoot, resource: resource.fingerprint)
     }
     func prepare() async throws -> PolicyPreparation { try await gate.prepare() }
     func review(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
@@ -50,14 +52,20 @@ actor MCPApprovedStdioLaunch {
         starting = true
         defer { starting = false; launchTask = nil }
         let configuration = configuration, workspaceRoot = workspaceRoot, projectRoot = projectRoot, expected = resource
-        let gate = gate
+        let gate = gate, secrets = secrets
         let task = Task { try await gate.execute(approvalID: approvalID) {
             try Task.checkCancellation()
+            let environment: [String: String]
+            if configuration.secretEnvironment.isEmpty { environment = [:] }
+            else {
+                guard let secrets else { throw AuthorizationError.denied }
+                environment = try await gate.environment(store: secrets)
+            }
             let resolved = try MCPLaunchResource.resolve(configuration, scope: configuration.scope,
                 workspaceRoot: workspaceRoot, projectRoot: projectRoot)
             guard resolved.fingerprint == expected else { throw AuthorizationError.stalePolicy }
             let transport = try MCPStdioTransport(scope: configuration.scope, connectionID: configuration.id,
-                executable: resolved.executable, arguments: configuration.arguments, directory: resolved.directory)
+                executable: resolved.executable, arguments: configuration.arguments, directory: resolved.directory, environment: environment)
             return try await MCPNegotiatedStdioConnection.open(transport: transport)
         }
         }

@@ -172,3 +172,22 @@ Review found the stored-policy factory verified IDs/revisions/permissions but re
 
 
 Final binding checks passed: one focused runtime integration test on the Mac host and on iPhone 16 Pro / iOS 26.0 (`stored-config-binding.log`, `exact-binding-iphone.xcresult`), all 85 Plugins host tests (`exact-binding-plugins.log`), and normal Mac/iPhone application builds (`exact-binding-app-mac.log`, `exact-binding-app-iphone.log`). The Simulator run used AgentDeskRuntime with `-only-testing:AgentDeskRuntimeTests/StoredPluginPolicySessionTests`, the primary UUID and RuntimeIPhone derived data. Builds used the existing AgentDesk project/scheme and documented destinations. Xcode 26.0 / macOS 26.5.2. Diff and documentation checks passed. No UI behavior changed and no additional UI acceptance is claimed. Full native operation routing remains unfinished.
+
+
+## Native Jira read review in progress
+
+Added a public native read-review service owning a dedicated authenticated Jira session. Its opening path loads persisted permissions and uses the stored-policy factory with asynchronous adapter preparation. It exposes preparation, local-user approval, execution of the selected read only, and close/revocation. Opening failure closes the supplied dedicated connection. Policy result enums are public for this native API; the generic dispatch gate remains internal.
+
+Initial compilation required exposing those result enums and correcting a nonoptional RunID binding (`native-read-review-build.log`). The corrected build and existing stored-policy regression passed (`native-read-review-build-fixed.log`). Dedicated service lifecycle/HTTP tests, native UI wiring and native platform validation remain pending. No completed feature or live read is claimed, and these changes are not committed yet.
+
+
+### Native read-review boundary validation
+
+The service now has synthetic HTTP-level regressions proving that stored deny and approval rules prevent unapproved dispatch, reviewed execution dispatches once, consumed approvals cannot replay, disabling the saved configuration after approval prevents dispatch, and closing the review closes its dedicated connection and rejects further preparation.
+
+- `swift test --package-path Packages/AgentDeskRuntime --filter JiraPolicyReadTests`: four tests pass (`TestResults/p3-05/native-read-review-expanded.log`).
+- `swift test --package-path Packages/AgentDeskRuntime`: all 168 tests pass (`native-read-review-runtime-full.log`).
+- From `Packages/AgentDeskRuntime`: `xcodebuild -scheme AgentDeskRuntime -destination 'platform=iOS Simulator,id=C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE' -derivedDataPath ../../TestResults/p3-04/RuntimeIPhone -resultBundlePath ../../TestResults/p3-05/native-read-review-iphone.xcresult -only-testing:AgentDeskRuntimeTests/JiraPolicyReadTests -only-testing:AgentDeskRuntimeTests/StoredPluginPolicySessionTests -parallel-testing-enabled NO test`: five tests pass, iPhone 16 Pro / iOS 26.0.
+- Normal app builds: `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build` and the same command with the primary iOS Simulator destination and `TestResults/p1-08b/FilteredIPhone` derived data. Logs: `native-read-review-app-mac.log` and `native-read-review-app-iphone.log` under `TestResults/p3-05`.
+
+Environment: Xcode 26.0, macOS 26.5.2. No live Jira requests or real credentials. Native UI wiring remains unfinished; this is a service component, not completion of P3-05 or the full native Jira operation flow. Counts remain 52 documented tasks complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

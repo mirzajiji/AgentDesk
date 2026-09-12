@@ -14,6 +14,75 @@ import XCTest
     func testAttachmentSettingsRequireIndependentReadApproval() async throws {
         try await exercise(.attachmentSettings, pathSuffix: "/attachment/meta")
     }
+    func testNativeReadReviewUsesStoredRulesAndClosesItsConnection() async throws {
+        for disposition: PolicyDisposition in [.deny, .approval] { try await exerciseNative(disposition) }
+    }
+    func testNativeReadReviewRejectsChangedConfigurationAfterApproval() async throws {
+        try await exerciseNative(.approval, changeConfiguration: true)
+    }
+    private func exerciseNative(_ disposition: PolicyDisposition, changeConfiguration: Bool = false) async throws {
+        let operation = JiraReadOperation.issue(identifier: "A-1")
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let catalog = try WorkspaceCatalog(container: root)
+        let workspace = try await catalog.createWorkspace(name: "Synthetic")
+        let project = try await catalog.createProject(in: workspace.id, name: "Native read")
+        let scope = project.scope, environment = EnvironmentID()
+        let configurations = try await catalog.pluginConfigurationStore(for: JiraConnectionConfiguration.self, in: scope)
+        let id = UUID()
+        let permissions = try PluginPermissions(connectionID: id, scope: scope, environmentID: environment, rules: [.init(.issuesRead, disposition)])
+        let secretScope = try SecretScope(workspaceID: scope.workspaceID, projectID: scope.projectID, environmentID: environment)
+        let config = try JiraConnectionConfiguration(id: id, scope: scope, environmentID: environment,
+            instance: URL(string: "https://synthetic.atlassian.net")!, credential: SecretReference(scope: secretScope), enabled: true, permissions: permissions)
+        _ = try await configurations.save(config, in: scope, expectedRevision: nil)
+        let tokens = try JiraOAuthTokens(accessToken: SecretValue(Data("synthetic-access".utf8)), refreshToken: nil,
+            expiresAt: Date().addingTimeInterval(600), scopes: ["read:jira-work"])
+        let vault = try JiraCredentialVault(configuration: config, store: JiraTestSecrets(scope: secretScope))
+        try await vault.save(tokens)
+        let resource = JiraCloudResource(id: UUID(), scopes: ["read:jira-work"])
+        let transport = try JiraHTTPTransport(origin: resource.apiOrigin, protocolClasses: [JiraPolicyProtocol.self])
+        let account = try JiraCloudAccount.decode(.init(status: 200, body: Data(#"{"accountId":"synthetic","displayName":"Synthetic","active":true}"#.utf8)))
+        let connection = JiraCloudSession(account: account, transport: transport, configuration: config, resource: resource, tokens: tokens, vault: vault, now: { Date() })
+        let context = RedactionContext(scope: scope, environmentID: environment, runID: RunID())
+        let redactor = try ContentRedactor(context: context)
+        let rules = PolicyOperation.allCases.map { PolicyRule($0, .allow) }
+        let policy = try PolicySnapshot(workspace: PolicyDocument(level: .workspace, workspaceID: scope.workspaceID, rules: rules),
+            project: PolicyDocument(level: .project, workspaceID: scope.workspaceID, projectID: scope.projectID, rules: rules),
+            environment: PolicyDocument(level: .environment, workspaceID: scope.workspaceID, projectID: scope.projectID, environmentID: environment, rules: rules), environmentKind: .test)
+        let user = try PolicyAuthority(id: UUID(), kind: .localUser, scopes: [scope], environments: [environment], operations: [.readEvidence], canApprove: true, expiresAt: Date().addingTimeInterval(600))
+        let store = try ApprovalStore(database: root.appendingPathComponent("operations.sqlite"), scope: scope, environmentID: environment)
+        let path = resource.apiOrigin.path + "/rest/api/3" + "/issue/A-1"
+        let review = try await NativeJiraReadReview.open(connection: connection, operation: operation, configurations: configurations,
+            connectionID: config.id, context: context, redactor: redactor, authorities: [user], requesterID: user.id,
+            approvals: store, currentPolicy: { policy })
+        do { _ = try await review.execute(); XCTFail("Unreviewed native read dispatched") }
+        catch { XCTAssertEqual(error as? AuthorizationError, disposition == .deny ? .denied : .approvalRequired) }
+        XCTAssertEqual(JiraPolicyProtocol.counts.withLock { $0[path, default: 0] }, 0)
+        if disposition == .approval {
+            guard case .approval(let pending) = try await review.prepare() else { return XCTFail("Missing native review") }
+            _ = try await review.review(pending.id, approve: true, expectedSequence: pending.sequence)
+            if changeConfiguration {
+                let changed = try JiraConnectionConfiguration(id: id, scope: scope, environmentID: environment,
+                    instance: config.instance, credential: config.credential, enabled: false, permissions: permissions)
+                _ = try await configurations.save(changed, in: scope, expectedRevision: 1)
+                do { _ = try await review.execute(approvalID: pending.id); XCTFail("Disabled connection dispatched") }
+                catch { XCTAssertEqual(error as? AuthorizationError, .denied) }
+                XCTAssertEqual(JiraPolicyProtocol.counts.withLock { $0[path, default: 0] }, 0)
+            } else {
+                _ = try await review.execute(approvalID: pending.id)
+                XCTAssertEqual(JiraPolicyProtocol.counts.withLock { $0[path, default: 0] }, 1)
+                do { _ = try await review.execute(approvalID: pending.id); XCTFail("Native approval replayed") } catch { }
+                XCTAssertEqual(JiraPolicyProtocol.counts.withLock { $0[path, default: 0] }, 1)
+            }
+        }
+        await review.close()
+        do { _ = try await review.prepare(); XCTFail("Closed native review accepted") }
+        catch { XCTAssertEqual(error as? AuthorizationError, .denied) }
+        do { _ = try await connection.prepare(operation, configurationRevision: 1, permissions: permissions, runID: context.runID); XCTFail("Owned connection remained open") }
+        catch { XCTAssertEqual(error as? JiraTransportError, .closed) }
+        _ = JiraPolicyProtocol.counts.withLock { $0.removeValue(forKey: path) }
+    }
     private func exercise(_ operation: JiraReadOperation, pathSuffix: String) async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

@@ -10,7 +10,7 @@ extension PluginPolicySession {
                            connectionID: UUID, scope: ProjectScope,
                            authorities: [PolicyAuthority], requesterID: UUID, approvals: ApprovalStore,
                            currentPolicy: @escaping @Sendable () async throws -> PolicySnapshot,
-                           prepare: @escaping @Sendable (PluginConfigurationRevision<JiraConnectionConfiguration>, PluginPermissions) throws -> PreparedPluginAction) async throws -> PluginPolicySession {
+                           prepare: @escaping @Sendable (PluginConfigurationRevision<JiraConnectionConfiguration>, PluginPermissions) async throws -> PreparedPluginAction) async throws -> PluginPolicySession {
         let load: @Sendable () async throws -> (PreparedPluginAction, PluginPermissions, PolicySnapshot) = {
             try Task.checkCancellation()
             guard let record = try await configurationStore.read(id: connectionID, in: scope) else {
@@ -18,7 +18,7 @@ extension PluginPolicySession {
             }
             guard record.configuration.enabled else { throw AuthorizationError.denied }
             let permissions = try record.configuration.resolvedPermissions()
-            let prepared = try prepare(record, permissions)
+            let prepared = try await prepare(record, permissions)
             guard prepared.connectionID == connectionID, prepared.configurationRevision == record.revision,
                   prepared.action.scope == scope, prepared.action.environmentID == record.configuration.environmentID,
                   prepared.configurationFingerprint == (try ActionFingerprint.canonical(record.configuration)),

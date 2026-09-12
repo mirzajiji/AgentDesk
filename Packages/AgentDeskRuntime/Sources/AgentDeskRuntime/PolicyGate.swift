@@ -3,12 +3,12 @@ import AgentDeskPersistence
 import AgentDeskSecurity
 import Foundation
 
-enum PolicyPreparation: Sendable {
+public enum PolicyPreparation: Sendable {
     case allowed
     case approval(ApprovalRecord)
     case denied(PolicyEvaluation)
 }
-enum PolicyExecutionResult<Value: Sendable>: Sendable {
+public enum PolicyExecutionResult<Value: Sendable>: Sendable {
     case dryRun(PolicyEvaluation)
     case executed(Value)
 }

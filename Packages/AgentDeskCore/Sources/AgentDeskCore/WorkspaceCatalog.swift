@@ -173,6 +173,17 @@ public actor WorkspaceCatalog {
         }
     }
 
+    public func mcpConfigurationStore<Value: ScopedMCPConfiguration>(
+        for type: Value.Type, in scope: ProjectScope
+    ) throws -> ProjectMCPConfigurationStore<Value> {
+        try root.withLock {
+            _ = try loadWorkspace(scope.workspaceID); _ = try loadProject(scope)
+            let workspace = try root.child(scope.workspaceID.rawValue)
+            return ProjectMCPConfigurationStore(scope: scope, root: root, workspace: workspace,
+                project: try workspace.child("Projects").child(scope.projectID.rawValue))
+        }
+    }
+
     public func bugStore(in scope: ProjectScope) throws -> ProjectBugStore {
         try root.withLock {
             _ = try loadWorkspace(scope.workspaceID); _ = try loadProject(scope)

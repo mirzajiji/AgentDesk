@@ -7,7 +7,7 @@ public enum MCPConfigurationError: Error, Equatable, Sendable {
 }
 
 /// Non-secret launch intent. Filesystem resolution and policy approval are required before launch.
-public struct MCPStdioConfiguration: Codable, Equatable, Sendable {
+public struct MCPStdioConfiguration: ScopedMCPConfiguration, Equatable {
     public let schemaVersion: Int
     public let id: UUID
     public let scope: ProjectScope

@@ -7,6 +7,29 @@ import AgentDeskSecurity
 import Combine
 import Foundation
 
+/// Narrow UI dependency; production forwards to the stored-policy runtime service.
+@MainActor
+protocol NativeJiraIssueReview: AnyObject {
+    func prepare() async throws -> PolicyPreparation
+    func review(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord
+    func execute(approvalID: UUID?) async throws -> PolicyExecutionResult<JiraReadResult>
+    func close() async
+}
+
+@MainActor
+final class NativeJiraIssueSession: NativeJiraIssueReview {
+    private let service: NativeJiraReadReview
+    init(_ service: NativeJiraReadReview) { self.service = service }
+    func prepare() async throws -> PolicyPreparation { try await service.prepare() }
+    func review(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        try await service.review(id, approve: approve, expectedSequence: expectedSequence)
+    }
+    func execute(approvalID: UUID?) async throws -> PolicyExecutionResult<JiraReadResult> {
+        try await service.execute(approvalID: approvalID)
+    }
+    func close() async { await service.close() }
+}
+
 @MainActor
 final class NativeJiraIssueModel: ObservableObject {
     @Published var identifier = ""
@@ -14,12 +37,12 @@ final class NativeJiraIssueModel: ObservableObject {
     @Published private(set) var pending: ApprovalRecord?
     @Published private(set) var content: String?
     @Published private(set) var message: String?
-    private var review: NativeJiraReadReview?
+    private var review: (any NativeJiraIssueReview)?
     private var task: Task<Void, Never>?
     private var generation = UUID()
-    private let open: (String) async throws -> NativeJiraReadReview
+    private let open: (String) async throws -> any NativeJiraIssueReview
 
-    init(open: @escaping (String) async throws -> NativeJiraReadReview) { self.open = open }
+    init(open: @escaping (String) async throws -> any NativeJiraIssueReview) { self.open = open }
     func lookup() {
         guard !busy else { return }
         let key = identifier.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -65,7 +88,7 @@ final class NativeJiraIssueModel: ObservableObject {
         let old = review; review = nil; pending = nil; busy = false; content = nil; message = nil
         if let old { Task { await old.close() } }
     }
-    private func display(_ session: NativeJiraReadReview, approval: UUID?, token: UUID) async throws {
+    private func display(_ session: any NativeJiraIssueReview, approval: UUID?, token: UUID) async throws {
         let result = try await session.execute(approvalID: approval)
         guard token == generation, !Task.isCancelled else { return }
         switch result {

@@ -8,7 +8,7 @@ struct NativeJiraIssueView: View {
     @StateObject private var model: NativeJiraIssueModel
     let site: String
     @Environment(\.dismiss) private var dismiss
-    init(site: String, open: @escaping (String) async throws -> NativeJiraReadReview) {
+    init(site: String, open: @escaping (String) async throws -> any NativeJiraIssueReview) {
         self.site = site; _model = StateObject(wrappedValue: NativeJiraIssueModel(open: open))
     }
     var body: some View {

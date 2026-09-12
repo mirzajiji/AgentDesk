@@ -122,7 +122,7 @@ struct ProjectJiraConnectionsView: View {
         .sheet(item: $issue) { request in
             if let record = request.existing, let openIssue {
                 NativeJiraIssueView(site: record.configuration.instance.host ?? "Jira", open: { key in
-                    try await openIssue(record, key)
+                    NativeJiraIssueSession(try await openIssue(record, key))
                 })
             }
         }

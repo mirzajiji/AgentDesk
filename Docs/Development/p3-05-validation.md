@@ -162,3 +162,13 @@ Full Runtime host regression passed 166 tests (`permissions-runtime-full.log`). 
 Final permission component checks passed: 85 Plugins and 166 Runtime host tests; 85 Plugins and 85 Runtime tests on iPhone 16 Pro / iOS 26.0; nine native Mac model tests and three UI regressions, plus the final readable-label UI rerun. Both normal app builds passed (`permissions-app-mac.log`, `permissions-app-iphone.log`). Native commands used Xcode 26.0, macOS 26.5.2, the documented AgentDesk/AgentDeskPlugins/AgentDeskRuntime schemes, native Mac or primary Simulator UUID, existing derived-data directories and disabled parallel testing. Documentation integrity/link and staged diff checks passed.
 
 This checkpoint delivers persisted permission documents, reviewed native editing and a runtime factory backed by authoritative stored rules. It does not claim migration of every manually constructed runtime session, full native Jira execution, live authentication or completion of P3-05. Unrelated Xcode normalization and historical handoff edits remain outside the commit. No real credentials, company data or live Jira traffic entered the tests.
+
+
+## Exact stored configuration binding
+
+Review found the stored-policy factory verified IDs/revisions/permissions but relied on the adapter to use the complete saved configuration. Prepared actions now expose a canonical configuration fingerprint, and the factory compares it with the authoritative record before opening the policy session. Disabled stored configurations are rejected before invoking the adapter builder.
+
+`swift test --package-path Packages/AgentDeskRuntime --filter StoredPluginPolicySessionTests` passed (`stored-config-binding.log`). The regression supplies a different site with matching connection/project/environment IDs and revision, and confirms rejection. Broader plugin/native checks and the focused fix commit remain pending. No external request was made.
+
+
+Final binding checks passed: one focused runtime integration test on the Mac host and on iPhone 16 Pro / iOS 26.0 (`stored-config-binding.log`, `exact-binding-iphone.xcresult`), all 85 Plugins host tests (`exact-binding-plugins.log`), and normal Mac/iPhone application builds (`exact-binding-app-mac.log`, `exact-binding-app-iphone.log`). The Simulator run used AgentDeskRuntime with `-only-testing:AgentDeskRuntimeTests/StoredPluginPolicySessionTests`, the primary UUID and RuntimeIPhone derived data. Builds used the existing AgentDesk project/scheme and documented destinations. Xcode 26.0 / macOS 26.5.2. Diff and documentation checks passed. No UI behavior changed and no additional UI acceptance is claimed. Full native operation routing remains unfinished.

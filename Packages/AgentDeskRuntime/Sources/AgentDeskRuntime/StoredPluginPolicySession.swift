@@ -16,10 +16,12 @@ extension PluginPolicySession {
             guard let record = try await configurationStore.read(id: connectionID, in: scope) else {
                 throw PluginStorageError.invalidRecord
             }
+            guard record.configuration.enabled else { throw AuthorizationError.denied }
             let permissions = try record.configuration.resolvedPermissions()
             let prepared = try prepare(record, permissions)
             guard prepared.connectionID == connectionID, prepared.configurationRevision == record.revision,
                   prepared.action.scope == scope, prepared.action.environmentID == record.configuration.environmentID,
+                  prepared.configurationFingerprint == (try ActionFingerprint.canonical(record.configuration)),
                   prepared.permissionsFingerprint == (try ActionFingerprint.canonical(permissions)) else {
                 throw AuthorizationError.scopeMismatch
             }

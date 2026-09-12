@@ -8,6 +8,7 @@ public struct PreparedPluginAction: Sendable {
     public let capability: PluginCapability
     public let configurationRevision: Int
     public let connectionID: UUID
+    public let configurationFingerprint: ActionFingerprint
     public let permissionsFingerprint: ActionFingerprint
 
     public init(id: UUID = UUID(), configuration: JiraConnectionConfiguration, configurationRevision: Int,
@@ -31,6 +32,7 @@ public struct PreparedPluginAction: Sendable {
         self.action = try PolicyAction(id: id, scope: configuration.scope,
             environmentID: configuration.environmentID, runID: runID, agentID: agentID,
             operation: capability.policyOperation, resource: binding, payload: payload)
+        self.configurationFingerprint = try .canonical(configuration)
         self.capability = capability; self.configurationRevision = configurationRevision
         self.connectionID = configuration.id
         self.permissionsFingerprint = try .canonical(permissions)

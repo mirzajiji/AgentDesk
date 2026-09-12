@@ -30,6 +30,16 @@ import XCTest
             let user = try PolicyAuthority(id: UUID(), kind: .localUser, scopes: [scope], environments: [environment],
                 operations: [.readEvidence], canApprove: true, expiresAt: Date().addingTimeInterval(600))
             let approvals = try ApprovalStore(database: root.appendingPathComponent("operations.sqlite"), scope: scope, environmentID: environment)
+            do {
+                _ = try await PluginPolicySession.openStored(configurationStore: configurations, connectionID: id, scope: scope,
+                    authorities: [user], requesterID: user.id, approvals: approvals, currentPolicy: { policy }, prepare: { record, permissions in
+                        let staleSite = try JiraConnectionConfiguration(id: id, scope: scope, environmentID: environment,
+                            instance: URL(string: "https://different.atlassian.net")!, enabled: true, permissions: permissions)
+                        return try PreparedPluginAction(configuration: staleSite, configurationRevision: record.revision,
+                            permissions: permissions, capability: .issuesRead, resource: .canonical("Synthetic issue"), payload: .canonical("Read"))
+                    })
+                XCTFail("Adapter changed the persisted site while retaining its identity")
+            } catch { XCTAssertEqual(error as? AuthorizationError, .scopeMismatch) }
             let actionID = UUID()
             let session = try await PluginPolicySession.openStored(configurationStore: configurations, connectionID: id, scope: scope,
                 authorities: [user], requesterID: user.id, approvals: approvals, currentPolicy: { policy }, prepare: { record, permissions in

@@ -106,10 +106,17 @@ final class ProjectJiraConnectionsModel: ObservableObject {
     }
     func signIn(_ record: PluginConfigurationRevision<JiraConnectionConfiguration>, registration: JiraOAuthRegistration,
                 openBrowser: @escaping @Sendable (URL) async throws -> Void) {
+        authenticate(record, registration: registration, refreshing: false, openBrowser: openBrowser)
+    }
+    func refreshGrant(_ record: PluginConfigurationRevision<JiraConnectionConfiguration>, registration: JiraOAuthRegistration) {
+        authenticate(record, registration: registration, refreshing: true, openBrowser: { _ in throw JiraServiceError.unavailable })
+    }
+    private func authenticate(_ record: PluginConfigurationRevision<JiraConnectionConfiguration>, registration: JiraOAuthRegistration,
+                              refreshing: Bool, openBrowser: @escaping @Sendable (URL) async throws -> Void) {
         guard !busy else { return }
         let current = generation
         checks[record.configuration.id] = nil
-        busy = true; authenticationMessage = "Waiting for Jira sign-in…"; error = nil
+        busy = true; authenticationMessage = refreshing ? "Refreshing Jira grant…" : "Waiting for Jira sign-in…"; error = nil
         loginTask = Task { [weak self] in
             guard let self else { return }
             let id = record.configuration.id
@@ -121,6 +128,7 @@ final class ProjectJiraConnectionsModel: ObservableObject {
                 let services = try await open()
                 var prepared = record
                 if record.configuration.credential == nil {
+                    guard !refreshing else { throw PluginConnectionError.notConfigured }
                     let value = record.configuration
                     let scope = try SecretScope(workspaceID: project.workspaceID, projectID: project.id, environmentID: value.environmentID)
                     let bound = try JiraConnectionConfiguration(id: id, scope: project.scope, environmentID: value.environmentID,
@@ -132,15 +140,20 @@ final class ProjectJiraConnectionsModel: ObservableObject {
                 try await validate(expected, generation: current)
                 let operation = try makeLogin(expected.configuration, registration)
                 login = operation
-                try await operation.signIn(validateConfiguration: { [weak self] in
+                let revalidate: @Sendable () async throws -> Void = { [weak self] in
                     guard let self else { throw CancellationError() }
                     try await self.validate(expected, generation: current)
-                }, openBrowser: openBrowser)
-                if generation == current { authenticationMessage = "Signed in to Jira. Runtime permissions still apply." }
+                }
+                if refreshing { try await operation.refresh(validateConfiguration: revalidate) }
+                else { try await operation.signIn(validateConfiguration: revalidate, openBrowser: openBrowser) }
+                if generation == current {
+                    authenticationMessage = refreshing ? "Jira grant refreshed. Runtime permissions still apply." : "Signed in to Jira. Runtime permissions still apply."
+                }
             } catch {
                 if generation == current {
                     authenticationMessage = nil
-                    self.error = error is CancellationError ? "Sign-in cancelled." : "Jira sign-in did not finish. Refresh the connection and try again."
+                    self.error = refreshing ? "Jira grant refresh did not finish. Sign in again if the previous grant was consumed." :
+                        error is CancellationError ? "Sign-in cancelled." : "Jira sign-in did not finish. Refresh the connection and try again."
                 }
             }
             await login?.close()

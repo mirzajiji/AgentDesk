@@ -150,6 +150,42 @@ import XCTest
         }
     }
 
+    func testNativeRefreshUsesExistingReferenceAndRejectsMissingOrChangedConfiguration() async throws {
+        for mode in 0...2 {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let catalog = try WorkspaceCatalog(container: root)
+            let workspace = try await catalog.createWorkspace(name: "Synthetic")
+            let project = try await catalog.createProject(in: workspace.id, name: "Refresh")
+            let environment = ProjectEnvironment(scope: project.scope, name: "Development")
+            let scope = try SecretScope(workspaceID: workspace.id, projectID: project.id, environmentID: environment.id)
+            let store = try await catalog.pluginConfigurationStore(for: JiraConnectionConfiguration.self, in: project.scope)
+            let value = try JiraConnectionConfiguration(scope: project.scope, environmentID: environment.id,
+                instance: URL(string: "https://synthetic.atlassian.net")!, credential: mode == 2 ? nil : SecretReference(scope: scope), enabled: true)
+            let first = try await store.save(value, in: project.scope, expectedRevision: nil)
+            let fake = FakeNativeJiraLogin {
+                if mode == 1 { _ = try await store.save(value, in: project.scope, expectedRevision: first.revision) }
+            }
+            let model = ProjectJiraConnectionsModel(project: project, makeLogin: { configuration, _ in
+                XCTAssertEqual(configuration.credential, value.credential)
+                return fake
+            }, open: { NativeJiraConfigurationServices(store: store, environments: [environment]) })
+            let registration = try NativeJiraRegistration.decode(["brokerOrigin": "https://broker.example", "clientID": "synthetic", "callback": "https://broker.example/callback"])
+            model.refreshGrant(first, registration: registration)
+            let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+            while model.busy, ContinuousClock.now < deadline { await Task.yield() }
+            XCTAssertFalse(model.busy)
+            XCTAssertEqual(model.error == nil, mode == 0)
+            let refreshed = await fake.refreshed
+            XCTAssertEqual(refreshed, mode != 2)
+            let latest = try await store.read(id: value.id, in: project.scope)
+            XCTAssertEqual(latest?.configuration.credential, value.credential)
+            XCTAssertEqual(latest?.revision, mode == 1 ? 2 : 1)
+            model.close()
+        }
+    }
+
     func testOwnershipRejectsSecondWindowAndReleases() async throws {
         let ownership = NativeJiraLoginOwnership(), id = UUID()
         try await ownership.acquire(id)
@@ -165,10 +201,17 @@ private actor FakeNativeJiraLogin: NativeJiraLogin {
     let change: @Sendable () async throws -> Void
     private(set) var closed = false
     private(set) var started = false
+    private(set) var refreshed = false
     init(change: @escaping @Sendable () async throws -> Void) { self.change = change }
     func signIn(validateConfiguration: @escaping @Sendable () async throws -> Void,
                 openBrowser: @escaping @Sendable (URL) async throws -> Void) async throws {
         started = true
+        try await validateConfiguration()
+        try await change()
+        try await validateConfiguration()
+    }
+    func refresh(validateConfiguration: @escaping @Sendable () async throws -> Void) async throws {
+        refreshed = true; started = true
         try await validateConfiguration()
         try await change()
         try await validateConfiguration()

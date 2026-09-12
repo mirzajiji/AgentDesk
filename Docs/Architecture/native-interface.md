@@ -99,3 +99,8 @@ Logout shares native ownership with sign-in; an active login in another window c
 Test Connection is available for enabled credential-bearing configurations. It restores the scoped grant through the existing Jira adapter, verifies accessible site/account data, copies the implemented capability set and closes the temporary session. It shares native ownership with sign-in/logout. Fresh project/environment/configuration checks surround the probe; errors, configuration changes or closing the project cannot publish a success result. Closing also cancels outstanding diagnostic work.
 
 Successful rows show a check timestamp and available implementations. These are diagnostic observations, not policy grants or continuous health monitoring. Raw account responses and errors are not displayed. Refresh, local edits, sign-in and logout invalidate cached diagnostic observations. Expired/missing authentication has distinct guidance. Live-account diagnostic acceptance is still pending.
+
+
+### Refreshing a Jira grant
+
+Refresh Grant requires an enabled connection, existing credential reference and valid publisher registration. It reuses the native authentication coordinator, ownership gate, configuration checks and Cancel Authentication control. It never opens a browser or reserves a new reference. The backend checks the registration binding and consumes the old refresh token before exchange; an ambiguous or cancelled exchange can require a fresh sign-in. It does not automatically retry a consumed token. Success invalidates prior diagnostic observations and reports only the completed refresh, not continuous health.

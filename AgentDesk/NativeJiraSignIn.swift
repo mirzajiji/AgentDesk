@@ -7,6 +7,7 @@ import Foundation
 protocol NativeJiraLogin: Sendable {
     func signIn(validateConfiguration: @escaping @Sendable () async throws -> Void,
                 openBrowser: @escaping @Sendable (URL) async throws -> Void) async throws
+    func refresh(validateConfiguration: @escaping @Sendable () async throws -> Void) async throws
     func close() async
 }
 actor NativeJiraLoginSession: NativeJiraLogin {
@@ -18,6 +19,9 @@ actor NativeJiraLoginSession: NativeJiraLogin {
                 openBrowser: @escaping @Sendable (URL) async throws -> Void) async throws {
         _ = try await login.signIn(validateConfiguration: { try await validateConfiguration() },
                                openBrowser: { try await openBrowser($0) })
+    }
+    func refresh(validateConfiguration: @escaping @Sendable () async throws -> Void) async throws {
+        _ = try await login.refresh(validateConfiguration: { try await validateConfiguration() })
     }
     func close() async { await login.close() }
 }

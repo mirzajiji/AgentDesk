@@ -66,7 +66,7 @@ struct ProjectJiraConnectionsView: View {
             }
             if let message = model.authenticationMessage {
                 Text(message).accessibilityIdentifier("connections.authentication")
-                if model.busy { Button("Cancel Sign-In") { model.cancelSignIn() }.accessibilityIdentifier("connections.login.cancel") }
+                if model.busy { Button("Cancel Authentication") { model.cancelSignIn() }.accessibilityIdentifier("connections.login.cancel") }
             }
             if let error = model.error { Text(error).foregroundStyle(.orange).accessibilityIdentifier("connections.error") }
             if model.busy { ProgressView("Loading connections…") }
@@ -106,6 +106,10 @@ struct ProjectJiraConnectionsView: View {
                                 }.disabled(model.busy || !record.configuration.enabled || registration == nil)
                                     .accessibilityIdentifier("connection.login.\(record.configuration.id)")
                                 if record.configuration.credential != nil {
+                                    Button("Refresh Grant") {
+                                        if let registration { model.refreshGrant(record, registration: registration) }
+                                    }.disabled(model.busy || !record.configuration.enabled || registration == nil)
+                                        .accessibilityIdentifier("connection.refresh-grant.\(record.configuration.id)")
                                     Button("Test Connection") { Task { await model.testConnection(record) } }
                                         .disabled(model.busy || !record.configuration.enabled)
                                         .accessibilityIdentifier("connection.test.\(record.configuration.id)")

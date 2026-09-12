@@ -87,3 +87,24 @@ Added Test Connection with scoped grant restoration via the existing Jira adapte
 `native-probe.xcresult` passed seven native Mac model tests and one configuration UI regression, zero failures (Xcode 26.0, macOS 26.5.2). The final status label now distinguishes a checked connection from authentication-not-checked; its UI rerun is `native-probe-ui.xcresult`. All probes in model tests are synthetic. The existing UI test does not exercise a live authenticated diagnostic result. Native full-account/scope/health UI acceptance remains pending. This component changes only Mac code; no new iPhone execution is claimed.
 
 The final native UI rerun passed (one test, zero failures). Documentation and diff checks passed. Connection testing is implemented as a component; P3-05 remains open for full lifecycle, permissions, account presentation and live acceptance.
+
+
+## Native refresh integration
+
+Added an asynchronous configuration validator to OAuth refresh. It runs before loading the grant, before consuming it, before saving the rotated grant and after saving. Early rejection preserves the original grant; rejection after consumption cannot retry the old token; rejection after saving cleans up the new grant through the existing independent deletion path.
+
+`swift test --package-path Packages/AgentDeskPlugins --filter JiraOAuthRotationTests` passed two host tests (`TestResults/p3-05/refresh-revalidation.log`). The added regression rejects each of the four boundaries and checks exact credential-store events and remaining grant state. Synthetic broker/adapter transports only. Native refresh controls, full native validation and the focused task commit remain pending.
+
+
+The native Refresh Grant control now uses the existing authentication coordinator and ownership/cancellation path. It rejects missing credential references instead of creating one, supplies configuration validation to token rotation, and reports refresh failure with fresh-sign-in guidance. `native-refresh-build.log` passed the normal Mac build. Added a native model regression for success, changed configuration during refresh and missing reference without new configuration publication. The current native run is `native-refresh.xcresult` / `native-refresh.log`; final results follow. No live broker or account was used.
+
+
+Final refresh component validation passed:
+
+- `native-refresh.xcresult`: eight native Mac model tests and one configuration UI regression, zero failures, using Xcode 26.0 on macOS 26.5.2. Model coverage includes native refresh routing, missing reference without publication, configuration changes, and existing authentication/logout/diagnostic cancellation and ownership checks. The UI regression is not a live refresh acceptance test.
+- `refresh-plugins-mac.log`: all 83 host Plugins tests passed.
+- `refresh-plugins-iphone.xcresult`: all 83 Plugins tests passed on iPhone 16 Pro / iOS 26.0 with the primary Simulator UUID, AgentDeskPlugins scheme and PluginsIPhone derived data.
+- `native-refresh-build.log` and `refresh-app-iphone.log`: normal Mac and iPhone builds passed.
+- Documentation integrity, links and diff whitespace checks passed.
+
+The shared package commands use `swift test --package-path Packages/AgentDeskPlugins` or `xcodebuild -scheme AgentDeskPlugins -parallel-testing-enabled NO test` from the package. App checks use the AgentDesk project/scheme and previously documented Mac/primary Simulator destinations. No live broker, production registration or real grant was used. This completes the refresh component, not P3-05 or its live/full UI acceptance.

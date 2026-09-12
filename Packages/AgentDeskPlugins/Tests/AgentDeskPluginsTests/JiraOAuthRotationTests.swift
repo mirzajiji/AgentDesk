@@ -1,10 +1,46 @@
 import AgentDeskCore
 import AgentDeskSecurity
 import Foundation
+import Synchronization
 import XCTest
 @testable import AgentDeskPlugins
 
 final class JiraOAuthRotationTests: XCTestCase {
+    func testChangedConfigurationCannotConsumeOrRetainRotatedGrant() async throws {
+        for failedCheck in 1...4 {
+            let scope = ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID()), environment = EnvironmentID()
+            let secretScope = try SecretScope(workspaceID: scope.workspaceID, projectID: scope.projectID, environmentID: environment)
+            let config = try JiraConnectionConfiguration(scope: scope, environmentID: environment,
+                instance: URL(string: "https://synthetic.atlassian.net")!, credential: SecretReference(scope: secretScope), enabled: true)
+            let store = RotationSecrets(scope: secretScope)
+            let vault = try JiraCredentialVault(configuration: config, store: store)
+            let broker = try JiraOAuthBrokerClient(origin: URL(string: "https://broker.example")!, clientID: "synthetic-client",
+                callback: URL(string: "https://broker.example/callback")!, protocolClasses: [NativeBrokerProtocol.self])
+            try await vault.save(JiraOAuthTokens(accessToken: SecretValue(Data("synthetic-old".utf8)),
+                refreshToken: SecretValue(Data("synthetic-refresh".utf8)), expiresAt: Date(timeIntervalSince1970: 1),
+                scopes: ["read:jira-user", "read:jira-work"]), registration: broker.registrationFingerprint)
+            await store.clearEvents()
+            let adapter = JiraCloudAdapter(store: store, now: { Date() }, makeTransport: {
+                try JiraHTTPTransport(origin: $0, protocolClasses: [AdapterProtocol.self])
+            })
+            let login = try JiraOAuthLogin(configuration: config, broker: broker, adapter: adapter, store: store)
+            let checks = Mutex(0)
+            do {
+                _ = try await login.refresh(validateConfiguration: {
+                    let count = checks.withLock { $0 += 1; return $0 }
+                    if count == failedCheck { throw PluginStorageError.staleRevision }
+                })
+                XCTFail("Stale configuration accepted rotation")
+            } catch { XCTAssertEqual(error as? PluginStorageError, .staleRevision) }
+            let events = await store.events
+            let expected = [[], ["get"], ["get", "delete"], ["get", "delete", "set", "delete"]]
+            XCTAssertEqual(events, expected[failedCheck - 1])
+            let remaining = try await vault.load()
+            XCTAssertEqual(remaining != nil, failedCheck <= 2)
+            await login.close()
+        }
+    }
+
     func testRefreshConsumesOldGrantBeforeReplacementAndFailureCannotRetry() async throws {
         for succeeds in [true, false] {
             let scope = ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID())

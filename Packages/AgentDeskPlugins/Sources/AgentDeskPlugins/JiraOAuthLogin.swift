@@ -72,14 +72,18 @@ public actor JiraOAuthLogin {
         defer { active = nil }
         return try await withTaskCancellationHandler { try await job.value } onCancel: { job.cancel() }
     }
-    public func refresh() async throws -> JiraCloudAccount {
+    public func refresh(validateConfiguration: @escaping @Sendable () async throws -> Void = {}) async throws -> JiraCloudAccount {
         guard !closed, active == nil, !loggingOut, configuration.enabled else { throw JiraServiceError.unavailable }
         let configuration = configuration, broker = broker, adapter = adapter, vault = vault
         let registration = broker.registrationFingerprint
         let job = Task {
+            try await validateConfiguration()
+            try Task.checkCancellation()
             guard let current = try await vault.load(registration: registration), let refreshToken = current.refreshToken else {
                 throw JiraServiceError.authenticationRequired
             }
+            try await validateConfiguration()
+            try Task.checkCancellation()
             // Persist consumption before any remote exchange. A crash or ambiguous response requires sign-in.
             try await vault.logout()
             var attemptedSave = false
@@ -87,9 +91,11 @@ public actor JiraOAuthLogin {
                 try Task.checkCancellation()
                 let tokens = try await broker.refresh(refreshToken, now: Date())
                 let account = try await adapter.validate(tokens, configuration: configuration)
+                try await validateConfiguration()
                 try Task.checkCancellation()
                 attemptedSave = true
                 try await vault.save(tokens, registration: registration)
+                try await validateConfiguration()
                 try Task.checkCancellation()
                 return account
             } catch {

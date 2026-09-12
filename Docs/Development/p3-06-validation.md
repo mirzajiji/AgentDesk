@@ -49,3 +49,18 @@ Five focused tests pass (`swift test --package-path Packages/AgentDeskRuntime --
 
 
 Final stdio checks: all 173 Runtime host tests pass (`swift test --package-path Packages/AgentDeskRuntime`, `p3-06-stdio-runtime-full.log`), including the consumer-cancellation assertion that shutdown completes before the five-second process lifetime. Normal Mac and iPhone builds pass with the new transitive MCP dependency (`p3-06-stdio-app-mac.log`, `p3-06-stdio-app-iphone.log`) using the documented AgentDesk project/scheme/destinations/derived data. Xcode 26.0 / macOS 26.5.2. No iPhone subprocess test is possible or intended; the shared wire/tracker Simulator tests were verified separately above. Documentation and diff checks pass. This does not complete P3-06: scoped launch authorization, session negotiation, remote transport and native lifecycle remain outstanding. Counts unchanged: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+
+## Awaitable stdio request sessions
+
+The internal `MCPStdioSession` now ties the process stream to the connection tracker and checked continuations. It matches concurrent replies, returns remote result/error envelopes as untrusted data, and completes waiters on process exit, explicit close, per-call timeout and caller cancellation. Cancellation sends a best-effort `notifications/cancelled`; send failure closes the session and fails remaining calls. Late/uncorrelated replies do not reach callers, and server requests fail closed rather than executing local actions. Notifications are currently ignored pending negotiated routing. No automatic retry is performed.
+
+The wire module now encodes request/notification envelopes while retaining supplied compact object-parameter bytes. IDs/methods are JSON encoded; malformed parameters and multiline wire payloads are rejected. Protocol negotiation, modern request metadata, legacy compatibility, tool permissions and scoped launch approval are still required before native exposure.
+
+Real-process tests use a static local Python JSON-RPC fixture passed as an argument array. They cover concurrent matching, cancellation/timeout with a later successful call, clean process exit and explicit-close waiter release. The first run exposed a deadline task cancelling itself before sending its cancellation notification, incorrectly closing unrelated requests. The corrected timeout path avoids cancelling its own task; all three session tests pass (`p3-06-session-tests-fixed.log`). Shared encoding tests also pass. Full native checks pending.
+
+
+Final session validation: all 176 Runtime host tests passed (`swift test --package-path Packages/AgentDeskRuntime`, `p3-06-session-runtime-full.log`). All nine shared MCP tests passed on Mac (`p3-06-request-encoding-final.log`) and iPhone 16 Pro / iOS 26.0 (`p3-06/session-wire-iphone-final.xcresult`). The encoder checks parameter, method and string-ID sizes before envelope allocation; new tests cover oversize rejection, escaped IDs, preserved large numeric parameters and notification encoding. The Simulator command uses the existing AgentDeskMCP scheme, primary destination, `../../TestResults/p3-06/MCPIPhone` derived data and `../../TestResults/p3-06/session-wire-iphone-final.xcresult` with `-parallel-testing-enabled NO test`. Normal app builds pending. macOS 26.5.2 / Xcode 26.0. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+
+Both normal app builds passed (`p3-06-session-app-mac.log`, `p3-06-session-app-iphone.log`), using the documented AgentDesk project/scheme/destinations and derived-data paths. Documentation and diff checks passed. No negotiated MCP server connection, tool execution or native manager acceptance is claimed.

@@ -47,6 +47,19 @@ final class MCPWireTests: XCTestCase {
             XCTAssertEqual($0 as? MCPWireError, .messageTooLarge)
         }
     }
+    func testRequestEncodingPreservesParamsAndEscapesIdentity() throws {
+        XCTAssertThrowsError(try MCPMessage.request(id: nil, method: "ping", params: Data(repeating: 32, count: 262_145))) {
+            XCTAssertEqual($0 as? MCPWireError, .messageTooLarge)
+        }
+        XCTAssertThrowsError(try MCPMessage.request(id: .string(String(repeating: "x", count: 1025)), method: "ping"))
+        let params = Data(#"{"amount":9007199254740993}"#.utf8)
+        let request = try MCPMessage.request(id: .string("quoted\"id"), method: "tools/call", params: params)
+        XCTAssertEqual(request.id, .string("quoted\"id")); XCTAssertEqual(request.kind, .request("tools/call"))
+        XCTAssertTrue(String(decoding: request.bytes, as: UTF8.self).contains("9007199254740993"))
+        XCTAssertEqual(try MCPMessage.request(id: nil, method: "notifications/cancelled").kind, .notification("notifications/cancelled"))
+        XCTAssertThrowsError(try MCPMessage.request(id: .integer(1), method: "ping", params: Data("[]".utf8)))
+        XCTAssertThrowsError(try MCPMessage.request(id: .integer(1), method: "ping", params: Data("{\n}".utf8)))
+    }
     func testLimitsTruncationAndRemoteErrors() throws {
         XCTAssertThrowsError(try MCPLineDecoder(maximumBytes: 0))
         var short = try MCPLineDecoder(maximumBytes: 4)

@@ -8,6 +8,7 @@ actor MCPStdioSession {
     private struct Pending {
         let continuation: CheckedContinuation<MCPMessage, any Error>
         let deadline: Task<Void, Never>
+        let cancelOnWire: Bool
     }
     private let transport: MCPStdioTransport
     private let tracker: MCPRequestTracker
@@ -36,10 +37,15 @@ actor MCPStdioSession {
                     catch { return }
                     await self?.cancel(ticket.id, error: MCPRequestError.timedOut, fromDeadline: true)
                 }
-                pending[ticket.id] = Pending(continuation: continuation, deadline: deadline)
+                pending[ticket.id] = Pending(continuation: continuation, deadline: deadline, cancelOnWire: method != "initialize")
                 Task { [weak self] in await self?.send(message, id: ticket.id) }
             }
         } onCancel: { Task { await self.cancel(ticket.id, error: CancellationError()) } }
+    }
+    func notify(method: String, params: Data = Data("{}".utf8)) async throws {
+        try Task.checkCancellation()
+        guard !closed else { throw MCPProcessError.closed }
+        try await transport.send(.request(id: nil, method: method, params: params))
     }
     private func startReader() {
         guard reader == nil else { return }
@@ -75,6 +81,7 @@ actor MCPStdioSession {
         if !fromDeadline { call.deadline.cancel() }
         await tracker.cancel(id)
         call.continuation.resume(throwing: error)
+        guard call.cancelOnWire else { return }
         // Cancellation is best-effort on the wire. Failure closes the connection and resolves other waiters.
         do {
             let encoded = try JSONEncoder().encode(id)

@@ -9,9 +9,16 @@ final class MCPStdioSessionTests: XCTestCase {
     private func session() throws -> MCPStdioSession {
         let script = """
         import json, sys
+        cancellations = 0
         for line in sys.stdin:
             request = json.loads(line)
-            if 'id' not in request: continue
+            if 'id' not in request:
+                if request['method'] == 'notifications/cancelled': cancellations += 1
+                continue
+            if request['method'] == 'initialize': continue
+            if request['method'] == 'cancellationCount':
+                print(json.dumps({'jsonrpc':'2.0','id':request['id'],'result':{'count':cancellations}}), flush=True)
+                continue
             if request['method'] == 'hold': continue
             if request['method'] == 'exit': sys.exit(0)
             print(json.dumps({'jsonrpc':'2.0','id':request['id'],'result':request['params']}), flush=True)
@@ -40,6 +47,16 @@ final class MCPStdioSessionTests: XCTestCase {
         catch { XCTAssertTrue(error is CancellationError) }
         let result = try await session.request(method: "ping")
         XCTAssertEqual(result.kind, .result)
+        await session.close()
+    }
+    func testInitializeTimeoutDoesNotSendWireCancellation() async throws {
+        let session = try session()
+        do { _ = try await session.request(method: "initialize", timeout: .milliseconds(30)); XCTFail("No timeout") }
+        catch { XCTAssertEqual(error as? MCPRequestError, .timedOut) }
+        let result = try await session.request(method: "cancellationCount")
+        let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: result.bytes) as? [String: Any])
+        let payload = try XCTUnwrap(envelope["result"] as? [String: Any])
+        XCTAssertEqual(payload["count"] as? Int, 0)
         await session.close()
     }
     func testProcessExitAndExplicitCloseReleasePendingCalls() async throws {

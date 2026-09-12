@@ -64,3 +64,19 @@ Final session validation: all 176 Runtime host tests passed (`swift test --packa
 
 
 Both normal app builds passed (`p3-06-session-app-mac.log`, `p3-06-session-app-iphone.log`), using the documented AgentDesk project/scheme/destinations and derived-data paths. Documentation and diff checks passed. No negotiated MCP server connection, tool execution or native manager acceptance is claimed.
+
+## Explicit protocol negotiation
+
+The internal negotiated stdio connection supports explicitly selected 2026-07-28 discovery and 2025-11-25 initialization. Modern discovery and ping carry protocol/client metadata; legacy initialization sends the initialized notification before ping. Responses require the selected version and object capabilities, with bounded identity fields. Server identity and advertised capabilities remain untrusted claims, never permission grants; server instructions are not consumed. Failed negotiation closes the process. Initialization timeout releases its local waiter without sending the legacy-forbidden cancellation notification.
+
+References: [modern stdio](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/stdio), [discovery definition](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/server/discover.mdx), [legacy lifecycle](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle), and [legacy cancellation](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/cancellation).
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- `swift test --package-path Packages/AgentDeskRuntime`: 179 passed (`TestResults/p3-06-negotiation-runtime-full.log`). Includes real synthetic subprocess handshakes, notification order, mismatch cleanup, and initialize-timeout wire cancellation exclusion.
+- `swift test --package-path Packages/AgentDeskMCP`: 11 passed (`TestResults/p3-06-negotiation-wire-final.log`). Includes malformed negotiation responses and unsupported versions.
+- From Packages/AgentDeskMCP: `xcodebuild -scheme AgentDeskMCP -destination 'platform=iOS Simulator,id=C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE' -derivedDataPath ../../TestResults/p3-06/MCPIPhone -resultBundlePath ../../TestResults/p3-06/negotiation-wire-iphone.xcresult -parallel-testing-enabled NO test`: 11 passed on iPhone 16 Pro / iOS 26.0.
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: passed (`TestResults/p3-06-negotiation-app-mac.log`).
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=iOS Simulator,id=C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE' -derivedDataPath TestResults/p1-08b/FilteredIPhone build`: passed (`TestResults/p3-06-negotiation-app-iphone.log`).
+
+This is an internal explicit-mode implementation, not completed MCP acceptance. Automatic era/version negotiation, cancellation/send ordering hardening, scoped launch authorization, discovery routing, tool policy, HTTP transport and native manager remain outstanding. No installed third-party server was contacted. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

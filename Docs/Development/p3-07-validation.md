@@ -24,4 +24,17 @@ Both native app builds passed using the existing Mac and iPhone destination/deri
 
 ## Remaining work
 
-P3-07 remains in progress. Live discovery request integration, cross-page duplicate/cursor-loop handling, tools/resources/prompts browsing, permission and approval binding, capability changes and dispatch are not completed by this parser. No native capability browser is claimed. Counts remain 52 documented tasks complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+P3-07 remains in progress. Live discovery request integration, tools/resources/prompts browsing, permission and approval binding, capability changes and dispatch are not completed by this parser. No native capability browser is claimed. Counts remain 52 documented tasks complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Scoped tool pagination
+
+`MCPToolPagination` owns one bounded discovery traversal. It verifies every page's workspace/project, environment and connection identity, matches the requested cursor, rejects repeated cursors/cycles and duplicate tool names across pages, and limits page count, tool count and accumulated response bytes. Empty-string cursors remain valid opaque cursors. A completed catalog retains the original pages and is published only after a terminal page. Invalid input, exceeded limits, cancellation during append or explicit close clears partial state; a failed traversal cannot publish a catalog.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- `swift test --package-path Packages/AgentDeskMCP`: all 21 tests passed (`TestResults/p3-07-pagination-final.log`).
+- The same package's local iPhone 16 Pro / iOS 26.0 Simulator run passed all 21 tests, using the preceding command with result bundle `TestResults/p3-07-pagination-iphone.xcresult` (`TestResults/p3-07-pagination-iphone.log`).
+- Four new tests cover complete-only publication, retained page bytes, all four identity boundaries, wrong/repeated/cycling cursors, duplicate tools, page/tool/byte limits and cancelled append.
+- Both native app builds passed (`TestResults/p3-07-pagination-mac-build.log`, `TestResults/p3-07-pagination-iphone-build.log`). Documentation/diff checks pass.
+
+This is the shared traversal boundary, not live transport integration or permission to call tools. P3-07 remains in progress; counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

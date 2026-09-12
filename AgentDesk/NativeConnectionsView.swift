@@ -97,27 +97,10 @@ struct ProjectJiraConnectionsView: View {
                                     }
                                 }
                                 Spacer()
-                                Button("Sign In") {
-                                    guard let registration else { return }
-                                    model.signIn(record, registration: registration) { url in
-                                        let opened = await MainActor.run { NSWorkspace.shared.open(url) }
-                                        guard opened else { throw JiraServiceError.unavailable }
-                                    }
-                                }.disabled(model.busy || !record.configuration.enabled || registration == nil)
-                                    .accessibilityIdentifier("connection.login.\(record.configuration.id)")
-                                if record.configuration.credential != nil {
-                                    Button("Refresh Grant") {
-                                        if let registration { model.refreshGrant(record, registration: registration) }
-                                    }.disabled(model.busy || !record.configuration.enabled || registration == nil)
-                                        .accessibilityIdentifier("connection.refresh-grant.\(record.configuration.id)")
-                                    Button("Test Connection") { Task { await model.testConnection(record) } }
-                                        .disabled(model.busy || !record.configuration.enabled)
-                                        .accessibilityIdentifier("connection.test.\(record.configuration.id)")
-                                    Button("Log Out") { Task { await model.logout(record) } }.disabled(model.busy)
-                                        .accessibilityIdentifier("connection.logout.\(record.configuration.id)")
+                                ViewThatFits(in: .horizontal) {
+                                    HStack { connectionActions(record) }
+                                    VStack(alignment: .trailing, spacing: 8) { connectionActions(record) }
                                 }
-                                Button("Edit") { editor = .init(existing: record) }.disabled(model.busy)
-                                    .accessibilityIdentifier("connection.edit.\(record.configuration.id)")
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
                         }.accessibilityIdentifier("connection.row.\(record.configuration.id)")
                     }
@@ -129,6 +112,30 @@ struct ProjectJiraConnectionsView: View {
         .onDisappear { model.close() }
         .sheet(item: $editor) { request in JiraConnectionEditor(model: model, existing: request.existing) }
     }
+    @ViewBuilder private func connectionActions(_ record: PluginConfigurationRevision<JiraConnectionConfiguration>) -> some View {
+        Button("Sign In") {
+            guard let registration else { return }
+            model.signIn(record, registration: registration) { url in
+                let opened = await MainActor.run { NSWorkspace.shared.open(url) }
+                guard opened else { throw JiraServiceError.unavailable }
+            }
+        }.disabled(model.busy || !record.configuration.enabled || registration == nil)
+            .accessibilityIdentifier("connection.login.\(record.configuration.id)")
+        if record.configuration.credential != nil {
+            Button("Refresh Grant") {
+                if let registration { model.refreshGrant(record, registration: registration) }
+            }.disabled(model.busy || !record.configuration.enabled || registration == nil)
+                .accessibilityIdentifier("connection.refresh-grant.\(record.configuration.id)")
+            Button("Test Connection") { Task { await model.testConnection(record) } }
+                .disabled(model.busy || !record.configuration.enabled)
+                .accessibilityIdentifier("connection.test.\(record.configuration.id)")
+            Button("Log Out") { Task { await model.logout(record) } }.disabled(model.busy)
+                .accessibilityIdentifier("connection.logout.\(record.configuration.id)")
+        }
+        Button("Edit") { editor = .init(existing: record) }.disabled(model.busy)
+            .accessibilityIdentifier("connection.edit.\(record.configuration.id)")
+    }
+
 }
 
 private struct JiraConnectionEditor: View {

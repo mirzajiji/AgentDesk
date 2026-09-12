@@ -1,5 +1,6 @@
 #if DEBUG && os(macOS)
 import AgentDeskCore
+import AgentDeskPlugins
 import AgentDeskPersistence
 import AgentDeskSecurity
 import Foundation
@@ -31,6 +32,14 @@ enum NativeRunUITestSupport {
         }
         _ = try await catalog.agentStore(in: project.scope).create(.init(name: "Synthetic reviewer",
             instructions: "Inspect synthetic files only."), in: project.scope)
+        if ProcessInfo.processInfo.environment["AGENTDESK_TEST_JIRA_LAYOUT"] == "reference-only" {
+            guard let environment = try await setup.settings().project?.draft.environments.first?.id else { throw CatalogError.invalidConfiguration }
+            let secretScope = try SecretScope(workspaceID: workspace.id, projectID: project.id, environmentID: environment)
+            let store = try await catalog.pluginConfigurationStore(for: JiraConnectionConfiguration.self, in: project.scope)
+            let configuration = try JiraConnectionConfiguration(scope: project.scope, environmentID: environment,
+                instance: URL(string: "https://synthetic.atlassian.net")!, credential: SecretReference(scope: secretScope), enabled: true)
+            _ = try await store.save(configuration, in: project.scope, expectedRevision: nil)
+        }
         if ProcessInfo.processInfo.environment["AGENTDESK_TEST_MUTATION_HISTORY"] == "seeded" {
             guard let environment = try await setup.settings().project?.draft.environments.first?.id else { throw CatalogError.invalidConfiguration }
             let directories = try NativeProjectStorage.prepare(root: applicationRoot, workspaceID: workspace.id)

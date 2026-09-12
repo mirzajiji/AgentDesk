@@ -108,3 +108,12 @@ Final refresh component validation passed:
 - Documentation integrity, links and diff whitespace checks passed.
 
 The shared package commands use `swift test --package-path Packages/AgentDeskPlugins` or `xcodebuild -scheme AgentDeskPlugins -parallel-testing-enabled NO test` from the package. App checks use the AgentDesk project/scheme and previously documented Mac/primary Simulator destinations. No live broker, production registration or real grant was used. This completes the refresh component, not P3-05 or its live/full UI acceptance.
+
+
+## Compact lifecycle controls
+
+The credential-bearing row now lays actions out horizontally when space permits and vertically in narrower windows. Added a Debug-only fixture inside the existing UUID-scoped synthetic UI container that saves a credential reference without creating a Keychain value. The native layout test resizes to a compact window and checks all five actions remain within window bounds. It never invokes authentication or connection testing.
+
+Native validation is `compact-lifecycle.xcresult` / `compact-lifecycle.log`. Final results and visual inspection follow. This layout-only task does not change shared domain behavior or claim new iPhone coverage.
+
+Both native UI tests passed, zero failures, on macOS 26.5.2 / Xcode 26.0. The compact app-window screenshot was exported and visually inspected: all five actions remain visible in a vertical group and text stays readable. The final source adjustment only normalizes helper indentation. Documentation and diff checks passed. The requested physical-display matrix remains final acceptance work.

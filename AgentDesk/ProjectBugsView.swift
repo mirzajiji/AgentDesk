@@ -30,10 +30,11 @@ struct ProjectBugsView: View {
             if let issue = model.services?.environmentIssue { Text(issue).font(.caption).foregroundStyle(.orange) }
             TextField("Search title, behavior, details, ticket or UUID", text: $model.filter.query)
                 .textFieldStyle(.roundedBorder).accessibilityIdentifier("bugs.search")
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), alignment: .leading)],
-                      alignment: .leading, spacing: 8) {
-                filters
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+                GridRow { statusFilter; environmentFilter }
+                GridRow { ticketFilter; archivedFilter }
             }
+            .fixedSize(horizontal: false, vertical: true)
             HSplitView {
                 VStack {
                     if model.loading && model.records.isEmpty { ProgressView("Opening registry…") }
@@ -75,18 +76,24 @@ struct ProjectBugsView: View {
             }
         }
     }
-    @ViewBuilder private var filters: some View {
+    private var statusFilter: some View {
         Picker("Status", selection: $model.filter.status) {
             Text("All statuses").tag(BugStatus?.none)
             ForEach(BugStatus.allCases, id: \.self) { Text($0.rawValue.capitalized).tag(Optional($0)) }
         }.accessibilityIdentifier("bugs.filter.status")
+    }
+    private var environmentFilter: some View {
         Picker("Environment", selection: $model.filter.environment) {
             Text("All environments").tag(EnvironmentID?.none)
             ForEach(model.services?.environments ?? []) { Text($0.name).tag(Optional($0.id)) }
         }.accessibilityIdentifier("bugs.filter.environment")
+    }
+    private var ticketFilter: some View {
         Picker("Ticket", selection: $model.filter.registered) {
             Text("Any").tag(Bool?.none); Text("Linked").tag(Optional(true)); Text("Unlinked").tag(Optional(false))
         }.accessibilityIdentifier("bugs.filter.ticket")
+    }
+    private var archivedFilter: some View {
         Toggle("Include archived", isOn: $model.filter.includeArchived).disabled(model.filter.status != nil).accessibilityIdentifier("bugs.filter.archived")
     }
     @ViewBuilder private var detail: some View {

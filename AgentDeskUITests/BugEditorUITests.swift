@@ -30,6 +30,19 @@ final class BugEditorUITests: XCTestCase {
         XCTAssertLessThanOrEqual(app.sheets.firstMatch.frame.maxY, window.frame.maxY - 8)
         click("bug.review.back", app); click("bug.review", app); click("bug.publish", app)
         waitValue("Synthetic ticket bug", id: "bug.detail.title", app)
+        let statusFilter = app.popUpButtons["bugs.filter.status"]
+        let environmentFilter = app.popUpButtons["bugs.filter.environment"]
+        let ticketFilter = app.popUpButtons["bugs.filter.ticket"]
+        let archivedFilter = app.checkBoxes["bugs.filter.archived"]
+        XCTAssertEqual(statusFilter.frame.midY, environmentFilter.frame.midY, accuracy: 4)
+        XCTAssertEqual(ticketFilter.frame.midY, archivedFilter.frame.midY, accuracy: 4)
+        XCTAssertLessThanOrEqual(ticketFilter.frame.maxY - statusFilter.frame.minY, 72)
+        let detailTitle = app.staticTexts["bug.detail.title"]
+        XCTAssertLessThanOrEqual(detailTitle.frame.minY - ticketFilter.frame.maxY, 40)
+        XCTAssertLessThanOrEqual(detailTitle.frame.minY - app.sheets.firstMatch.frame.minY, 210)
+        let layoutShot = XCTAttachment(screenshot: window.screenshot())
+        layoutShot.name = "Compact selected bug with two filter rows"
+        layoutShot.lifetime = .keepAlways; add(layoutShot)
         click("bug.edit", app); tab("Ticket & Links", app)
         replace(app.textFields["bug.ticket.key"], "", app); replace(app.textFields["bug.ticket.url"], "", app)
         replace(app.textFields["bug.reason"], "Reviewed unlink", app)

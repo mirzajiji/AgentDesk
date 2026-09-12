@@ -28,6 +28,38 @@ final class ProjectExecutionSetupTests: XCTestCase {
         }
         func remove() { try? FileManager.default.removeItem(at: root) }
     }
+    func testAdministrativePolicyMatchesExecutionAndRejectsUnavailableEnvironment() async throws {
+        let f = try await Fixture.make(); defer { f.remove() }; try await f.configure()
+        let context = try await f.service.preview(agentID: f.agent.id)
+        let settings = try await f.service.settings()
+        XCTAssertEqual(try settings.policy(environmentID: context.configuration.environment.id), context.configuration.policy)
+        do { _ = try settings.policy(environmentID: EnvironmentID()); XCTFail("Unknown environment accepted") }
+        catch { XCTAssertEqual(error as? ExecutionConfigurationError, .unavailableEnvironment) }
+        let foreign = ExecutionSetupSnapshot(scope: ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID()),
+            workspace: settings.workspace, project: settings.project)
+        do { _ = try foreign.policy(environmentID: context.configuration.environment.id); XCTFail("Foreign policy accepted") }
+        catch { XCTAssertEqual(error as? ExecutionConfigurationError, .scopeMismatch) }
+    }
+
+    func testAdministrativePolicyMissingRulesDenyAndDisabledEnvironmentFails() async throws {
+        let f = try await Fixture.make(); defer { f.remove() }
+        var draft = try await f.service.proposedDefaults(at: .project)
+        let environment = draft.environments[0].id
+        draft.policy = nil; draft.environments[0].policy = nil
+        _ = try await f.service.save(draft, at: .project, expectedRevision: nil)
+        let settings = try await f.service.settings()
+        let policy = try settings.policy(environmentID: environment)
+        XCTAssertTrue(policy.workspace.rules.isEmpty)
+        XCTAssertTrue(policy.project.rules.isEmpty)
+        XCTAssertTrue(policy.environment.rules.isEmpty)
+        XCTAssertEqual(policy, try settings.policy(environmentID: environment))
+        draft.environments[0].enabled = false; draft.defaultEnvironmentID = nil
+        _ = try await f.service.save(draft, at: .project, expectedRevision: 1)
+        let disabled = try await f.service.settings()
+        do { _ = try disabled.policy(environmentID: environment); XCTFail("Disabled environment accepted") }
+        catch { XCTAssertEqual(error as? ExecutionConfigurationError, .unavailableEnvironment) }
+    }
+
     func testPersistentCatalogLockFailsClosedAndRetrySleepIsCancellable() async throws {
         let f = try await Fixture.make(); defer { f.remove() }; try await f.configure()
         let context = try await f.service.preview(agentID: f.agent.id)

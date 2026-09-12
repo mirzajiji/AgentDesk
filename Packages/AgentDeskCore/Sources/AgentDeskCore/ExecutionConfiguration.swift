@@ -227,15 +227,8 @@ public enum ExecutionConfigurationComposer {
                                                         fingerprint: try ActionFingerprint.canonical(settings)))
         }
         if let models { guard let model, models.contains(model) else { throw ExecutionConfigurationError.modelDenied } }
-        // Omitted policies deny every operation, with a stable version for this bundled default.
-        func denyDefault(_ level: PolicyLevel) throws -> PolicyDocument {
-            try PolicyDocument(revision: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, level: level,
-                workspaceID: scope.workspaceID, projectID: level == .workspace ? nil : scope.projectID,
-                environmentID: level == .environment ? environment.id : nil, rules: [])
-        }
-        let policy = try PolicySnapshot(workspace: workspace?.draft.policy ?? denyDefault(.workspace),
-            project: project?.draft.policy ?? denyDefault(.project), environment: environment.policy ?? denyDefault(.environment),
-            environmentKind: environment.kind, workspaceLocked: workspace?.draft.workspaceLocked ?? false)
+        let policy = try ExecutionSetupSnapshot(scope: scope, workspace: workspace, project: project)
+            .policy(environmentID: environment.id)
         return EffectiveExecutionConfiguration(scope: scope, agentID: agent.id, agentRevision: agent.definition.revision,
             environment: environment, policy: policy, modelIdentifier: model, requestedAccess: profile.requestedAccess,
             maximumSteps: steps, timeoutSeconds: timeout, maximumOutputBytes: bytes, outputSchema: schema, knowledge: profile.knowledge, sources: sources, origins: origins)

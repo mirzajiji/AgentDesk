@@ -12,6 +12,29 @@ public struct ExecutionSetupSnapshot: Equatable, Sendable {
     public func configuration(at level: ExecutionConfigurationLevel) -> ExecutionConfigurationSnapshot? {
         level == .workspace ? workspace : project
     }
+    /// Resolve local administrative policy without inventing an agent or granting missing rules.
+    public func policy(environmentID: EnvironmentID) throws -> PolicySnapshot {
+        for (level, snapshot) in [(ExecutionConfigurationLevel.workspace, workspace), (.project, project)] {
+            if let snapshot {
+                guard snapshot.schemaVersion == 1, snapshot.workspaceID == scope.workspaceID,
+                      snapshot.projectID == (level == .project ? scope.projectID : nil),
+                      (1...1_000_000).contains(snapshot.revision), snapshot.createdAt.timeIntervalSince1970.isFinite
+                else { throw ExecutionConfigurationError.scopeMismatch }
+                try snapshot.draft.validate(at: level, in: scope)
+            }
+        }
+        guard let environment = project?.draft.environments.first(where: { $0.id == environmentID && $0.enabled })
+        else { throw ExecutionConfigurationError.unavailableEnvironment }
+        func denyDefault(_ level: PolicyLevel) throws -> PolicyDocument {
+            try PolicyDocument(revision: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, level: level,
+                workspaceID: scope.workspaceID, projectID: level == .workspace ? nil : scope.projectID,
+                environmentID: level == .environment ? environment.id : nil, rules: [])
+        }
+        return try PolicySnapshot(workspace: workspace?.draft.policy ?? denyDefault(.workspace),
+            project: project?.draft.policy ?? denyDefault(.project), environment: environment.policy ?? denyDefault(.environment),
+            environmentKind: environment.kind, workspaceLocked: workspace?.draft.workspaceLocked ?? false)
+    }
+
 }
 
 /// Exact source values for the trusted native preparation boundary, not an authorization or wire payload.

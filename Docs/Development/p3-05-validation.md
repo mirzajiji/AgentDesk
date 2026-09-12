@@ -191,3 +191,13 @@ The service now has synthetic HTTP-level regressions proving that stored deny an
 - Normal app builds: `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build` and the same command with the primary iOS Simulator destination and `TestResults/p1-08b/FilteredIPhone` derived data. Logs: `native-read-review-app-mac.log` and `native-read-review-app-iphone.log` under `TestResults/p3-05`.
 
 Environment: Xcode 26.0, macOS 26.5.2. No live Jira requests or real credentials. Native UI wiring remains unfinished; this is a service component, not completion of P3-05 or the full native Jira operation flow. Counts remain 52 documented tasks complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+
+## Administrative policy resolution
+
+Native Jira issue reads need policy for a selected environment without requiring an AI agent. `ExecutionSetupSnapshot.policy(environmentID:)` validates source identities, schema/revision, draft scope and enabled environment, then composes the same workspace/project/environment policy used by execution. The execution composer now calls this method, preserving the stable deny-default policy revision, environment kind and workspace lock. This refactor grants no new operations and does not yet wire the issue browser.
+
+Core tests compare native and execution policy, reject foreign/unknown environments, verify all missing policy layers have no rules and stable results, and reject a disabled environment. The first disabled-environment fixture incorrectly retained a disabled default; existing configuration validation rejected it before resolution. The corrected fixture clears the default. All 198 Core tests pass (`swift test --package-path Packages/AgentDeskCore`, `TestResults/p3-05/administrative-policy-core-fixed.log`). Native platform checks pending.
+
+
+Final checks: 23 tests passed on iPhone 16 Pro / iOS 26.0. Command from `Packages/AgentDeskCore`: `xcodebuild -scheme AgentDeskCore -destination 'platform=iOS Simulator,id=C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE' -derivedDataPath ../../TestResults/p3-05/CoreIPhone -resultBundlePath ../../TestResults/p3-05/administrative-policy-iphone.xcresult -only-testing:AgentDeskCoreTests/ProjectExecutionSetupTests -only-testing:AgentDeskCoreTests/ExecutionConfigurationTests -parallel-testing-enabled NO test`. Both normal application builds passed, using the preceding native-read-review build commands with logs `administrative-policy-app-mac.log` and `administrative-policy-app-iphone.log`. Xcode 26.0 / macOS 26.5.2. Documentation and diff checks pass. No UI change or live Jira acceptance is claimed. This does not complete a parent architecture task.

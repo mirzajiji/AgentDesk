@@ -29,6 +29,7 @@ actor MCPApprovedStdioLaunch {
     private let projectRoot: URL
     private let resource: ActionFingerprint
     private var connection: MCPNegotiatedStdioConnection?
+    private var repositoryAccess: RepositoryAccess?
     private var closed = false
     private var starting = false
     private var launchTask: Task<PolicyExecutionResult<Opened>, any Error>?
@@ -57,6 +58,19 @@ actor MCPApprovedStdioLaunch {
             })
         return Self(secrets: secrets, gate: gate, configuration: configuration, workspaceRoot: workspaceRoot, projectRoot: projectRoot, resource: resource.fingerprint)
     }
+    /// Owns the registered folder grant until process cleanup completes.
+    static func open(configurations: ProjectMCPConfigurationStore<MCPStdioConfiguration>, connectionID: UUID,
+                     scope: ProjectScope, environmentID: EnvironmentID, workspaceRoot: URL, repository: RepositoryAccess,
+                     authorities: [PolicyAuthority], requesterID: UUID, approvals: ApprovalStore,
+                     secrets: (any SecretStore)? = nil, currentPolicy: @escaping @Sendable () async throws -> PolicySnapshot) async throws -> Self {
+        guard repository.registration.scope == scope else { throw AuthorizationError.denied }
+        let launch = try await open(configurations: configurations, connectionID: connectionID,
+            scope: scope, environmentID: environmentID, workspaceRoot: workspaceRoot, projectRoot: repository.directory,
+            authorities: authorities, requesterID: requesterID, approvals: approvals, secrets: secrets, currentPolicy: currentPolicy)
+        await launch.retain(repository)
+        return launch
+    }
+    private func retain(_ repository: RepositoryAccess) { repositoryAccess = repository }
     func prepare() async throws -> PolicyPreparation { try await gate.prepare() }
     func review(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
         try await gate.review(id, approve: approve, expectedSequence: expectedSequence)
@@ -117,6 +131,7 @@ actor MCPApprovedStdioLaunch {
         if let pending, case .executed(let opened) = try? await pending.value { await opened.connection.close() }
         await connection?.close()
         connection = nil
+        repositoryAccess = nil
     }
 }
 #endif

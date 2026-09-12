@@ -23,3 +23,15 @@ Final wire tests: four tests pass on Mac (`p3-06-wire-final.log`) and iPhone 16 
 
 
 Normal application builds passed using `AgentDesk.xcodeproj`, scheme `AgentDesk`, the documented Mac/primary Simulator destinations and `TestResults/p1-01/NativeMac` / `TestResults/p1-08b/FilteredIPhone` derived data (`p3-06-app-mac.log`, `p3-06-app-iphone.log`). The app does not yet link or invoke MCP; these builds are compatibility checks, while package tests establish wire behavior. Documentation and diff checks pass.
+
+
+## Connection-scoped request tracking
+
+`MCPRequestTracker` owns one project/connection's pending metadata. Each tracker has a fresh generation and monotonically increasing request IDs, so IDs are never reused after completion/cancellation within a tracker and responses from an old connection cannot match a new tracker. It accepts only result/error envelopes for completion, rejects unmatched/duplicate responses, enforces a configurable pending cap (1–1,024), and bounds deadlines to one hour. Deadline comparison uses `ContinuousClock`; expiration at the deadline is rejected. Cancelling, expiring and closing drop pending metadata; close returns outstanding requests for the future transport to fail its waiters. No raw request/response bodies are retained by the tracker.
+
+This is correlation state, not an execution permission, dispatch loop or timer scheduler. The transport still must schedule expiration, write cancellation notifications, fail continuations and release processes. No method is sent or run by this component.
+
+`swift test --package-path Packages/AgentDeskMCP` passes all eight wire/tracker tests (`TestResults/p3-06-tracker.log`). Added tests cover out-of-order result/error responses, duplicate rejection, capacity release, timeout boundary, explicit expiry, cancellation, foreign connection rejection, close, notification separation and invalid limits. Native Simulator checks pending.
+
+
+Final tracker checks: eight tests pass on iPhone 16 Pro / iOS 26.0 (`p3-06/tracker-iphone.xcresult`), using `xcodebuild -scheme AgentDeskMCP -destination 'platform=iOS Simulator,id=C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE' -derivedDataPath ../../TestResults/p3-06/MCPIPhone -resultBundlePath ../../TestResults/p3-06/tracker-iphone.xcresult -parallel-testing-enabled NO test` from the package directory. Normal Mac/iPhone app compatibility builds pass using the preceding documented commands (`p3-06-tracker-app-mac.log`, `p3-06-tracker-app-iphone.log`). MCP is not yet wired into the app. Documentation and diff checks pass. Xcode 26.0 / macOS 26.5.2. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

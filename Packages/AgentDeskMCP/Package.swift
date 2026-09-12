@@ -5,9 +5,9 @@ let package = Package(
     name: "AgentDeskMCP",
     platforms: [.macOS(.v15), .iOS(.v18)],
     products: [.library(name: "AgentDeskMCP", targets: ["AgentDeskMCP"])],
-    dependencies: [.package(path: "../AgentDeskCore")],
+    dependencies: [.package(path: "../AgentDeskCore"), .package(path: "../AgentDeskSecurity")],
     targets: [
-        .target(name: "AgentDeskMCP", dependencies: ["AgentDeskCore"]),
+        .target(name: "AgentDeskMCP", dependencies: ["AgentDeskCore", "AgentDeskSecurity"]),
         .testTarget(name: "AgentDeskMCPTests", dependencies: ["AgentDeskMCP"])
     ]
 )

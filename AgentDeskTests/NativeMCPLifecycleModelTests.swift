@@ -61,6 +61,24 @@ import AgentDeskPersistence
         XCTAssertFalse(model.connected); XCTAssertEqual(fake.closes, 1)
         XCTAssertFalse(model.message.contains("private-value"))
     }
+    func testStopWaitsForFailureCleanupBeforeAllowingAnotherReview() async throws {
+        let fake = try LifecycleFake(); fake.failStart = true
+        var release: CheckedContinuation<Void, Never>?
+        fake.beforeClose = { await withCheckedContinuation { release = $0 } }
+        var opens = 0
+        let model = NativeMCPLifecycleModel(needsCredentials: false) { opens += 1; return fake }
+        model.prepare(); try await settle(model); model.approve()
+        for _ in 0..<100 where release == nil { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertNotNil(release)
+        model.stop(); model.stop()
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertTrue(model.busy, "Stop must wait for the in-flight process cleanup")
+        XCTAssertEqual(model.message, "Stopping…")
+        model.prepare(); XCTAssertEqual(opens, 1)
+        release?.resume(); try await settle(model)
+        XCTAssertEqual(fake.closes, 1); XCTAssertEqual(model.message, "Stopped.")
+        XCTAssertFalse(model.connected); XCTAssertNil(model.pending)
+    }
     private func settle(_ model: NativeMCPLifecycleModel) async throws {
         for _ in 0..<100 where model.busy { try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertFalse(model.busy)
@@ -73,6 +91,7 @@ import AgentDeskPersistence
     var launchID: UUID?, credentialID: UUID?
     var denyCredentials = false, failStart = false
     var beforeStart: (() async -> Void)?
+    var beforeClose: (() async -> Void)?
     init() throws {
         let scope = ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID()), environment = EnvironmentID()
         let fingerprint = try ActionFingerprint(bytes: Data("synthetic".utf8))
@@ -102,6 +121,6 @@ import AgentDeskPersistence
         return MCPServerPresentation(mode: .modern, name: nil, version: nil, tools: false, resources: false, prompts: false)
     }
     func ping() async throws { pings += 1 }
-    func close() async { closes += 1 }
+    func close() async { closes += 1; await beforeClose?() }
 }
 #endif

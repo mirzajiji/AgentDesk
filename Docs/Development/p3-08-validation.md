@@ -56,3 +56,15 @@ xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform
 ```
 
 Passed on macOS 26.5.2 / Xcode 26.0: five model unit tests and two native UI tests, including two actual approved process lifecycles. Log: `TestResults/p3-08-native-stdio-interpreter.log`. Normal signed Mac build passed (`TestResults/p3-08-native-stdio-build.log`). Documentation/diff checks pass. This extends native Mac acceptance only; no new iPhone run is claimed. P3-08 remains incomplete for credentials editing, deletion, capability/permission browsing, remote transport and persistent diagnostics. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Stop during failed-connection cleanup
+
+A delayed-close regression reproduced a race: failure handling released the model's session reference before awaiting cleanup, so Stop could immediately display Stopped and permit another review while that cleanup was still pending. Failure handling and Stop now retain and join the same cleanup chain. Cancellation of the UI operation does not cancel its process cleanup. Stop remains busy until the chain finishes; repeated Stop does not enqueue duplicate closes.
+
+The new test failed against the previous implementation (`TestResults/p3-08-cleanup-before.xcresult`), then passed with the fix. Final command:
+
+```sh
+xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac -resultBundlePath TestResults/p3-08-cleanup-after.xcresult -only-testing:AgentDeskTests/NativeMCPLifecycleModelTests -only-testing:AgentDeskUITests/NativeMCPConnectionsUITests/testReviewedNativeProcessStartHealthStopAndRestart -parallel-testing-enabled NO test
+```
+
+Passed on macOS 26.5.2 / Xcode 26.0: six lifecycle unit tests and one real-process native UI test. Normal signed Mac build passed (`TestResults/p3-08-cleanup-build.log`); documentation/diff checks pass. No new iPhone coverage is claimed for this Mac-only model fix. Task counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

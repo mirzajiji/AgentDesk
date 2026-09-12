@@ -28,6 +28,7 @@ extension NativeMCPConnection: NativeMCPLifecycle {}
     private let open: () async throws -> any NativeMCPLifecycle
     private var session: (any NativeMCPLifecycle)?
     private var task: Task<Void, Never>?
+    private var cleanupTask: Task<Void, Never>?
     private var generation = UUID()
     private var launchApproval: UUID?
     private var stopping = false
@@ -92,10 +93,10 @@ extension NativeMCPConnection: NativeMCPLifecycle {}
         generation = UUID(); task?.cancel(); task = nil
         let old = session; session = nil; pending = nil; launchApproval = nil
         connected = false; reviewingCredentials = false; busy = true; message = "Stopping…"
-        let token = generation
+        let token = generation, cleanup = enqueueCleanup(old)
         task = Task {
-            await old?.close()
-            if token == generation { busy = false; stopping = false; message = "Stopped." }
+            await cleanup.value
+            if token == generation { cleanupTask = nil; busy = false; stopping = false; message = "Stopped." }
         }
     }
     private func start(_ value: any NativeMCPLifecycle, credential: UUID?, token: UUID) async throws {
@@ -108,8 +109,19 @@ extension NativeMCPConnection: NativeMCPLifecycle {}
     private func failed(_ token: UUID) async {
         guard token == generation else { return }
         let old = session; session = nil; pending = nil; launchApproval = nil; connected = false; reviewingCredentials = false
-        await old?.close()
-        if token == generation { message = "Connection failed or was denied. Check the executable, registered repository and current permissions, then review again." }
+        let cleanup = enqueueCleanup(old)
+        await cleanup.value
+        if token == generation {
+            cleanupTask = nil
+            message = "Connection failed or was denied. Check the executable, registered repository and current permissions, then review again."
+        }
+    }
+    /// A cancelled UI operation cannot discard cleanup that already owns a process.
+    private func enqueueCleanup(_ value: (any NativeMCPLifecycle)?) -> Task<Void, Never> {
+        let previous = cleanupTask
+        let cleanup = Task { await previous?.value; await value?.close() }
+        cleanupTask = cleanup
+        return cleanup
     }
 }
 #endif

@@ -1,4 +1,7 @@
 #if os(macOS)
+import AgentDeskCore
+import AgentDeskMCP
+import AgentDeskSecurity
 import Darwin
 import Foundation
 import Synchronization
@@ -95,6 +98,26 @@ final class MacProcessRunnerTests: XCTestCase {
         XCTAssertLessThan(ContinuousClock.now - start, .seconds(2))
     }
 
+    func testMaximumMCPVariableNameReachesTheChildAndLargerNamesAreRejected() async throws {
+        let scope = ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID()), environment = EnvironmentID()
+        let key = String(repeating: "K", count: 128)
+        let reference = SecretReference(scope: try SecretScope(workspaceID: scope.workspaceID, projectID: scope.projectID, environmentID: environment))
+        let configuration = try MCPStdioConfiguration(scope: scope, environmentID: environment, name: "Synthetic", executable: "/usr/bin/env",
+            workingDirectory: nil, secretEnvironment: [key: reference], directoryBase: .registeredRepository)
+        XCTAssertEqual(configuration.secretEnvironment.keys.first, key)
+        let output = Mutex(Data())
+        let result = try await MacProcessRunner.run(executable: URL(fileURLWithPath: configuration.executable), arguments: [],
+            directory: URL(fileURLWithPath: "/private/tmp"), environment: [key: "synthetic-value"], timeout: .seconds(5), maximumBytes: 1024) { chunk in
+                if case .stdout = chunk.channel { output.withLock { $0.append(chunk.bytes) } }
+            }
+        XCTAssertEqual(result.status, 0)
+        XCTAssertEqual(output.withLock { String(decoding: $0, as: UTF8.self) }, key + "=synthetic-value\n")
+        do {
+            _ = try await MacProcessRunner.run(executable: URL(fileURLWithPath: "/usr/bin/env"), arguments: [],
+                directory: URL(fileURLWithPath: "/private/tmp"), environment: [key + "K": "synthetic-value"], timeout: .seconds(5), maximumBytes: 1024) { _ in XCTFail("Oversized key reached child") }
+            XCTFail("Accepted oversized environment key")
+        } catch { XCTAssertEqual(error as? CodexDiagnosticIssue, .commandFailed) }
+    }
     func testInvalidInputAndEnvironmentFailBeforeLaunchingTheExecutable() async throws {
         for (input, environment, directory) in [
             (Data(repeating: 0, count: 1_048_577), [:], URL(fileURLWithPath: "/private/tmp")),

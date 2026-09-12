@@ -98,3 +98,14 @@ xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform
 ```
 
 Passed on macOS 26.5.2 / Xcode 26.0: three native integration tests, zero failures (`TestResults/p3-08-keychain-native-final.log`). The new test explicitly verifies the serialized connection revision contains no credential value. It uses the installed direct Xcode Python interpreter to avoid the sandbox-incompatible xcrun shim. This is a native model/service integration in the signed app, not an additional mouse-driven credential-save UI test. The existing secure-field UI regression remains the visual/input coverage. No real account credential or company service was used; no new iPhone coverage claimed. Product code is unchanged by this test-only task. Documentation and diff checks pass. Revocation, deletion, discovery/permissions, remote transport and persistent diagnostics remain outstanding; counts stay 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Credential variable-name launch boundary
+
+MCP configuration accepts ASCII environment-variable names up to 128 bytes, but MacProcessRunner previously rejected names above 100 bytes. A regression using a validated MCP configuration and a real `/usr/bin/env` child reproduced the launch failure. The runner now accepts the same 128-byte name limit. A 129-byte name still fails before child output; existing environment count, aggregate-byte, NUL and equals-sign validation remains intact.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- The focused regression failed before the fix (`TestResults/p3-08-variable-limit-before.log`).
+- `swift test --package-path Packages/AgentDeskRuntime` passed all 198 tests (`TestResults/p3-08-variable-limit-after.log`).
+- Signed native Keychain-to-MCP integration passed using the standard native test command with `-only-testing:AgentDeskTests/NativeMCPCredentialIntegrationTests` and result bundle `TestResults/p3-08-variable-native.xcresult` (`TestResults/p3-08-variable-native.log`). Its app host built successfully.
+- Documentation and whitespace checks pass. The runner is macOS-only; no new iPhone coverage is claimed. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

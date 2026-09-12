@@ -28,7 +28,7 @@ enum MacProcessRunner {
               arguments.count <= 128, arguments.allSatisfy({ !$0.utf8.contains(0) && $0.utf8.count <= 65_536 }),
               arguments.reduce(0, { $0 + $1.utf8.count }) <= 131_072,
               environment.count <= 64,
-              environment.allSatisfy({ !$0.key.isEmpty && $0.key.utf8.count <= 100 && $0.value.utf8.count <= 65_536 && !$0.key.contains("=") && !$0.key.utf8.contains(0) && !$0.value.utf8.contains(0) }),
+              environment.allSatisfy({ !$0.key.isEmpty && $0.key.utf8.count <= 128 && $0.value.utf8.count <= 65_536 && !$0.key.contains("=") && !$0.key.utf8.contains(0) && !$0.value.utf8.contains(0) }),
               environment.reduce(0, { $0 + $1.key.utf8.count + $1.value.utf8.count }) <= 131_072 else {
             throw CodexDiagnosticIssue.commandFailed
         }

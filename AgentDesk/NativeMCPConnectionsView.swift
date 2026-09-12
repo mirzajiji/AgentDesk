@@ -58,6 +58,7 @@ private struct MCPConnectionEditor: View {
     @State private var name = ""
     @State private var executable = ""
     @State private var directory = ""
+    @State private var directoryBase = MCPDirectoryBase.workspace
     @State private var arguments: [String] = []
     @State private var environment: EnvironmentID?
     @State private var enabled = false
@@ -78,7 +79,11 @@ private struct MCPConnectionEditor: View {
                     TextField("Name", text: $name).accessibilityIdentifier("mcp.name")
                     Text("Executable absolute path").font(.caption).foregroundStyle(.secondary)
                     TextField("Executable absolute path", text: $executable).accessibilityIdentifier("mcp.executable")
-                    Text("Working directory relative to workspace").font(.caption).foregroundStyle(.secondary)
+                    Picker("Directory base", selection: $directoryBase) {
+                        Text("Workspace").tag(MCPDirectoryBase.workspace)
+                        Text("Registered repository").tag(MCPDirectoryBase.registeredRepository)
+                    }.accessibilityIdentifier("mcp.directory-base")
+                    Text(directoryBase == .workspace ? "Working directory relative to workspace" : "Repository subdirectory (leave empty for root)").font(.caption).foregroundStyle(.secondary)
                     TextField("Working directory relative to workspace", text: $directory).accessibilityIdentifier("mcp.directory")
                     Picker("Environment", selection: $environment) {
                         Text("Choose environment").tag(EnvironmentID?.none)
@@ -100,7 +105,7 @@ private struct MCPConnectionEditor: View {
         }.padding(20).macEditorLayout(idealWidth: 720, idealHeight: 560)
         .onAppear {
             if let value = existing?.configuration {
-                name = value.name; executable = value.executable; directory = value.workingDirectory.relativePath
+                name = value.name; executable = value.executable; directory = value.workingDirectory?.relativePath ?? ""; directoryBase = value.directoryBase
                 arguments = value.arguments; environment = value.environmentID; enabled = value.enabled
             } else { environment = model.environments.first?.id }
         }
@@ -109,7 +114,7 @@ private struct MCPConnectionEditor: View {
         guard let environment else { return }
         do {
             try await model.save(name: name, executable: executable, arguments: arguments, directory: directory,
-                environment: environment, enabled: enabled, existing: existing)
+                environment: environment, enabled: enabled, existing: existing, directoryBase: directoryBase)
             dismiss()
         } catch { self.error = "Could not save. Check the paths and arguments, or reopen the connection if it changed." }
     }

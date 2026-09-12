@@ -42,7 +42,7 @@ struct NativeMCPConfigurationServices {
         }
     }
     func save(name: String, executable: String, arguments: [String], directory: String, environment: EnvironmentID,
-              enabled: Bool, existing: MCPConfigurationRevision<MCPStdioConfiguration>?) async throws {
+              enabled: Bool, existing: MCPConfigurationRevision<MCPStdioConfiguration>?, directoryBase: MCPDirectoryBase = .workspace) async throws {
         guard !busy else { throw MCPStorageError.staleRevision }
         let current = generation
         busy = true
@@ -57,8 +57,8 @@ struct NativeMCPConfigurationServices {
         }
         let value = try MCPStdioConfiguration(id: existing?.configuration.id ?? UUID(), scope: project.scope,
             environmentID: environment, name: name.trimmingCharacters(in: .whitespacesAndNewlines), executable: executable,
-            arguments: arguments, workingDirectory: WorkspacePath(workspaceID: project.scope.workspaceID, relativePath: directory),
-            secretEnvironment: existing?.configuration.secretEnvironment ?? [:], enabled: enabled)
+            arguments: arguments, workingDirectory: directory.isEmpty && directoryBase == .registeredRepository ? nil : WorkspacePath(workspaceID: project.scope.workspaceID, relativePath: directory),
+            secretEnvironment: existing?.configuration.secretEnvironment ?? [:], enabled: enabled, directoryBase: directoryBase)
         _ = try await services.store.save(value, in: project.scope, expectedRevision: existing?.revision)
         let page = try await services.store.list(in: project.scope)
         guard generation == current else { return }

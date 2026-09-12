@@ -15,6 +15,12 @@ final class MCPStdioConfigurationTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(MCPStdioConfiguration.self, from: data), value)
         XCTAssertFalse(value.enabled)
         var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "directoryBase")
+        let legacy = try JSONDecoder().decode(MCPStdioConfiguration.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertEqual(legacy.directoryBase, .workspace)
+        let repository = try MCPStdioConfiguration(scope: scope, environmentID: environment, name: "Repository",
+            executable: "/bin/example", workingDirectory: nil, directoryBase: .registeredRepository)
+        XCTAssertEqual(try JSONDecoder().decode(MCPStdioConfiguration.self, from: JSONEncoder().encode(repository)), repository)
         object["executable"] = "../escape"
         XCTAssertThrowsError(try JSONDecoder().decode(MCPStdioConfiguration.self, from: JSONSerialization.data(withJSONObject: object)))
     }

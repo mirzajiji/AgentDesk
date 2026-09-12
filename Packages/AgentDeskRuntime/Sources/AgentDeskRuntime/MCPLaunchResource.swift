@@ -17,8 +17,11 @@ struct MCPLaunchResource: Sendable {
         guard configuration.scope == scope else { throw AuthorizationError.scopeMismatch }
         let workspace = try canonical(workspaceRoot)
         let project = try canonical(projectRoot)
-        guard contained(project, in: workspace) else { throw AuthorizationError.scopeMismatch }
-        let directory = try canonical(workspace.appendingPathComponent(configuration.workingDirectory.relativePath))
+        if configuration.directoryBase == .workspace {
+            guard contained(project, in: workspace) else { throw AuthorizationError.scopeMismatch }
+        }
+        let base = configuration.directoryBase == .workspace ? workspace : project
+        let directory = try configuration.workingDirectory.map { try canonical(base.appendingPathComponent($0.relativePath)) } ?? project
         guard contained(directory, in: project) else { throw AuthorizationError.scopeMismatch }
         let executable = try canonical(URL(fileURLWithPath: configuration.executable))
         let directoryIdentity = try identity(directory, directory: true)

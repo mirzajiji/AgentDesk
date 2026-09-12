@@ -2,10 +2,32 @@
 import AgentDeskCore
 import AgentDeskMCP
 import Foundation
+import Darwin
 import XCTest
 @testable import AgentDeskRuntime
 
 final class MCPLaunchResourceTests: XCTestCase {
+    func testRegisteredRepositoryRootOutsideWorkspace() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let workspace = root.appendingPathComponent("workspace")
+        let repository = root.appendingPathComponent("external-repository")
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let scope = ProjectScope(workspaceID: WorkspaceID(), projectID: ProjectID())
+        let config = try MCPStdioConfiguration(scope: scope, environmentID: EnvironmentID(), name: "Synthetic",
+            executable: "/usr/bin/true", workingDirectory: nil, directoryBase: .registeredRepository)
+        let resolved = try MCPLaunchResource.resolve(config, scope: scope, workspaceRoot: workspace, projectRoot: repository)
+        let canonical = try XCTUnwrap(realpath(repository.path, nil))
+        defer { free(canonical) }
+        XCTAssertEqual(resolved.directory.path, String(cString: canonical))
+        XCTAssertThrowsError(try MCPStdioConfiguration(scope: scope, environmentID: EnvironmentID(), name: "Synthetic",
+            executable: "/usr/bin/true", workingDirectory: nil))
+        try FileManager.default.createSymbolicLink(at: repository.appendingPathComponent("escape"), withDestinationURL: workspace)
+        let escaped = try MCPStdioConfiguration(scope: scope, environmentID: EnvironmentID(), name: "Synthetic", executable: "/usr/bin/true",
+            workingDirectory: WorkspacePath(workspaceID: scope.workspaceID, relativePath: "escape"), directoryBase: .registeredRepository)
+        XCTAssertThrowsError(try MCPLaunchResource.resolve(escaped, scope: scope, workspaceRoot: workspace, projectRoot: repository))
+    }
     func testExecutableChangesInvalidateIdentityAndNonExecutableFilesFail() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let project = root.appendingPathComponent("project")

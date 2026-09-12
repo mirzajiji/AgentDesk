@@ -30,6 +30,13 @@ final class NativeMCPConnectionsUITests: XCTestCase {
         edit.click()
         XCTAssertEqual(app.textFields["mcp.executable"].value as? String, "/usr/bin/true")
         XCTAssertEqual(app.textFields["mcp.argument.0"].value as? String, "--version")
+        app.popUpButtons["mcp.directory-base"].click()
+        app.menuItems["Registered repository"].click()
+        let directory = app.textFields["mcp.directory"]
+        directory.click(); directory.typeKey("a", modifierFlags: .command); directory.typeKey(.delete, modifierFlags: [])
+        app.buttons["mcp.save"].click()
+        XCTAssertTrue(edit.waitForExistence(timeout: 5)); edit.click()
+        XCTAssertEqual(app.textFields["mcp.directory"].value as? String, "")
         let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         shot.name = "Native MCP configuration editor"; shot.lifetime = .keepAlways; add(shot)
         app.buttons["Cancel"].click()

@@ -26,3 +26,5 @@ xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform
 Logs: `TestResults/p3-08-mac-build.log`, `TestResults/p3-08-iphone-build.log`, `TestResults/p3-08-native-arguments.log`. iPhone 16 Pro / iOS 26.0 build only for this Mac UI task; no new iPhone test coverage claimed. Documentation/diff checks pass.
 
 P3-08 remains in progress: native reviewed start/stop/restart, credentials, remote transport, deletion, capability/permission browsing, health and logs still require implementation and acceptance. Counts remain 52 tasks complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+The editor now offers Workspace or Registered repository directory bases. Empty subdirectory selects the registered repository root; workspace-relative paths remain mandatory. Native save/reopen coverage passes for this selection. See the [directory-base validation record](p3-06-validation.md) for package, runtime, Simulator and native build results. Native process-start controls remain unfinished.

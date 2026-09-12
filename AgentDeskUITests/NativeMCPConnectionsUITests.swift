@@ -19,6 +19,7 @@ final class NativeMCPConnectionsUITests: XCTestCase {
             let field = app.textFields[id]
             XCTAssertTrue(field.waitForExistence(timeout: 5)); field.click(); field.typeText(value)
         }
+        app.checkBoxes["Enabled"].click()
         app.buttons["Add Argument"].click()
         app.textFields["mcp.argument.0"].click()
         app.textFields["mcp.argument.0"].typeText("--version")
@@ -40,6 +41,17 @@ final class NativeMCPConnectionsUITests: XCTestCase {
         let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         shot.name = "Native MCP configuration editor"; shot.lifetime = .keepAlways; add(shot)
         app.buttons["Cancel"].click()
+        let connection = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mcp.connection.")).firstMatch
+        XCTAssertTrue(connection.waitForExistence(timeout: 5)); connection.click()
+        XCTAssertTrue(app.buttons["mcp.lifecycle.review"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["/usr/bin/true"].firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["1: --version"].exists)
+        XCTAssertFalse(app.buttons["mcp.lifecycle.approve"].exists)
+        let lifecycle = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        lifecycle.name = "Native MCP launch review"; lifecycle.lifetime = .keepAlways; add(lifecycle)
+        app.buttons["mcp.lifecycle.stop"].click()
+        XCTAssertTrue(app.staticTexts["Stopped."].waitForExistence(timeout: 5))
+        app.buttons["Done"].click()
     }
 }
 #endif

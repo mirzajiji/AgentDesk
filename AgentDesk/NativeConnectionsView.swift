@@ -31,7 +31,7 @@ struct NativeConnectionsView: View {
                     Text("MCP").tag("MCP")
                 }.pickerStyle(.segmented).accessibilityIdentifier("connections.kind")
                 if connectionKind == "MCP" {
-                    NativeMCPConnectionsView(project: project, open: { try await catalog.mcpConfigurationServices(for: project) }).id(project.scope)
+                    NativeMCPConnectionsView(project: project, openConnection: { record in try await catalog.openMCP(project: project, record: record) }, open: { try await catalog.mcpConfigurationServices(for: project) }).id(project.scope)
                 } else {
                 ProjectJiraConnectionsView(project: project, openIssue: { record, key in
                     try await catalog.openJiraIssue(project: project, record: record, identifier: key)

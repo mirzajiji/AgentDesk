@@ -11,7 +11,10 @@ private struct MCPEditRequest: Identifiable {
 struct NativeMCPConnectionsView: View {
     @StateObject private var model: ProjectMCPConnectionsModel
     @State private var editor: MCPEditRequest?
-    init(project: ProjectRecord, open: @escaping () async throws -> NativeMCPConfigurationServices) {
+    @State private var lifecycle: MCPEditRequest?
+    private let openConnection: ((MCPConfigurationRevision<MCPStdioConfiguration>) async throws -> any NativeMCPLifecycle)?
+    init(project: ProjectRecord, openConnection: ((MCPConfigurationRevision<MCPStdioConfiguration>) async throws -> any NativeMCPLifecycle)? = nil, open: @escaping () async throws -> NativeMCPConfigurationServices) {
+        self.openConnection = openConnection
         _model = StateObject(wrappedValue: ProjectMCPConnectionsModel(project: project, open: open))
     }
     var body: some View {
@@ -40,6 +43,11 @@ struct NativeMCPConnectionsView: View {
                                 Text("\(record.configuration.enabled ? "Enabled" : "Disabled") · Configuration v\(record.revision)").foregroundStyle(.secondary)
                             }
                             Spacer()
+                            if openConnection != nil {
+                                Button("Connection") { lifecycle = .init(record: record) }
+                                    .disabled(model.busy || !record.configuration.enabled)
+                                    .accessibilityIdentifier("mcp.connection.\(record.configuration.id)")
+                            }
                             Button("Edit") { editor = .init(record: record) }.disabled(model.busy)
                                 .accessibilityIdentifier("mcp.edit.\(record.configuration.id)")
                         }.padding(12).background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
@@ -48,6 +56,11 @@ struct NativeMCPConnectionsView: View {
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }
         }.task { await model.load() }.onDisappear { model.cancel() }
+        .sheet(item: $lifecycle) { request in
+            if let record = request.record, let openConnection {
+                NativeMCPLifecycleView(configuration: record.configuration, open: { try await openConnection(record) })
+            }
+        }
         .sheet(item: $editor) { MCPConnectionEditor(model: model, existing: $0.record) }
     }
 }

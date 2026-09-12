@@ -1,5 +1,7 @@
 #if os(macOS)
 import AgentDeskMCP
+import AgentDeskPersistence
+import AgentDeskSecurity
 import AgentDeskCore
 import AgentDeskRuntime
 import AgentDeskPlugins
@@ -223,6 +225,32 @@ final class WorkspaceBrowserModel: ObservableObject {
         let store = try await catalog.mcpConfigurationStore(for: MCPStdioConfiguration.self, in: project.scope)
         let settings = try await ProjectExecutionSetupService(catalog: catalog, scope: project.scope).settings()
         return NativeMCPConfigurationServices(store: store, environments: settings.project?.draft.environments ?? [])
+    }
+
+    func openMCP(project: ProjectRecord, record: MCPConfigurationRevision<MCPStdioConfiguration>) async throws -> NativeMCPConnection {
+        guard let applicationRoot else { throw CatalogError.invalidConfiguration }
+        let services = try await executionServices(for: project)
+        let configuration = record.configuration, environment = record.configuration.environmentID
+        guard configuration.scope == project.scope, configuration.enabled else { throw AuthorizationError.denied }
+        let store = try await services.catalog.mcpConfigurationStore(for: MCPStdioConfiguration.self, in: project.scope)
+        guard let latest = try await store.read(id: configuration.id, in: project.scope),
+              latest.revision == record.revision, latest.configuration == configuration else { throw AuthorizationError.stalePolicy }
+        let setup = services.setup
+        _ = try await setup.settings().policy(environmentID: environment)
+        let user = try PolicyAuthority(id: UUID(), kind: .localUser, scopes: [project.scope], environments: [environment],
+            operations: [.runShell, .readSecret], canApprove: true, expiresAt: Date().addingTimeInterval(1800))
+        let approvals = try ApprovalStore(database: services.database, scope: project.scope, environmentID: environment)
+        let secretScope = try SecretScope(workspaceID: project.workspaceID, projectID: project.id, environmentID: environment)
+        let connection = try await NativeMCPConnection.open(configurations: store, connectionID: configuration.id, scope: project.scope,
+            environmentID: environment, workspaceRoot: applicationRoot.appendingPathComponent("Workspaces/\(project.workspaceID.rawValue)"),
+            repositories: services.repositories, authorities: [user], requesterID: user.id, approvals: approvals,
+            secrets: KeychainSecretStore(scope: secretScope), currentPolicy: { try await setup.settings().policy(environmentID: environment) })
+        do {
+            try Task.checkCancellation()
+            guard let current = try await store.read(id: configuration.id, in: project.scope),
+                  current.revision == record.revision, current.configuration == configuration else { throw AuthorizationError.stalePolicy }
+            return connection
+        } catch { await connection.close(); throw error }
     }
 
     func executionServices(for project: ProjectRecord) async throws -> ProjectNativeServices {

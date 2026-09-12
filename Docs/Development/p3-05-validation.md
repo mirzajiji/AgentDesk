@@ -117,3 +117,16 @@ The credential-bearing row now lays actions out horizontally when space permits 
 Native validation is `compact-lifecycle.xcresult` / `compact-lifecycle.log`. Final results and visual inspection follow. This layout-only task does not change shared domain behavior or claim new iPhone coverage.
 
 Both native UI tests passed, zero failures, on macOS 26.5.2 / Xcode 26.0. The compact app-window screenshot was exported and visually inspected: all five actions remain visible in a vertical group and text stays readable. The final source adjustment only normalizes helper indentation. Documentation and diff checks passed. The requested physical-display matrix remains final acceptance work.
+
+
+## Native reset
+
+Added Reset with a native confirmation describing its exact effect: remove the local grant, clear the credential reference and disable the connection while preserving site, environment and immutable history. It shares authentication ownership and stale-row validation with logout. Credential deletion precedes publication; a later cancellation/stale revision can leave an empty old reference, so failure guidance explicitly reports possible partial cleanup instead of claiming success.
+
+`native-reset-build.log`: normal Mac build passed. Added model tests for successful reset, deletion failure and a concurrent configuration update between deletion and publication, including historical-version preservation. The compact layout regression now includes the sixth action. Native results are `native-reset.xcresult` / `native-reset.log` when complete. No live account was reset.
+
+
+The first native run passed seven model tests but both UI scenarios failed to interact with the window; the AX snapshot marked the app disabled. A session check reported an unlocked console. Retrying unchanged code in `native-reset-ui-retry.xcresult` passed both UI scenarios. No root cause beyond the observed interaction failure is claimed. The direct reset confirmation test is now running in `native-reset-confirmation.xcresult`: cancel must retain v1; confirmation must publish disabled v2 and remove credential-only controls, using the reference-only synthetic fixture.
+
+
+The first direct confirmation test failed because Cancel matched both the Touch Bar and sheet. Scoping Cancel and Reset Connection to the sheet fixed the selector. `native-reset-confirmation-fixed.xcresult` passed: cancelling preserved v1, confirming published disabled v2 and removed credential-only controls. Seven native model tests, the two unchanged UI regressions on retry, and this direct confirmation test passed on macOS 26.5.2 / Xcode 26.0. Commands used the AgentDesk project/scheme, native Mac destination, NativeMac derived data and disabled parallel testing with the named test selectors. Documentation and diff checks passed. No real grant existed in the fixture; the deletion-failure and concurrent-publication scenarios use injected model services. Mac-only change, no new iPhone coverage claimed. Full P3-05/live-account acceptance remains open.

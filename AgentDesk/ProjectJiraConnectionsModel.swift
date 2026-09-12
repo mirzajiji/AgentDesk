@@ -211,6 +211,12 @@ final class ProjectJiraConnectionsModel: ObservableObject {
     }
 
     func logout(_ record: PluginConfigurationRevision<JiraConnectionConfiguration>) async {
+        await removeAuthentication(record, reset: false)
+    }
+    func resetConnection(_ record: PluginConfigurationRevision<JiraConnectionConfiguration>) async {
+        await removeAuthentication(record, reset: true)
+    }
+    private func removeAuthentication(_ record: PluginConfigurationRevision<JiraConnectionConfiguration>, reset: Bool) async {
         guard !busy else { return }
         busy = true; error = nil; authenticationMessage = nil; checks[record.configuration.id] = nil
         let current = generation, id = record.configuration.id
@@ -227,11 +233,24 @@ final class ProjectJiraConnectionsModel: ObservableObject {
             try Task.checkCancellation()
             guard generation == current else { throw CancellationError() }
             if let reference = latest.configuration.credential { try await removeGrant(reference) }
+            if reset {
+                try Task.checkCancellation()
+                guard generation == current else { throw CancellationError() }
+                let value = latest.configuration
+                let cleared = try JiraConnectionConfiguration(id: value.id, scope: value.scope, environmentID: value.environmentID,
+                    instance: value.instance, credential: nil, enabled: false)
+                let saved = try await services.store.save(cleared, in: project.scope, expectedRevision: latest.revision)
+                if generation == current, let index = records.firstIndex(where: { $0.configuration.id == id }) { records[index] = saved }
+            }
             if generation == current {
-                authenticationMessage = "Local Jira grant removed. Your browser session and Atlassian consent are unchanged."
+                authenticationMessage = reset ? "Connection reset and disabled. Configuration history is preserved." :
+                    "Local Jira grant removed. Your browser session and Atlassian consent are unchanged."
             }
         } catch {
-            if generation == current { self.error = "Could not remove the local Jira grant. Finish any active sign-in, refresh, and try again." }
+            if generation == current {
+                self.error = reset ? "Reset did not finish. The local grant may already be removed; refresh the connection before retrying." :
+                    "Could not remove the local Jira grant. Finish any active sign-in, refresh, and try again."
+            }
         }
         if owned { await NativeJiraLoginOwnership.shared.release(id) }
         if generation == current { busy = false }

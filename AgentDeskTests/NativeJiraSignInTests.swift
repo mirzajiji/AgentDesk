@@ -186,6 +186,43 @@ import XCTest
         }
     }
 
+    func testResetPreservesHistoryAndReportsDeletionOrPublicationFailure() async throws {
+        for mode in 0...2 {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let catalog = try WorkspaceCatalog(container: root)
+            let workspace = try await catalog.createWorkspace(name: "Synthetic")
+            let project = try await catalog.createProject(in: workspace.id, name: "Reset")
+            let environment = EnvironmentID()
+            let scope = try SecretScope(workspaceID: workspace.id, projectID: project.id, environmentID: environment)
+            let reference = SecretReference(scope: scope)
+            let store = try await catalog.pluginConfigurationStore(for: JiraConnectionConfiguration.self, in: project.scope)
+            let value = try JiraConnectionConfiguration(scope: project.scope, environmentID: environment,
+                instance: URL(string: "https://synthetic.atlassian.net")!, credential: reference, enabled: true)
+            let first = try await store.save(value, in: project.scope, expectedRevision: nil)
+            let calls = Mutex(0)
+            let model = ProjectJiraConnectionsModel(project: project, removeGrant: { requested in
+                XCTAssertEqual(requested, reference); calls.withLock { $0 += 1 }
+                if mode == 1 { throw SecretStoreError.invalidResult }
+                if mode == 2 { _ = try await store.save(value, in: project.scope, expectedRevision: first.revision) }
+            }, open: { NativeJiraConfigurationServices(store: store, environments: []) })
+            await model.load()
+            await model.resetConnection(first)
+            XCTAssertEqual(calls.withLock { $0 }, 1)
+            XCTAssertEqual(model.error != nil, mode != 0)
+            XCTAssertFalse(model.busy)
+            let stored = try await store.read(id: value.id, in: project.scope)
+            let latest = try XCTUnwrap(stored)
+            XCTAssertEqual(latest.configuration.credential == nil, mode == 0)
+            XCTAssertEqual(latest.configuration.enabled, mode != 0)
+            XCTAssertEqual(latest.configuration.instance, value.instance)
+            let historical = try await store.read(id: value.id, in: project.scope, revision: first.revision)
+            XCTAssertEqual(historical?.configuration, value)
+            model.close()
+        }
+    }
+
     func testOwnershipRejectsSecondWindowAndReleases() async throws {
         let ownership = NativeJiraLoginOwnership(), id = UUID()
         try await ownership.acquire(id)

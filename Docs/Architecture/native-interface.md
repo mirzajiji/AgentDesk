@@ -104,3 +104,8 @@ Successful rows show a check timestamp and available implementations. These are 
 ### Refreshing a Jira grant
 
 Refresh Grant requires an enabled connection, existing credential reference and valid publisher registration. It reuses the native authentication coordinator, ownership gate, configuration checks and Cancel Authentication control. It never opens a browser or reserves a new reference. The backend checks the registration binding and consumes the old refresh token before exchange; an ambiguous or cancelled exchange can require a fresh sign-in. It does not automatically retry a consumed token. Success invalidates prior diagnostic observations and reports only the completed refresh, not continuous health.
+
+
+### Resetting a Jira connection
+
+Reset requires confirmation and uses the same native ownership and current-version checks as logout. It removes the local grant first, then publishes a disabled configuration without a credential reference. Site, environment and immutable history remain. Deletion failure prevents publication. A concurrent edit after deletion prevents overwriting newer configuration, but the grant may already be gone; the UI reports incomplete reset and asks for refresh. This is not an atomic transaction between Keychain and configuration files, and does not revoke browser sessions or remote consent.

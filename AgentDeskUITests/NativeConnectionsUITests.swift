@@ -17,7 +17,7 @@ final class NativeConnectionsUITests: XCTestCase {
         let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -2, dy: -2))
         corner.press(forDuration: 0.2, thenDragTo: window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 908, dy: 718)))
         XCTAssertLessThanOrEqual(window.frame.width, 950)
-        for prefix in ["login", "refresh-grant", "test", "logout", "edit"] {
+        for prefix in ["login", "refresh-grant", "test", "logout", "reset", "edit"] {
             let action = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "connection." + prefix + ".")).firstMatch
             XCTAssertTrue(action.exists)
             XCTAssertGreaterThan(action.frame.width, 35)
@@ -27,6 +27,15 @@ final class NativeConnectionsUITests: XCTestCase {
         }
         let attachment = XCTAttachment(screenshot: window.screenshot())
         attachment.name = "Compact Jira lifecycle actions"; attachment.lifetime = .keepAlways; add(attachment)
+        let reset = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "connection.reset.")).firstMatch
+        reset.click()
+        XCTAssertTrue(app.sheets.firstMatch.buttons["Reset Connection"].waitForExistence(timeout: 5))
+        app.sheets.firstMatch.buttons["Cancel"].click()
+        XCTAssertTrue(app.staticTexts["Configuration version 1"].exists)
+        reset.click(); app.sheets.firstMatch.buttons["Reset Connection"].click()
+        XCTAssertTrue(app.staticTexts["Configuration version 2"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Disabled"].exists)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "connection.logout.")).firstMatch.exists)
     }
 
     @MainActor func testJiraConfigurationPersistsAndCanBeDisabled() {

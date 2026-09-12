@@ -45,6 +45,7 @@ private struct JiraEditorRequest: Identifiable {
 struct ProjectJiraConnectionsView: View {
     @StateObject private var model: ProjectJiraConnectionsModel
     @State private var editor: JiraEditorRequest?
+    @State private var reset: PluginConfigurationRevision<JiraConnectionConfiguration>?
     private let registration = try? NativeJiraRegistration.load()
     init(project: ProjectRecord, open: @escaping () async throws -> NativeJiraConfigurationServices) {
         _model = StateObject(wrappedValue: ProjectJiraConnectionsModel(project: project, open: open))
@@ -111,6 +112,13 @@ struct ProjectJiraConnectionsView: View {
         .task { await model.load() }
         .onDisappear { model.close() }
         .sheet(item: $editor) { request in JiraConnectionEditor(model: model, existing: request.existing) }
+        .confirmationDialog("Reset this Jira connection?", isPresented: Binding(get: { reset != nil }, set: { if !$0 { reset = nil } })) {
+            if let record = reset {
+                Button("Reset Connection", role: .destructive) { Task { await model.resetConnection(record) } }
+            }
+        } message: {
+            Text("Remove the local grant, clear its reference and disable this connection. The site, environment and configuration history remain. Browser sessions and Atlassian consent are unchanged.")
+        }
     }
     @ViewBuilder private func connectionActions(_ record: PluginConfigurationRevision<JiraConnectionConfiguration>) -> some View {
         Button("Sign In") {
@@ -132,6 +140,8 @@ struct ProjectJiraConnectionsView: View {
             Button("Log Out") { Task { await model.logout(record) } }.disabled(model.busy)
                 .accessibilityIdentifier("connection.logout.\(record.configuration.id)")
         }
+        Button("Reset…") { reset = record }.disabled(model.busy)
+            .accessibilityIdentifier("connection.reset.\(record.configuration.id)")
         Button("Edit") { editor = .init(existing: record) }.disabled(model.busy)
             .accessibilityIdentifier("connection.edit.\(record.configuration.id)")
     }

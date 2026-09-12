@@ -227,6 +227,21 @@ final class WorkspaceBrowserModel: ObservableObject {
         return NativeMCPConfigurationServices(store: store, environments: settings.project?.draft.environments ?? [])
     }
 
+    func saveMCPCredential(project: ProjectRecord, record: MCPConfigurationRevision<MCPStdioConfiguration>, variable: String, value: SecretValue) async throws {
+        let services = try await executionServices(for: project)
+        let configuration = record.configuration
+        guard configuration.scope == project.scope else { throw SecretStoreError.scopeMismatch }
+        let settings = try await services.setup.settings()
+        guard settings.project?.draft.environments.contains(where: { $0.id == configuration.environmentID && $0.scope == project.scope }) == true else {
+            throw ExecutionConfigurationError.unavailableEnvironment
+        }
+        let store = try await services.catalog.mcpConfigurationStore(for: MCPStdioConfiguration.self, in: project.scope)
+        let secretScope = try SecretScope(workspaceID: project.workspaceID, projectID: project.id, environmentID: configuration.environmentID)
+        let editor = try NativeMCPCredentialEditor(configurations: store, secrets: KeychainSecretStore(scope: secretScope),
+            scope: project.scope, environmentID: configuration.environmentID)
+        _ = try await editor.set(connectionID: configuration.id, expectedRevision: record.revision, variable: variable, value: value)
+    }
+
     func openMCP(project: ProjectRecord, record: MCPConfigurationRevision<MCPStdioConfiguration>) async throws -> NativeMCPConnection {
         guard let applicationRoot else { throw CatalogError.invalidConfiguration }
         let services = try await executionServices(for: project)

@@ -74,6 +74,17 @@ final class NativeMCPConnectionsUITests: XCTestCase {
         let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         shot.name = "Native MCP configuration editor"; shot.lifetime = .keepAlways; add(shot)
         app.buttons["Cancel"].click()
+        let credentials = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mcp.credentials.")).firstMatch
+        XCTAssertTrue(credentials.waitForExistence(timeout: 5)); credentials.click()
+        XCTAssertTrue(app.secureTextFields["mcp.credential.value"].waitForExistence(timeout: 5))
+        app.textFields["mcp.credential.variable"].click(); app.textFields["mcp.credential.variable"].typeText("TOKEN")
+        app.secureTextFields["mcp.credential.value"].click(); app.secureTextFields["mcp.credential.value"].typeText("synthetic-cancelled-value")
+        let credentialShot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        credentialShot.name = "Native secure MCP credential entry"; credentialShot.lifetime = .keepAlways; add(credentialShot)
+        app.buttons["Cancel"].click()
+        XCTAssertTrue(credentials.waitForExistence(timeout: 5)); credentials.click()
+        XCTAssertEqual(app.secureTextFields["mcp.credential.value"].value as? String ?? "", "")
+        app.buttons["Cancel"].click()
         let connection = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mcp.connection.")).firstMatch
         XCTAssertTrue(connection.waitForExistence(timeout: 5)); connection.click()
         XCTAssertTrue(app.buttons["mcp.lifecycle.review"].waitForExistence(timeout: 5))

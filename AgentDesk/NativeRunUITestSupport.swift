@@ -30,6 +30,7 @@ enum NativeRunUITestSupport {
             let draft = try await setup.proposedDefaults(at: level)
             _ = try await setup.save(draft, at: level, expectedRevision: nil)
         }
+        try await NativeMCPUITestSupport.seed(catalog: catalog, project: project, applicationRoot: applicationRoot)
         _ = try await catalog.agentStore(in: project.scope).create(.init(name: "Synthetic reviewer",
             instructions: "Inspect synthetic files only."), in: project.scope)
         if ProcessInfo.processInfo.environment["AGENTDESK_TEST_JIRA_LAYOUT"] == "reference-only" {

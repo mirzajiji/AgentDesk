@@ -2,6 +2,39 @@
 import XCTest
 
 final class NativeMCPConnectionsUITests: XCTestCase {
+    @MainActor func testReviewedNativeProcessStartHealthStopAndRestart() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchEnvironment["AGENTDESK_TEST_RUN_MODE"] = "success"
+        app.launchEnvironment["AGENTDESK_TEST_MCP_LIFECYCLE"] = "stdio"
+        // Both the app and UI runner are sandboxed; never invoke the xcrun shim here.
+        let developer = ProcessInfo.processInfo.environment["DEVELOPER_DIR"] ?? "/Applications/Xcode.app/Contents/Developer"
+        let python = URL(fileURLWithPath: developer).appendingPathComponent("usr/bin/python3").path
+        XCTAssertTrue(FileManager.default.isExecutableFile(atPath: python), "Install Xcode Python or set DEVELOPER_DIR for this fixture")
+        app.launchEnvironment["AGENTDESK_TEST_MCP_PYTHON"] = python
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Connections"].firstMatch.waitForExistence(timeout: 15))
+        app.staticTexts["Connections"].firstMatch.click()
+        XCTAssertTrue(app.radioButtons["MCP"].waitForExistence(timeout: 10)); app.radioButtons["MCP"].click()
+        let connection = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mcp.connection.")).firstMatch
+        XCTAssertTrue(connection.waitForExistence(timeout: 10)); connection.click()
+        for _ in 0..<2 {
+            let review = app.buttons["mcp.lifecycle.review"]
+            XCTAssertTrue(review.waitForExistence(timeout: 10)); review.click()
+            let approve = app.buttons["mcp.lifecycle.approve"]
+            XCTAssertTrue(approve.waitForExistence(timeout: 10))
+            XCTAssertFalse(app.buttons["mcp.lifecycle.health"].exists)
+            approve.click()
+            let health = app.buttons["mcp.lifecycle.health"]
+            XCTAssertTrue(health.waitForExistence(timeout: 15)); health.click()
+            XCTAssertTrue(app.staticTexts["Server responded to the health check."].waitForExistence(timeout: 10))
+            app.buttons["mcp.lifecycle.stop"].click()
+            XCTAssertTrue(app.staticTexts["Stopped."].waitForExistence(timeout: 10))
+        }
+        app.buttons["Done"].click()
+    }
     @MainActor func testCreateAndReopenConfiguration() {
         continueAfterFailure = false
         let app = XCUIApplication()

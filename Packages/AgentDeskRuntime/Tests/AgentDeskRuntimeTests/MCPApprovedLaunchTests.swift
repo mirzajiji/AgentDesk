@@ -54,7 +54,7 @@ import XCTest
             if 'id' not in r: continue
             result = {'resultType':'complete'}
             if r['method'] == 'server/discover':
-                result.update({'supportedVersions':['2026-07-28'],'capabilities':{}})
+                result.update({'supportedVersions':['2026-07-28'],'capabilities':{},'_meta':{'io.modelcontextprotocol/serverInfo':{'name':os.environ['SYNTHETIC_TOKEN'],'version':'1'}}})
             print(json.dumps({'jsonrpc':'2.0','id':r['id'],'result':result}), flush=True)
         """
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -102,6 +102,10 @@ import XCTest
             let server = try await launch.start(approvalID: pending.id, credentialApprovalID: credentialApprovalID)
             XCTAssertTrue(disposition == .allow || review)
             XCTAssertEqual(server.mode, .modern)
+            let name = try XCTUnwrap(server.name)
+            XCTAssertFalse(name.text.contains("fixture-value"))
+            XCTAssertGreaterThan(name.redactionCount, 0)
+            XCTAssertEqual(name.context.scope, scope)
             try await launch.ping()
         } catch {
             XCTAssertEqual(error as? AuthorizationError, disposition == .deny ? .denied : .approvalRequired)

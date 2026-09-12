@@ -5,9 +5,23 @@ import AgentDeskPersistence
 import AgentDeskSecurity
 import Foundation
 
-/// Internal Mac integration. The host must retain registered filesystem access for this lifetime.
+/// Scoped, redacted server claims for presentation; capabilities do not grant permissions.
+struct MCPServerPresentation: Sendable {
+    let mode: MCPProtocolMode
+    let name: RedactedText?
+    let version: RedactedText?
+    let tools: Bool
+    let resources: Bool
+    let prompts: Bool
+}
+
+/// Internal Mac integration. The host retains registered filesystem access for this lifetime.
 /// Credential reads require independent readSecret policy permission.
 actor MCPApprovedStdioLaunch {
+    private struct Opened: Sendable {
+        let connection: MCPNegotiatedStdioConnection
+        let presentation: MCPServerPresentation
+    }
     private let secrets: (any SecretStore)?
     private let gate: MCPLaunchPolicySession
     private let configuration: MCPStdioConfiguration
@@ -17,7 +31,7 @@ actor MCPApprovedStdioLaunch {
     private var connection: MCPNegotiatedStdioConnection?
     private var closed = false
     private var starting = false
-    private var launchTask: Task<PolicyExecutionResult<MCPNegotiatedStdioConnection>, any Error>?
+    private var launchTask: Task<PolicyExecutionResult<Opened>, any Error>?
 
     private init(secrets: (any SecretStore)?, gate: MCPLaunchPolicySession, configuration: MCPStdioConfiguration,
                  workspaceRoot: URL, projectRoot: URL, resource: ActionFingerprint) {
@@ -51,7 +65,7 @@ actor MCPApprovedStdioLaunch {
     func reviewCredentials(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
         try await gate.reviewCredentials(id, approve: approve, expectedSequence: expectedSequence)
     }
-    func start(approvalID: UUID, credentialApprovalID: UUID? = nil) async throws -> MCPServerDescription {
+    func start(approvalID: UUID, credentialApprovalID: UUID? = nil) async throws -> MCPServerPresentation {
         guard !closed, !starting, connection == nil else { throw AuthorizationError.denied }
         starting = true
         defer { starting = false; launchTask = nil }
@@ -70,15 +84,26 @@ actor MCPApprovedStdioLaunch {
             guard resolved.fingerprint == expected else { throw AuthorizationError.stalePolicy }
             let transport = try MCPStdioTransport(scope: configuration.scope, connectionID: configuration.id,
                 executable: resolved.executable, arguments: configuration.arguments, directory: resolved.directory, environment: environment)
-            return try await MCPNegotiatedStdioConnection.open(transport: transport)
+            let opened = try await MCPNegotiatedStdioConnection.open(transport: transport)
+            do {
+                let context = RedactionContext(scope: configuration.scope, environmentID: configuration.environmentID, runID: RunID())
+                let known = try environment.values.map { try SecretValue(Data($0.utf8)) }
+                let redactor = try ContentRedactor(context: context).includingKnownSecrets(known, in: context)
+                let server = opened.server
+                let presentation = try MCPServerPresentation(mode: server.mode,
+                    name: server.name.map { try redactor.redactText($0, in: context) },
+                    version: server.version.map { try redactor.redactText($0, in: context) },
+                    tools: server.tools, resources: server.resources, prompts: server.prompts)
+                return Opened(connection: opened, presentation: presentation)
+            } catch { await opened.close(); throw error }
         }
         }
         launchTask = task
         let result = try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
         guard case .executed(let opened) = result else { throw AuthorizationError.denied }
-        if closed || Task.isCancelled { await opened.close(); throw CancellationError() }
-        connection = opened
-        return opened.server
+        if closed || Task.isCancelled { await opened.connection.close(); throw CancellationError() }
+        connection = opened.connection
+        return opened.presentation
     }
     func ping() async throws {
         guard !closed, let connection else { throw MCPProcessError.closed }
@@ -89,7 +114,7 @@ actor MCPApprovedStdioLaunch {
         let pending = launchTask
         pending?.cancel()
         await gate.close()
-        if let pending, case .executed(let opened) = try? await pending.value { await opened.close() }
+        if let pending, case .executed(let opened) = try? await pending.value { await opened.connection.close() }
         await connection?.close()
         connection = nil
     }

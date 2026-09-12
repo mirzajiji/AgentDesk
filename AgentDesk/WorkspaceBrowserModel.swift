@@ -1,4 +1,5 @@
 #if os(macOS)
+import AgentDeskMCP
 import AgentDeskCore
 import AgentDeskRuntime
 import AgentDeskPlugins
@@ -215,6 +216,13 @@ final class WorkspaceBrowserModel: ObservableObject {
         let store = try await catalog.pluginConfigurationStore(for: JiraConnectionConfiguration.self, in: project.scope)
         let settings = try await ProjectExecutionSetupService(catalog: catalog, scope: project.scope).settings()
         return NativeJiraConfigurationServices(store: store, environments: settings.project?.draft.environments ?? [])
+    }
+
+    func mcpConfigurationServices(for project: ProjectRecord) async throws -> NativeMCPConfigurationServices {
+        guard let catalog else { throw CatalogError.invalidConfiguration }
+        let store = try await catalog.mcpConfigurationStore(for: MCPStdioConfiguration.self, in: project.scope)
+        let settings = try await ProjectExecutionSetupService(catalog: catalog, scope: project.scope).settings()
+        return NativeMCPConfigurationServices(store: store, environments: settings.project?.draft.environments ?? [])
     }
 
     func executionServices(for project: ProjectRecord) async throws -> ProjectNativeServices {

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		AF0000000000000000000004 /* AgentDeskPlugins in Frameworks */ = {isa = PBXBuildFile; productRef = AF0000000000000000000005 /* AgentDeskPlugins */; };
+		B10000000000000000000004 /* AgentDeskMCP in Frameworks */ = {isa = PBXBuildFile; productRef = B10000000000000000000005 /* AgentDeskMCP */; };
 		AD0000000000000000000001 /* AgentDeskCore in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000011 /* AgentDeskCore */; };
 		AD0000000000000000000002 /* AgentDeskDesign in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000012 /* AgentDeskDesign */; };
 		AD0000000000000000000003 /* AgentDeskCore in Frameworks */ = {isa = PBXBuildFile; productRef = AD0000000000000000000013 /* AgentDeskCore */; };
@@ -30,6 +31,7 @@
 			platformFilters = ("macos", );
 		};
 		AF0000000000000000000001 /* AgentDeskPlugins in Frameworks */ = {isa = PBXBuildFile; productRef = AF0000000000000000000002 /* AgentDeskPlugins */; };
+		B10000000000000000000001 /* AgentDeskMCP in Frameworks */ = {isa = PBXBuildFile; productRef = B10000000000000000000002 /* AgentDeskMCP */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -127,6 +129,7 @@
 				AD0000000000000000000006 /* AgentDeskSecurity in Frameworks */,
 				AD0000000000000000000008 /* AgentDeskRuntime in Frameworks */,
 				AF0000000000000000000004 /* AgentDeskPlugins in Frameworks */,
+				B10000000000000000000004 /* AgentDeskMCP in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -139,6 +142,7 @@
 				AD0000000000000000000007 /* AgentDeskSecurity in Frameworks */,
 				AD0000000000000000000009 /* AgentDeskRuntime in Frameworks */,
 				AF0000000000000000000001 /* AgentDeskPlugins in Frameworks */,
+				B10000000000000000000001 /* AgentDeskMCP in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -212,6 +216,7 @@
 				AD0000000000000000000016 /* AgentDeskSecurity */,
 				AD0000000000000000000018 /* AgentDeskRuntime */,
 				AF0000000000000000000005 /* AgentDeskPlugins */,
+				B10000000000000000000005 /* AgentDeskMCP */,
 			);
 			productName = AgentDesk;
 			productReference = C514A9163051AAE0006A58EA /* AgentDesk.app */;
@@ -244,6 +249,7 @@
 				AD0000000000000000000017 /* AgentDeskSecurity */,
 				AD0000000000000000000019 /* AgentDeskRuntime */,
 				AF0000000000000000000002 /* AgentDeskPlugins */,
+				B10000000000000000000002 /* AgentDeskMCP */,
 			);
 			productName = AgentDeskTests;
 			productReference = C514A9233051AAE2006A58EA /* AgentDeskTests.xctest */;
@@ -324,6 +330,7 @@
 				AD0000000000000000000024 /* XCLocalSwiftPackageReference "Packages/AgentDeskSecurity" */,
 				AD0000000000000000000025 /* XCLocalSwiftPackageReference "Packages/AgentDeskRuntime" */,
 				AF0000000000000000000003 /* XCLocalSwiftPackageReference "Packages/AgentDeskPlugins" */,
+				B10000000000000000000003 /* XCLocalSwiftPackageReference "Packages/AgentDeskMCP" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C514A9173051AAE0006A58EA /* Products */;
@@ -830,10 +837,12 @@
 			relativePath = Packages/AgentDeskRuntime;
 		};
 		AF0000000000000000000003 /* XCLocalSwiftPackageReference "Packages/AgentDeskPlugins" */ = {isa = XCLocalSwiftPackageReference; relativePath = Packages/AgentDeskPlugins; };
+		B10000000000000000000003 /* XCLocalSwiftPackageReference "Packages/AgentDeskMCP" */ = {isa = XCLocalSwiftPackageReference; relativePath = Packages/AgentDeskMCP; };
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		AF0000000000000000000005 /* AgentDeskPlugins */ = {isa = XCSwiftPackageProductDependency; package = AF0000000000000000000003 /* XCLocalSwiftPackageReference "Packages/AgentDeskPlugins" */; productName = AgentDeskPlugins; };
+		B10000000000000000000005 /* AgentDeskMCP */ = {isa = XCSwiftPackageProductDependency; package = B10000000000000000000003 /* XCLocalSwiftPackageReference "Packages/AgentDeskMCP" */; productName = AgentDeskMCP; };
 		AD0000000000000000000011 /* AgentDeskCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AgentDeskCore;
@@ -876,6 +885,7 @@
 			productName = "AgentDeskRuntime";
 		};
 		AF0000000000000000000002 /* AgentDeskPlugins */ = {isa = XCSwiftPackageProductDependency; package = AF0000000000000000000003 /* XCLocalSwiftPackageReference "Packages/AgentDeskPlugins" */; productName = AgentDeskPlugins; };
+		B10000000000000000000002 /* AgentDeskMCP */ = {isa = XCSwiftPackageProductDependency; package = B10000000000000000000003 /* XCLocalSwiftPackageReference "Packages/AgentDeskMCP" */; productName = AgentDeskMCP; };
 /* End XCSwiftPackageProductDependency section */
 /* Begin PBXCopyFilesBuildPhase section */
 		AE0000000000000000000012 = {

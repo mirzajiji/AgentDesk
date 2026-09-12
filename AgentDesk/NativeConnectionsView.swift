@@ -9,6 +9,7 @@ import AppKit
 struct NativeConnectionsView: View {
     @ObservedObject var catalog: WorkspaceBrowserModel
     @State private var projectID: ProjectID?
+    @State private var connectionKind = "Jira"
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -25,10 +26,18 @@ struct NativeConnectionsView: View {
             }
             if let error = catalog.errorMessage { Text(error).foregroundStyle(.orange) }
             if let project = catalog.projects.first(where: { $0.id == projectID }) {
+                Picker("Connection type", selection: $connectionKind) {
+                    Text("Jira").tag("Jira")
+                    Text("MCP").tag("MCP")
+                }.pickerStyle(.segmented).accessibilityIdentifier("connections.kind")
+                if connectionKind == "MCP" {
+                    NativeMCPConnectionsView(project: project, open: { try await catalog.mcpConfigurationServices(for: project) }).id(project.scope)
+                } else {
                 ProjectJiraConnectionsView(project: project, openIssue: { record, key in
                     try await catalog.openJiraIssue(project: project, record: record, identifier: key)
                 }, open: { try await catalog.jiraConfigurationServices(for: project) })
                     .id(project.scope)
+                }
             } else {
                 ContentUnavailableView("Choose a project", systemImage: "point.3.connected.trianglepath.dotted",
                     description: Text("Connections belong to a workspace, project and environment. Create a project in Workspaces if needed."))

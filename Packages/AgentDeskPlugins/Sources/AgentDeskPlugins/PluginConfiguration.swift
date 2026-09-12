@@ -16,9 +16,10 @@ public struct JiraConnectionConfiguration: ScopedPluginConfiguration, Equatable 
     public let instance: URL
     public let credential: SecretReference?
     public let enabled: Bool
+    public let permissions: PluginPermissions?
 
     public init(id: UUID = UUID(), scope: ProjectScope, environmentID: EnvironmentID,
-                instance: URL, credential: SecretReference? = nil, enabled: Bool = false) throws {
+                instance: URL, credential: SecretReference? = nil, enabled: Bool = false, permissions: PluginPermissions? = nil) throws {
         guard let parts = URLComponents(url: instance, resolvingAgainstBaseURL: false),
               parts.scheme?.lowercased() == "https", let host = parts.host, !host.isEmpty,
               parts.user == nil, parts.password == nil, parts.query == nil, parts.fragment == nil,
@@ -33,13 +34,25 @@ public struct JiraConnectionConfiguration: ScopedPluginConfiguration, Equatable 
                 throw PluginConfigurationError.credentialScopeMismatch
             }
         }
+        if let permissions {
+            guard permissions.connectionID == id, permissions.scope == scope, permissions.environmentID == environmentID else {
+                throw AuthorizationError.scopeMismatch
+            }
+        }
+        self.permissions = permissions
         self.schemaVersion = 1; self.id = id; self.scope = scope
         self.environmentID = environmentID; self.instance = instance
         self.credential = credential; self.enabled = enabled
     }
 
+    /// Legacy configurations carry no grants. Stable identity keeps repeated reads deterministic.
+    public func resolvedPermissions() throws -> PluginPermissions {
+        if let permissions { return permissions }
+        return try PluginPermissions(revision: id, connectionID: id, scope: scope, environmentID: environmentID, rules: [])
+    }
+
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, id, scope, environmentID, instance, credential, enabled
+        case schemaVersion, id, scope, environmentID, instance, credential, enabled, permissions
     }
 
     public init(from decoder: any Decoder) throws {
@@ -52,6 +65,7 @@ public struct JiraConnectionConfiguration: ScopedPluginConfiguration, Equatable 
                       environmentID: values.decode(EnvironmentID.self, forKey: .environmentID),
                       instance: values.decode(URL.self, forKey: .instance),
                       credential: values.decodeIfPresent(SecretReference.self, forKey: .credential),
-                      enabled: values.decode(Bool.self, forKey: .enabled))
+                      enabled: values.decode(Bool.self, forKey: .enabled),
+                      permissions: values.decodeIfPresent(PluginPermissions.self, forKey: .permissions))
     }
 }

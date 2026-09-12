@@ -38,6 +38,37 @@ final class NativeConnectionsUITests: XCTestCase {
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "connection.logout.")).firstMatch.exists)
     }
 
+    @MainActor func testPermissionReviewPersistsAfterRelaunch() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["AGENTDESK_TEST_CONTAINER_ID"] = UUID().uuidString
+        app.launchEnvironment["AGENTDESK_TEST_RUN_MODE"] = "success"
+        app.launchEnvironment["AGENTDESK_TEST_JIRA_LAYOUT"] = "reference-only"
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Connections"].firstMatch.waitForExistence(timeout: 10))
+        app.staticTexts["Connections"].firstMatch.click()
+        let permissions = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "connection.permissions.")).firstMatch
+        XCTAssertTrue(permissions.waitForExistence(timeout: 10)); permissions.click()
+        let picker = app.popUpButtons["permissions.rule.issuesRead"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["permissions.save"].exists)
+        picker.click(); app.menuItems["Require approval"].click()
+        app.buttons["permissions.review"].click()
+        XCTAssertTrue(app.staticTexts["permissions.change.issuesRead"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["permissions.change.issuesRead"].value as? String, "Read issues: deny → approval")
+        app.buttons["permissions.save"].click()
+        XCTAssertTrue(app.staticTexts["Configuration version 2"].waitForExistence(timeout: 10))
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.staticTexts["Connections"].firstMatch.waitForExistence(timeout: 10))
+        app.staticTexts["Connections"].firstMatch.click()
+        XCTAssertTrue(permissions.waitForExistence(timeout: 10)); permissions.click()
+        XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        XCTAssertEqual(picker.value as? String, "Require approval")
+        let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        shot.name = "Persisted Jira permission editor"; shot.lifetime = .keepAlways; add(shot)
+    }
+
     @MainActor func testJiraConfigurationPersistsAndCanBeDisabled() {
         continueAfterFailure = false
         let app = XCUIApplication()

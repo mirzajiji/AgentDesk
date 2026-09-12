@@ -45,6 +45,7 @@ private struct JiraEditorRequest: Identifiable {
 struct ProjectJiraConnectionsView: View {
     @StateObject private var model: ProjectJiraConnectionsModel
     @State private var editor: JiraEditorRequest?
+    @State private var permissions: JiraEditorRequest?
     @State private var reset: PluginConfigurationRevision<JiraConnectionConfiguration>?
     private let registration = try? NativeJiraRegistration.load()
     init(project: ProjectRecord, open: @escaping () async throws -> NativeJiraConfigurationServices) {
@@ -112,6 +113,9 @@ struct ProjectJiraConnectionsView: View {
         .task { await model.load() }
         .onDisappear { model.close() }
         .sheet(item: $editor) { request in JiraConnectionEditor(model: model, existing: request.existing) }
+        .sheet(item: $permissions) { request in
+            if let record = request.existing { JiraPermissionEditor(model: model, record: record) }
+        }
         .confirmationDialog("Reset this Jira connection?", isPresented: Binding(get: { reset != nil }, set: { if !$0 { reset = nil } })) {
             if let record = reset {
                 Button("Reset Connection", role: .destructive) { Task { await model.resetConnection(record) } }
@@ -140,6 +144,8 @@ struct ProjectJiraConnectionsView: View {
             Button("Log Out") { Task { await model.logout(record) } }.disabled(model.busy)
                 .accessibilityIdentifier("connection.logout.\(record.configuration.id)")
         }
+        Button("Permissions") { permissions = .init(existing: record) }.disabled(model.busy)
+            .accessibilityIdentifier("connection.permissions.\(record.configuration.id)")
         Button("Reset…") { reset = record }.disabled(model.busy)
             .accessibilityIdentifier("connection.reset.\(record.configuration.id)")
         Button("Edit") { editor = .init(existing: record) }.disabled(model.busy)

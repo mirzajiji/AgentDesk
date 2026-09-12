@@ -38,6 +38,19 @@ import XCTest
         XCTAssertEqual(page.records.count, 1)
         XCTAssertEqual(page.records.first?.revision, 2)
         XCTAssertFalse(model.busy)
+        let latest = try XCTUnwrap(reopened.records.first)
+        try await reopened.savePermissions([.init(.issuesRead, .approval)], for: latest)
+        let reviewed = try XCTUnwrap(reopened.records.first)
+        XCTAssertEqual(reviewed.revision, 3)
+        XCTAssertEqual(reviewed.configuration.permissions?.disposition(for: .issuesRead), .approval)
+        try await reopened.save(instance: reviewed.configuration.instance.absoluteString, environment: environment.id, enabled: false, existing: reviewed)
+        let edited = try XCTUnwrap(reopened.records.first)
+        XCTAssertEqual(edited.configuration.permissions, reviewed.configuration.permissions)
+        do { try await reopened.savePermissions([.init(.issuesRead, .allow)], for: latest); XCTFail("Stale permission edit accepted") }
+        catch { XCTAssertEqual(error as? PluginStorageError, .staleRevision) }
+        await reopened.resetConnection(edited)
+        XCTAssertNil(reopened.error)
+        XCTAssertEqual(reopened.records.first?.configuration.permissions, reviewed.configuration.permissions)
     }
 
     func testCloseDiscardsLateLoadFailure() async throws {

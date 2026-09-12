@@ -97,13 +97,32 @@ final class ProjectJiraConnectionsModel: ObservableObject {
             }
         }
         let value = try JiraConnectionConfiguration(id: existing?.configuration.id ?? UUID(), scope: project.scope,
-            environmentID: environment, instance: url, credential: existing?.configuration.credential, enabled: enabled)
+            environmentID: environment, instance: url, credential: existing?.configuration.credential, enabled: enabled, permissions: existing?.configuration.permissions)
         _ = try await services.store.save(value, in: project.scope, expectedRevision: existing?.revision)
         let page = try await services.store.list(in: project.scope)
         guard generation == current else { return }
         environments = services.environments; records = page.records; cursor = page.nextID; hasMore = cursor != nil
         error = nil
     }
+    func savePermissions(_ rules: [PluginPermissionRule], for record: PluginConfigurationRevision<JiraConnectionConfiguration>) async throws {
+        guard !busy else { throw PluginStorageError.staleRevision }
+        busy = true
+        let current = generation
+        defer { if generation == current { busy = false } }
+        let value = record.configuration
+        guard value.scope == project.scope else { throw PluginStorageError.scopeMismatch }
+        let services = try await open()
+        try Task.checkCancellation()
+        guard generation == current else { throw CancellationError() }
+        let permissions = try PluginPermissions(connectionID: value.id, scope: value.scope, environmentID: value.environmentID, rules: rules)
+        let changed = try JiraConnectionConfiguration(id: value.id, scope: value.scope, environmentID: value.environmentID,
+            instance: value.instance, credential: value.credential, enabled: value.enabled, permissions: permissions)
+        let saved = try await services.store.save(changed, in: project.scope, expectedRevision: record.revision)
+        guard generation == current else { return }
+        if let index = records.firstIndex(where: { $0.configuration.id == value.id }) { records[index] = saved }
+        checks[value.id] = nil; authenticationMessage = nil; error = nil
+    }
+
     func signIn(_ record: PluginConfigurationRevision<JiraConnectionConfiguration>, registration: JiraOAuthRegistration,
                 openBrowser: @escaping @Sendable (URL) async throws -> Void) {
         authenticate(record, registration: registration, refreshing: false, openBrowser: openBrowser)
@@ -132,7 +151,7 @@ final class ProjectJiraConnectionsModel: ObservableObject {
                     let value = record.configuration
                     let scope = try SecretScope(workspaceID: project.workspaceID, projectID: project.id, environmentID: value.environmentID)
                     let bound = try JiraConnectionConfiguration(id: id, scope: project.scope, environmentID: value.environmentID,
-                        instance: value.instance, credential: SecretReference(scope: scope), enabled: value.enabled)
+                        instance: value.instance, credential: SecretReference(scope: scope), enabled: value.enabled, permissions: value.permissions)
                     try Task.checkCancellation()
                     prepared = try await services.store.save(bound, in: project.scope, expectedRevision: record.revision)
                 }
@@ -238,7 +257,7 @@ final class ProjectJiraConnectionsModel: ObservableObject {
                 guard generation == current else { throw CancellationError() }
                 let value = latest.configuration
                 let cleared = try JiraConnectionConfiguration(id: value.id, scope: value.scope, environmentID: value.environmentID,
-                    instance: value.instance, credential: nil, enabled: false)
+                    instance: value.instance, credential: nil, enabled: false, permissions: value.permissions)
                 let saved = try await services.store.save(cleared, in: project.scope, expectedRevision: latest.revision)
                 if generation == current, let index = records.firstIndex(where: { $0.configuration.id == id }) { records[index] = saved }
             }

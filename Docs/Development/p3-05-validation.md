@@ -130,3 +130,35 @@ The first native run passed seven model tests but both UI scenarios failed to in
 
 
 The first direct confirmation test failed because Cancel matched both the Touch Bar and sheet. Scoping Cancel and Reset Connection to the sheet fixed the selector. `native-reset-confirmation-fixed.xcresult` passed: cancelling preserved v1, confirming published disabled v2 and removed credential-only controls. Seven native model tests, the two unchanged UI regressions on retry, and this direct confirmation test passed on macOS 26.5.2 / Xcode 26.0. Commands used the AgentDesk project/scheme, native Mac destination, NativeMac derived data and disabled parallel testing with the named test selectors. Documentation and diff checks passed. No real grant existed in the fixture; the deletion-failure and concurrent-publication scenarios use injected model services. Mac-only change, no new iPhone coverage claimed. Full P3-05/live-account acceptance remains open.
+
+
+## Persisted connection permissions
+
+Jira configuration now accepts an optional scoped PluginPermissions document. Connection/project/environment mismatches are rejected during construction and decoding. Legacy absence resolves deterministically to deny-all permissions. Native configuration edits, credential reservation and reset preserve any existing permission document. Native permission editing/review and runtime retrieval of these persisted documents are not wired yet.
+
+`swift test --package-path Packages/AgentDeskPlugins --filter JiraStoredPermissionsTests` initially failed because a throwing assertion omitted `try` (`stored-permissions.log`); corrected run passed (`stored-permissions-fixed.log`). The test covers legacy deny defaults, deterministic resolution, round-trip encoding and foreign identity rejection. Full persistence/native checks and the task commit remain pending.
+
+
+The persistence extension passed two focused host tests (`stored-permissions-history.log`), including reopening authoritative files, historical deny preservation and stale-save rejection. Added the native model save path for validated rules, preserving connection identity, site, credential reference and enabled state while publishing a new configuration version. `permissions-model-build.log` passed the normal Mac build. Native editor/review, model regression coverage and runtime retrieval remain in progress; no permission component commit or end-to-end enforcement claim is made yet.
+
+
+Added the native Permissions editor with deny/approval/allow choices and a separate immutable selection review before saving. It preserves connection identity and uses optimistic configuration revisions. `permissions-editor-build.log` passed the normal Mac build. The native review/relaunch scenario is running in `permissions-editor.xcresult` / `permissions-editor.log`; final UI and broader validation remain pending. Persisted permissions still require runtime lookup integration before end-to-end enforcement can be claimed.
+
+
+`permissions-editor.xcresult` passed the native Mac UI scenario (one test, zero failures): Save is unavailable before review, the review shows deny → approval, saving publishes v2, and the selected approval rule survives app relaunch. This establishes editor persistence, not runtime use of the saved rule. Visual review, model regressions, runtime integration and Mac/iPhone shared checks remain before committing this task.
+
+
+Added `PluginPolicySession.openStored` for trusted runtime adapters to load current persisted configuration/permissions and repeat that lookup during policy review/dispatch. Its preparation closure binds an exact stable action to the supplied current record. `stored-policy-runtime-build.log` passed the two existing policy-session tests; `stored-policy-runtime-tests.log` passed the new persisted-rule integration test. That test uses real scoped configuration files and SQLite approvals with a synthetic effect: deny/approval prevent dispatch, allow permits it, and a saved change invalidates an already approved action. No Jira HTTP was sent. Existing callers are not automatically migrated; full native operation routing and broader acceptance still remain.
+
+
+Full Plugins host regression passed 85 tests (`permissions-plugins-full.log`). `permissions-native.xcresult` passed nine native model tests and three UI tests, including ordinary edits/reset preserving permissions, stale permission save rejection, compact lifecycle/reset and permission review/relaunch. The initial permission screenshot was visually inspected; its internal capability labels were then replaced with readable names. The final label UI check is `permissions-readable-ui.xcresult`. Full Runtime regression, native shared iPhone validation and final builds remain pending before commit.
+
+The readable-label native UI rerun passed (one test, zero failures). Remaining pre-commit checks are unchanged.
+
+
+Full Runtime host regression passed 166 tests (`permissions-runtime-full.log`). Native iPhone Plugins regression passed all 85 tests (`permissions-plugins-iphone.xcresult`) on iPhone 16 Pro / iOS 26.0. Runtime Simulator coverage is running in `permissions-runtime-iphone.xcresult`; final application builds and commit review remain pending. All runs use synthetic fixtures and the existing scoped local test stores.
+
+
+Final permission component checks passed: 85 Plugins and 166 Runtime host tests; 85 Plugins and 85 Runtime tests on iPhone 16 Pro / iOS 26.0; nine native Mac model tests and three UI regressions, plus the final readable-label UI rerun. Both normal app builds passed (`permissions-app-mac.log`, `permissions-app-iphone.log`). Native commands used Xcode 26.0, macOS 26.5.2, the documented AgentDesk/AgentDeskPlugins/AgentDeskRuntime schemes, native Mac or primary Simulator UUID, existing derived-data directories and disabled parallel testing. Documentation integrity/link and staged diff checks passed.
+
+This checkpoint delivers persisted permission documents, reviewed native editing and a runtime factory backed by authoritative stored rules. It does not claim migration of every manually constructed runtime session, full native Jira execution, live authentication or completion of P3-05. Unrelated Xcode normalization and historical handoff edits remain outside the commit. No real credentials, company data or live Jira traffic entered the tests.

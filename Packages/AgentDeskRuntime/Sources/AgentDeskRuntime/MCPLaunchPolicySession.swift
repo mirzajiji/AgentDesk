@@ -17,6 +17,7 @@ actor MCPLaunchPolicySession {
     private let discoveryAction: PolicyAction
     private let promptDiscoveryAction: PolicyAction
     private let resourceDiscoveryAction: PolicyAction
+    private let resourceReadActionID = UUID()
     private let requesterID: UUID
     private let policyFingerprint: ActionFingerprint
     private let validate: @Sendable () async throws -> (PolicyAction, PolicySnapshot)
@@ -121,6 +122,37 @@ actor MCPLaunchPolicySession {
             try await self.check()
             let value = try await read()
             // A configuration/policy change during the traversal invalidates the returned claims.
+            try await self.check()
+            return value
+        }
+    }
+    private struct ResourceReadPayload: Encodable {
+        let configuration: ActionFingerprint
+        let method = "resources/read"
+        let uri: String
+    }
+    private func resourceReadAction(uri: String) throws -> PolicyAction {
+        // Reuse the wire validator without normalizing opaque server resource identities.
+        _ = try MCPResourceRead.parameters(mode: .legacy, uri: uri)
+        return try PolicyAction(id: resourceReadActionID, scope: action.scope, environmentID: action.environmentID,
+            operation: .readEvidence, resource: action.resource,
+            payload: ActionFingerprint.canonical(ResourceReadPayload(configuration: action.payload, uri: uri)))
+    }
+    func prepareResourceRead(uri: String) async throws -> PolicyPreparation {
+        try await check()
+        return try await gate.prepare(resourceReadAction(uri: uri), requesterID: requesterID)
+    }
+    func reviewResourceRead(_ id: UUID, uri: String, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        try await check()
+        return try await gate.review(id, expectedAction: resourceReadAction(uri: uri), requesterID: requesterID,
+            reviewerID: requesterID, approve: approve, expectedSequence: expectedSequence)
+    }
+    func readResource<Value: Sendable>(uri: String, approvalID: UUID? = nil,
+                                      read: @Sendable () async throws -> Value) async throws -> PolicyExecutionResult<Value> {
+        try await check()
+        return try await gate.execute(resourceReadAction(uri: uri), requesterID: requesterID, approvalID: approvalID) { _ in
+            try await self.check()
+            let value = try await read()
             try await self.check()
             return value
         }

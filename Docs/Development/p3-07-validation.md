@@ -174,3 +174,14 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-live-resource-read-mac-build.log`). This Mac-only integration adds no Simulator coverage.
 
 P3-07 remains in progress. Exact-resource policy and redacted presentation are next; counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Exact-resource read policy
+
+The internal launch policy session now prepares, reviews and executes a separate resources/read action. Its immutable fingerprint includes the unnormalized URI and configuration revision, with existing project/environment/resource and authority bindings. Listing, launch and different-URI approvals cannot substitute for content-read approval. Reads revalidate configuration and policy before dispatch and before returning content. The session uses one read action identifier with distinct payload fingerprints, serializing concurrent reads without retaining an unbounded URI-action cache.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- `swift test --package-path Packages/AgentDeskRuntime`: 212 tests passed (`TestResults/p3-07-resource-read-policy.log`). The added regression covers deny/allow/approval, launch/listing approval substitution, encoded versus decoded URI mismatch, preserving the proper approval after mismatch, configuration changes during dispatch and closed-session rejection.
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-resource-read-policy-build.log`). No new Simulator coverage is claimed for this Mac-only boundary.
+
+The policy boundary is internal; native resource-read dispatch and redacted content presentation are still pending. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

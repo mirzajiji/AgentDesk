@@ -16,7 +16,7 @@ enum NativeMCPUITestSupport {
         let settings = try await setup.settings()
         guard let current = settings.project, let workspace = settings.workspace,
               let environmentID = current.draft.environments.first?.id else { throw CatalogError.invalidConfiguration }
-        let rules = [PolicyRule(.runShell, .approval)]
+        let rules = [PolicyRule(.runShell, .approval), PolicyRule(.readEvidence, .approval)]
         let environment = ProjectEnvironment(id: environmentID, scope: project.scope, name: "Synthetic MCP", kind: .test,
             policy: try PolicyDocument(level: .environment, workspaceID: project.workspaceID, projectID: project.id,
                 environmentID: environmentID, rules: rules))
@@ -43,7 +43,9 @@ enum NativeMCPUITestSupport {
             if 'id' not in r: continue
             result = {'resultType':'complete'}
             if r['method'] == 'server/discover':
-                result.update({'supportedVersions':['2026-07-28'],'capabilities':{},'_meta':{'io.modelcontextprotocol/serverInfo':{'name':'Synthetic native server','version':'1'}}})
+                result.update({'supportedVersions':['2026-07-28'],'capabilities':{'tools':{}},'_meta':{'io.modelcontextprotocol/serverInfo':{'name':'Synthetic native server','version':'1'}}})
+            elif r['method'] == 'tools/list':
+                result.update({'ttlMs':0,'cacheScope':'private','tools':[{'name':'synthetic_health','title':'Synthetic health tool','description':'Reports synthetic service status.','inputSchema':{'type':'object'},'annotations':{'readOnlyHint':True}}]})
             print(json.dumps({'jsonrpc':'2.0','id':r['id'],'result':result}), flush=True)
         """
         let store = try await catalog.mcpConfigurationStore(for: MCPStdioConfiguration.self, in: project.scope)

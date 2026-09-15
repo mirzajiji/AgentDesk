@@ -253,7 +253,7 @@ final class WorkspaceBrowserModel: ObservableObject {
         let setup = services.setup
         _ = try await setup.settings().policy(environmentID: environment)
         let user = try PolicyAuthority(id: UUID(), kind: .localUser, scopes: [project.scope], environments: [environment],
-            operations: [.runShell, .readSecret], canApprove: true, expiresAt: Date().addingTimeInterval(1800))
+            operations: [.runShell, .readSecret, .readEvidence], canApprove: true, expiresAt: Date().addingTimeInterval(1800))
         let approvals = try ApprovalStore(database: services.database, scope: project.scope, environmentID: environment)
         let secretScope = try SecretScope(workspaceID: project.workspaceID, projectID: project.id, environmentID: environment)
         let connection = try await NativeMCPConnection.open(configurations: store, connectionID: configuration.id, scope: project.scope,

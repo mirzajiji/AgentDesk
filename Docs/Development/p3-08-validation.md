@@ -109,3 +109,21 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - `swift test --package-path Packages/AgentDeskRuntime` passed all 198 tests (`TestResults/p3-08-variable-limit-after.log`).
 - Signed native Keychain-to-MCP integration passed using the standard native test command with `-only-testing:AgentDeskTests/NativeMCPCredentialIntegrationTests` and result bundle `TestResults/p3-08-variable-native.xcresult` (`TestResults/p3-08-variable-native.log`). Its app host built successfully.
 - Documentation and whitespace checks pass. The runner is macOS-only; no new iPhone coverage is claimed. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Native tool discovery
+
+The running connection screen now offers Discover Tools and a separate Approve Tool Discovery action when required by the current scoped policy. The host grants the local user's read-evidence operation to the policy engine; this does not bypass workspace/project/environment rules. The view displays only the runtime's redacted names, titles and descriptions, labels annotation hints as server claims, and provides no tool execution control. Stop clears the catalog and cancels the pending request. Generation checks prevent late discovery results from restoring a stopped connection; denied/failed discovery uses fixed diagnostics and closes the session.
+
+Connection controls now sit outside the scrollable details area. The real UI regression exposed that long command arguments could otherwise push Check Health below the viewport. Keeping controls fixed makes approval, discovery, health and Stop reachable while details and tool cards scroll.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+```sh
+xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac -resultBundlePath TestResults/p3-08-discovery-ui-visible.xcresult -only-testing:AgentDeskTests/NativeMCPLifecycleModelTests -only-testing:AgentDeskUITests/NativeMCPConnectionsUITests/testReviewedNativeProcessStartHealthStopAndRestart -parallel-testing-enabled NO test
+```
+
+Passed: 9 native model tests and 1 native UI test, zero failures (`TestResults/p3-08-discovery-ui-visible.log`). The UI test performs two real synthetic process start/discovery approval/health/stop cycles, verifies the displayed tool title through macOS accessibility and scrolls the card into view. The exported screenshot was visually inspected: the tool card, hints and fixed controls are visible. New model regressions cover separate review, empty catalog, denial with fixed diagnostics, stop clearing results and cancellation with late completion.
+
+Earlier attempts recorded a missing view import (`p3-08-discovery-ui.log`), the unreachable health control (`p3-08-discovery-ui-final.log`), and an accessibility assertion reading label instead of macOS static-text value (`p3-08-discovery-ui-footer.log`). Each was corrected before the passing run. Normal signed Mac build passed with the standard Mac build command (`TestResults/p3-08-discovery-ui-build.log`). Documentation/diff checks pass. This Mac-only change adds no iPhone Simulator coverage; physical display matrix remains deferred.
+
+Discovery UI is implemented, but schema browsing, tool invocation, resources/prompts and the remaining MCP management/transport scope keep P3-07/P3-08 in progress. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

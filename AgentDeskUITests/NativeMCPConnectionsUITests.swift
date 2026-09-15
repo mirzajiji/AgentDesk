@@ -30,6 +30,20 @@ final class NativeMCPConnectionsUITests: XCTestCase {
             let health = app.buttons["mcp.lifecycle.health"]
             XCTAssertTrue(health.waitForExistence(timeout: 15)); health.click()
             XCTAssertTrue(app.staticTexts["Server responded to the health check."].waitForExistence(timeout: 10))
+            app.buttons["mcp.lifecycle.discover"].click()
+            XCTAssertTrue(app.buttons["Approve Tool Discovery"].waitForExistence(timeout: 10))
+            XCTAssertFalse(app.staticTexts["mcp.tool.0"].exists)
+            app.buttons["Approve Tool Discovery"].click()
+            XCTAssertTrue(app.staticTexts["mcp.tool.0"].waitForExistence(timeout: 10))
+            let tool = app.staticTexts["mcp.tool.0"]
+            XCTAssertEqual(tool.value as? String ?? tool.label, "Synthetic health tool")
+            let details = app.scrollViews["mcp.lifecycle.details"]
+            for _ in 0..<12 where !details.frame.contains(tool.frame) {
+                details.scroll(byDeltaX: 0, deltaY: tool.frame.minY < details.frame.minY ? -150 : 150)
+            }
+            XCTAssertTrue(details.frame.contains(tool.frame), "Discovered tool must be visible in the scroll area")
+            let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+            shot.name = "Native MCP discovered tools"; shot.lifetime = .keepAlways; add(shot)
             app.buttons["mcp.lifecycle.stop"].click()
             XCTAssertTrue(app.staticTexts["Stopped."].waitForExistence(timeout: 10))
         }

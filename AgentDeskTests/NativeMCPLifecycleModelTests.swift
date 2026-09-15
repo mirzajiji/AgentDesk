@@ -79,6 +79,39 @@ import AgentDeskPersistence
         XCTAssertEqual(fake.closes, 1); XCTAssertEqual(model.message, "Stopped.")
         XCTAssertFalse(model.connected); XCTAssertNil(model.pending)
     }
+    func testDiscoveryRequiresItsOwnReviewAndStopClearsCatalog() async throws {
+        let fake = try LifecycleFake()
+        let model = NativeMCPLifecycleModel(needsCredentials: false) { fake }
+        model.prepare(); try await settle(model); model.approve(); try await settle(model)
+        model.discover(); try await settle(model)
+        XCTAssertTrue(model.reviewingDiscovery); XCTAssertEqual(model.pending?.id, fake.discovery.id)
+        XCTAssertEqual(fake.discoveries, 0)
+        model.approve(); try await settle(model)
+        XCTAssertEqual(fake.discoveries, 1); XCTAssertNotNil(model.catalog)
+        XCTAssertEqual(model.message, "This server returned no tools.")
+        XCTAssertFalse(model.reviewingDiscovery); XCTAssertNil(model.pending)
+        model.stop(); try await settle(model); XCTAssertNil(model.catalog)
+    }
+    func testDeniedDiscoveryClosesWithoutLeakingError() async throws {
+        let fake = try LifecycleFake(); fake.denyDiscovery = true
+        let model = NativeMCPLifecycleModel(needsCredentials: false) { fake }
+        model.prepare(); try await settle(model); model.approve(); try await settle(model)
+        model.discover(); try await settle(model)
+        XCTAssertEqual(fake.discoveries, 0); XCTAssertEqual(fake.closes, 1)
+        XCTAssertNil(model.catalog); XCTAssertFalse(model.message.contains("private-value"))
+    }
+    func testLateDiscoveryCannotRepopulateStoppedConnection() async throws {
+        let fake = try LifecycleFake()
+        var release: CheckedContinuation<Void, Never>?
+        fake.beforeDiscovery = { await withCheckedContinuation { release = $0 } }
+        let model = NativeMCPLifecycleModel(needsCredentials: false) { fake }
+        model.prepare(); try await settle(model); model.approve(); try await settle(model)
+        model.discover(); try await settle(model); model.approve()
+        for _ in 0..<100 where release == nil { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertNotNil(release); model.stop(); release?.resume(); try await settle(model)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertNil(model.catalog); XCTAssertFalse(model.connected); XCTAssertNil(model.pending)
+    }
     private func settle(_ model: NativeMCPLifecycleModel) async throws {
         for _ in 0..<100 where model.busy { try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertFalse(model.busy)
@@ -87,6 +120,9 @@ import AgentDeskPersistence
 @MainActor private final class LifecycleFake: NativeMCPLifecycle {
     let launch: ApprovalRecord
     let credential: ApprovalRecord
+    let discovery: ApprovalRecord
+    var discoveries = 0, denyDiscovery = false
+    var beforeDiscovery: (() async -> Void)?
     var starts = 0, closes = 0, pings = 0
     var launchID: UUID?, credentialID: UUID?
     var denyCredentials = false, failStart = false
@@ -102,7 +138,7 @@ import AgentDeskPersistence
                 state: .pending, sequence: 1, createdAt: now, expiresAt: now.addingTimeInterval(600), updatedAt: now,
                 reviewerID: nil, reviewerRevision: nil)
         }
-        launch = try pending(.runShell); credential = try pending(.readSecret)
+        launch = try pending(.runShell); credential = try pending(.readSecret); discovery = try pending(.readEvidence)
     }
     func prepare() async throws -> PolicyPreparation { .approval(launch) }
     func review(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
@@ -119,6 +155,19 @@ import AgentDeskPersistence
         await beforeStart?()
         if failStart { throw NSError(domain: "private-value", code: 1) }
         return MCPServerPresentation(mode: .modern, name: nil, version: nil, tools: false, resources: false, prompts: false)
+    }
+    func prepareDiscovery() async throws -> PolicyPreparation {
+        if denyDiscovery { throw NSError(domain: "private-value", code: 1) }
+        return .approval(discovery)
+    }
+    func reviewDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        XCTAssertEqual(id, discovery.id); XCTAssertTrue(approve); return discovery
+    }
+    func discoverTools(approvalID: UUID?) async throws -> MCPToolCatalogPresentation {
+        XCTAssertEqual(approvalID, discovery.id); discoveries += 1
+        await beforeDiscovery?()
+        return MCPToolCatalogPresentation(scope: discovery.action.scope, environmentID: discovery.action.environmentID,
+            connectionID: UUID(), tools: [])
     }
     func ping() async throws { pings += 1 }
     func close() async { closes += 1; await beforeClose?() }

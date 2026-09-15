@@ -2,6 +2,8 @@
 import AgentDeskCore
 import AgentDeskDesign
 import AgentDeskMCP
+import AgentDeskRuntime
+import AgentDeskSecurity
 import SwiftUI
 
 struct NativeMCPLifecycleView: View {
@@ -36,21 +38,36 @@ struct NativeMCPLifecycleView: View {
                         Text("Credential variables").font(.headline)
                         Text(configuration.secretEnvironment.keys.sorted().joined(separator: ", "))
                     }
-                    Text(model.message).accessibilityIdentifier("mcp.lifecycle.message")
-                    if model.busy { ProgressView() }
-                    if model.pending != nil {
-                        Button(model.reviewingCredentials ? "Approve Credential Access" : "Approve and Start") { model.approve() }
-                            .disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.approve")
-                    } else if model.connected {
-                        Button("Check Health") { model.checkHealth() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.health")
-                    } else {
-                        Button("Review Start") { model.prepare() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.review")
+                    if let catalog = model.catalog {
+                        Text("Tools (\(catalog.tools.count))").font(.headline)
+                        ForEach(Array(catalog.tools.enumerated()), id: \.offset) { index, tool in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(verbatim: tool.title?.text ?? tool.name.text).font(.headline)
+                                    .accessibilityIdentifier("mcp.tool.\(index)")
+                                Text(verbatim: tool.name.text).font(.caption).foregroundStyle(.secondary)
+                                if let description = tool.description { Text(verbatim: description.text).textSelection(.enabled) }
+                                Text("Server hints · Read only: \(tool.readOnlyHint.map { $0 ? "Yes" : "No" } ?? "Unspecified") · Destructive: \(tool.destructiveHint.map { $0 ? "Yes" : "No" } ?? "Unspecified")")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                        }
                     }
-                    Button("Stop / Cancel Review") { model.stop() }.accessibilityIdentifier("mcp.lifecycle.stop")
                     Text("Closing this window stops this connection. Server capabilities do not grant permission to use tools.")
                         .font(.caption).foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity, alignment: .leading)
+            }.accessibilityIdentifier("mcp.lifecycle.details")
+            Text(model.message).accessibilityIdentifier("mcp.lifecycle.message")
+            if model.busy { ProgressView() }
+            if model.pending != nil {
+                Button(model.reviewingDiscovery ? "Approve Tool Discovery" : model.reviewingCredentials ? "Approve Credential Access" : "Approve and Start") { model.approve() }
+                    .disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.approve")
+            } else if model.connected {
+                Button("Discover Tools") { model.discover() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.discover")
+                Button("Check Health") { model.checkHealth() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.health")
+            } else {
+                Button("Review Start") { model.prepare() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.review")
             }
+            Button("Stop / Cancel Review") { model.stop() }.accessibilityIdentifier("mcp.lifecycle.stop")
         }.padding(20).macEditorLayout(idealWidth: 780, idealHeight: 600)
         .onDisappear { model.stop() }
     }

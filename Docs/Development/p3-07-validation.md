@@ -149,3 +149,17 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-resource-authorization-build.log`). Documentation/diff checks pass. This Mac-only integration adds no Simulator coverage.
 
 Resource browsing UI is next; reading, templates, tool invocation and remaining lifecycle/manager requirements remain outstanding. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Resource content decoding
+
+`MCPResourceRead` encodes resources/read parameters and decodes scoped text/binary results. It preserves the requested URI separately from returned content URIs (a server can return related parts), exact wire evidence, UTF-8 text and strict canonical base64 bytes. Ambiguous text/blob fields, null or malformed bodies, invalid URI/MIME metadata and missing modern cache/completion fields fail closed. The decoder caps content at 128 items and 192 KiB of aggregate decoded bytes within the existing wire bound. An input_required result returns a dedicated error; no interaction is answered automatically. Content remains untrusted and unredacted until runtime policy/redaction integration; no file is opened or payload interpreted.
+
+Read-resource fields were checked against the [official 2026-07-28 schema](https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/schema/2026-07-28/schema.ts) on 2026-09-15. This decoder does not implement transport dispatch, content rendering, authorization or caching.
+
+Validation on macOS 26.5.2 / Xcode 26.0, iPhone 16 Pro / iOS 26.0:
+
+- `swift test --package-path Packages/AgentDeskMCP`: all 30 tests passed (`TestResults/p3-07-resource-read-final.log`). Malformed-body regressions were refined after the initial passing run to ensure they fail independently of modern metadata checks. Tests cover exact requested identity and raw evidence, Unicode text, binary bytes, opaque URI parameters, related content URIs, ambiguity/null/base64 errors, input-required results, limits and cancellation.
+- From `Packages/AgentDeskMCP`: `xcodebuild -scheme AgentDeskMCP -destination 'platform=iOS Simulator,id=C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE' -derivedDataPath ../../TestResults/p3-06/MCPIPhone -resultBundlePath ../../TestResults/p3-07-resource-read-iphone.xcresult -parallel-testing-enabled NO test`: all 30 tests passed (`TestResults/p3-07-resource-read-iphone.log`).
+- Both app builds passed using the standard Mac and primary-iPhone commands (`TestResults/p3-07-resource-read-mac-build.log`, `TestResults/p3-07-resource-read-iphone-build.log`). Documentation/diff checks pass.
+
+Live resource reading and its exact-action authorization/redacted UI remain next. P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

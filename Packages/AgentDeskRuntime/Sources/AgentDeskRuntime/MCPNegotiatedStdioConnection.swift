@@ -140,6 +140,14 @@ actor MCPNegotiatedStdioConnection {
         try Task.checkCancellation()
         return MCPResourceCatalog(scope: scope, environmentID: environmentID, connectionID: connectionID, pages: pages)
     }
+    /// Internal read boundary; the host must authorize the exact URI and redact returned content.
+    func readResource(uri: String, environmentID: EnvironmentID, timeout: Duration = .seconds(30)) async throws -> MCPResourceReadResult {
+        try Task.checkCancellation()
+        let response = try await session.request(method: "resources/read",
+            params: MCPResourceRead.parameters(mode: server.mode, uri: uri), timeout: timeout)
+        return try MCPResourceRead.decode(response, mode: server.mode, requestedURI: uri,
+            scope: scope, environmentID: environmentID, connectionID: connectionID)
+    }
     func close() async { await session.close() }
 }
 #endif

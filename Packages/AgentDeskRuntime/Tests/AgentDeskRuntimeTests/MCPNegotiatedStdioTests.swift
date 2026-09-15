@@ -41,6 +41,15 @@ final class MCPNegotiatedStdioTests: XCTestCase {
                 if mode != 'legacy': result.update({'resultType':'complete','ttlMs':0,'cacheScope':'private'})
                 if index == 0 or mode in ['prompt-cycle','prompt-pages','prompt-count','prompt-bytes']:
                     result['nextCursor'] = '1' if mode == 'prompt-cycle' else str(index+1)
+            elif method == 'resources/read':
+                if mode == 'read-stall': continue
+                if mode == 'legacy': assert initialized and '_meta' not in r['params']
+                else: assert r['params']['_meta']['io.modelcontextprotocol/protocolVersion'] == '2026-07-28'
+                assert r['params']['uri'] == 'custom:collection%2Fone'
+                result = {'contents':[{'uri':'urn:part:a','text':'Synthetic text'},{'uri':'urn:part:b','blob':'AP9B'}]}
+                if mode != 'legacy': result.update({'resultType':'complete','ttlMs':0,'cacheScope':'private'})
+                if mode == 'read-input': result = {'resultType':'input_required'}
+                if mode == 'read-malformed': result['contents'][0]['blob'] = 'YQ=='
             elif method == 'resources/list':
                 if mode == 'resource-stall': continue
                 if mode == 'legacy':
@@ -199,6 +208,41 @@ final class MCPNegotiatedStdioTests: XCTestCase {
         catch { XCTAssertTrue(error is CancellationError) }
         do { _ = try await connection.ping() }
         catch { await connection.close(); throw error }
+        await connection.close()
+    }
+    func testLiveResourceReadsPreserveRequestIdentityAndBothBodyKinds() async throws {
+        for mode in [MCPProtocolMode.modern, .legacy] {
+            let transport = try transport(mode == .modern ? "modern" : "legacy")
+            let connection = try await MCPNegotiatedStdioConnection.open(transport: transport, mode: mode)
+            do {
+                let environment = EnvironmentID()
+                let result = try await connection.readResource(uri: "custom:collection%2Fone", environmentID: environment)
+                XCTAssertEqual(result.scope, transport.scope); XCTAssertEqual(result.connectionID, transport.connectionID)
+                XCTAssertEqual(result.environmentID, environment); XCTAssertEqual(result.requestedURI, "custom:collection%2Fone")
+                XCTAssertEqual(result.contents.map(\.body), [.text("Synthetic text"), .blob(Data([0, 255, 65]))])
+                await connection.close()
+            } catch { await connection.close(); throw error }
+        }
+    }
+    func testResourceReadsRejectMalformedContentAndDoNotAnswerInputRequests() async throws {
+        for (fixture, expected): (String, MCPResourceReadError) in [("read-malformed", .invalidResponse), ("read-input", .inputRequired)] {
+            let connection = try await MCPNegotiatedStdioConnection.open(transport: transport(fixture), mode: .modern)
+            do { _ = try await connection.readResource(uri: "custom:collection%2Fone", environmentID: EnvironmentID()); XCTFail("Invalid read completed") }
+            catch { XCTAssertEqual(error as? MCPResourceReadError, expected) }
+            await connection.close()
+        }
+    }
+    func testResourceReadTimeoutCancellationAndInvalidURIDoNotBreakConnection() async throws {
+        let connection = try await MCPNegotiatedStdioConnection.open(transport: transport("read-stall"), mode: .modern)
+        do { _ = try await connection.readResource(uri: "relative", environmentID: EnvironmentID()); XCTFail("Invalid URI sent") }
+        catch { XCTAssertEqual(error as? MCPResourceReadError, .invalidURI) }
+        do { _ = try await connection.readResource(uri: "custom:collection%2Fone", environmentID: EnvironmentID(), timeout: .milliseconds(50)); XCTFail("Stalled read completed") }
+        catch { XCTAssertEqual(error as? MCPRequestError, .timedOut) }
+        let operation = Task { try await connection.readResource(uri: "custom:collection%2Fone", environmentID: EnvironmentID()) }
+        try await Task.sleep(for: .milliseconds(30)); operation.cancel()
+        do { _ = try await operation.value; XCTFail("Cancelled read completed") }
+        catch { XCTAssertTrue(error is CancellationError) }
+        do { _ = try await connection.ping() } catch { await connection.close(); throw error }
         await connection.close()
     }
     func testModernDiscoveryAndLegacyInitializeOrder() async throws {

@@ -163,3 +163,14 @@ Validation on macOS 26.5.2 / Xcode 26.0, iPhone 16 Pro / iOS 26.0:
 - Both app builds passed using the standard Mac and primary-iPhone commands (`TestResults/p3-07-resource-read-mac-build.log`, `TestResults/p3-07-resource-read-iphone-build.log`). Documentation/diff checks pass.
 
 Live resource reading and its exact-action authorization/redacted UI remain next. P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Live resource read transport
+
+The internal negotiated stdio connection now dispatches resources/read with the exact requested URI and negotiated metadata, then decodes bounded scoped text/binary contents. Invalid URIs fail before dispatch. Malformed responses and input-required results fail without initiating interaction. This internal boundary is not exposed through the native connection: exact-URI authorization and redaction remain required before user-facing reads.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- `swift package --package-path Packages/AgentDeskRuntime clean` followed by `swift test --package-path Packages/AgentDeskRuntime`: 211 tests passed, zero failures (`TestResults/p3-07-live-resource-read.log`). Three new synthetic-process tests exercise modern/legacy requests, exact request identity, text and binary bodies, malformed/input-required responses, invalid URI, timeout, cancellation and continued connection health.
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-live-resource-read-mac-build.log`). This Mac-only integration adds no Simulator coverage.
+
+P3-07 remains in progress. Exact-resource policy and redacted presentation are next; counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

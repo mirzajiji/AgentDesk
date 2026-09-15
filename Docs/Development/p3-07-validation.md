@@ -38,3 +38,16 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - Both native app builds passed (`TestResults/p3-07-pagination-mac-build.log`, `TestResults/p3-07-pagination-iphone-build.log`). Documentation/diff checks pass.
 
 This is the shared traversal boundary, not live transport integration or permission to call tools. P3-07 remains in progress; counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Live negotiated tool traversal
+
+The internal Mac negotiated connection now sends `tools/list` requests with the negotiated protocol metadata and follows opaque cursors through the scoped pagination boundary. The transport supplies workspace/project and connection identity; the authorized caller will supply its environment. One 30-second deadline bounds the entire traversal, rather than restarting the timeout per page. Errors and cancellation discard partial catalogs. This API remains internal: public discovery still requires independent policy review and redaction before display or persistence. No tool dispatch or native capability browser is claimed.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- `swift test --package-path Packages/AgentDeskRuntime`: 200 tests passed, zero failures (`TestResults/p3-07-live-discovery.log`).
+- After adding cancellation coverage, `swift test --package-path Packages/AgentDeskRuntime --filter MCPNegotiatedStdioTests`: all 7 tests passed (`TestResults/p3-07-live-discovery-focused.log`). Synthetic local processes verify modern and legacy pagination, protocol metadata, preserved transport identity, repeated-cursor rejection, timeout, and cancellation without damaging the connection's subsequent ping.
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed native build passed (`TestResults/p3-07-live-discovery-mac-build.log`).
+- This implementation and its tests are macOS-only; no new Simulator coverage is claimed. Documentation and diff checks pass.
+
+P3-07 remains in progress. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

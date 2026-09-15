@@ -25,6 +25,17 @@ final class MCPNegotiatedStdioTests: XCTestCase {
                     print(json.dumps({'jsonrpc':'2.0','id':r['id'],'error':{'code':int(mode.split(':')[1]),'message':'Synthetic rejection'}}), flush=True)
                     continue
                 result = {'resultType':'complete','supportedVersions':['unknown' if mode == 'bad' else '2026-07-28'],'capabilities':{'tools':{}}}
+            elif method == 'tools/list':
+                if mode == 'stall': continue
+                if mode == 'legacy':
+                    assert initialized
+                    assert '_meta' not in r['params']
+                else: assert r['params']['_meta']['io.modelcontextprotocol/protocolVersion'] == '2026-07-28'
+                cursor = r['params'].get('cursor')
+                assert cursor is None or cursor == 'opaque cursor'
+                result = {'tools':[{'name':'first' if cursor is None else 'second','inputSchema':{'type':'object'}}]}
+                if mode != 'legacy': result.update({'resultType':'complete','ttlMs':0,'cacheScope':'private'})
+                if cursor is None or mode == 'cycle': result['nextCursor'] = 'opaque cursor'
             elif method == 'initialize':
                 assert r['params']['protocolVersion'] == '2025-11-25'
                 assert r['params']['capabilities'] == {}
@@ -38,6 +49,47 @@ final class MCPNegotiatedStdioTests: XCTestCase {
         """
         return try MCPStdioTransport(scope: .init(workspaceID: WorkspaceID(), projectID: ProjectID()), connectionID: UUID(),
             executable: URL(fileURLWithPath: "/usr/bin/python3"), arguments: ["-u", "-c", script, mode], directory: URL(fileURLWithPath: "/tmp"), timeout: .seconds(5))
+    }
+    func testLiveToolPaginationPreservesTransportIdentityAndProtocol() async throws {
+        for mode in [MCPProtocolMode.modern, .legacy] {
+            let transport = try transport(mode == .modern ? "modern" : "legacy")
+            let connection = try await MCPNegotiatedStdioConnection.open(transport: transport, mode: mode)
+            do {
+                let environment = EnvironmentID()
+                let catalog = try await connection.discoverTools(environmentID: environment)
+                XCTAssertEqual(catalog.tools.map(\.name), ["first", "second"])
+                XCTAssertEqual(catalog.pages.count, 2)
+                XCTAssertEqual(catalog.scope, transport.scope)
+                XCTAssertEqual(catalog.connectionID, transport.connectionID)
+                XCTAssertEqual(catalog.environmentID, environment)
+                await connection.close()
+            } catch { await connection.close(); throw error }
+        }
+    }
+    func testDiscoveryRejectsCyclesAndTimesOutWithoutPublishingPartialCatalog() async throws {
+        for fixture in ["cycle", "stall"] {
+            let connection = try await MCPNegotiatedStdioConnection.open(transport: transport(fixture), mode: .modern)
+            do {
+                _ = try await connection.discoverTools(environmentID: EnvironmentID(), timeout: .milliseconds(100))
+                XCTFail("Invalid discovery completed")
+            } catch {
+                if fixture == "cycle" { XCTAssertEqual(error as? MCPToolPaginationError, .repeatedCursor) }
+                else { XCTAssertEqual(error as? MCPRequestError, .timedOut) }
+            }
+            await connection.close()
+        }
+    }
+    func testCancelledDiscoveryReturnsNoCatalogAndConnectionCanStillPing() async throws {
+        let connection = try await MCPNegotiatedStdioConnection.open(transport: transport("modern"), mode: .modern)
+        let operation = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await connection.discoverTools(environmentID: EnvironmentID())
+        }
+        do { _ = try await operation.value; XCTFail("Cancelled discovery completed") }
+        catch { XCTAssertTrue(error is CancellationError) }
+        do { _ = try await connection.ping() }
+        catch { await connection.close(); throw error }
+        await connection.close()
     }
     func testModernDiscoveryAndLegacyInitializeOrder() async throws {
         for mode in [MCPProtocolMode.modern, .legacy] {

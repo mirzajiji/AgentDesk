@@ -75,3 +75,17 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-native-discovery-mac-build.log`). Documentation and diff checks pass. This Mac-only API adds no Simulator coverage.
 
 Native discovery UI and its host authority wiring remain next; schema browsing and tool invocation are not implemented by the display API. P3-07/P3-08 remain in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Prompt discovery metadata
+
+`MCPPromptDiscovery` decodes scoped `prompts/list` pages with bounded names, titles, descriptions, argument counts, prompts per page and cursors. It rejects duplicate prompt/argument names, malformed argument flags, invalid modern completion/cache metadata and cancellation. Optional argument-required hints remain optional; the original wire response preserves unknown metadata exactly. Prompt descriptions are untrusted server data and are never inserted into agent instructions by discovery.
+
+Protocol fields were checked against the [official 2026-07-28 schema](https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/schema/2026-07-28/schema.ts) on 2026-09-15. Both legacy and modern metadata forms are supported. The decoder itself performs no prompt retrieval, cursor traversal or caching; live prompt discovery and its policy/UI integration remain outstanding.
+
+Validation on macOS 26.5.2 / Xcode 26.0, local iPhone 16 Pro / iOS 26.0:
+
+- `swift test --package-path Packages/AgentDeskMCP`: all 24 tests passed (`TestResults/p3-07-prompts.log`). After tightening the cancellation test to cancel after wire-fixture construction, all 24 passed again (`TestResults/p3-07-prompts-final.log`).
+- From `Packages/AgentDeskMCP`: `xcodebuild -scheme AgentDeskMCP -destination 'platform=iOS Simulator,id=C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE' -derivedDataPath ../../TestResults/p3-06/MCPIPhone -resultBundlePath ../../TestResults/p3-07-prompts-iphone.xcresult -parallel-testing-enabled NO test`: all 24 passed before the cancellation-test refinement (`TestResults/p3-07-prompts-iphone.log`). Production source was unchanged afterward.
+- Both app builds passed using the standard Mac and primary-iPhone build commands (`TestResults/p3-07-prompts-mac-build.log`, `TestResults/p3-07-prompts-iphone-build.log`). Documentation/diff checks pass.
+
+Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining. This component does not complete P3-07.

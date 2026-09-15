@@ -212,3 +212,14 @@ Validation on macOS 26.5.2 / Xcode 26.0 and iPhone 16 Pro / iOS 26.0:
 - Both native app builds passed with the standard Mac and primary-iPhone commands (`TestResults/p3-07-resource-templates-mac-build.log`, `TestResults/p3-07-resource-templates-iphone-build.log`). Documentation/diff checks pass.
 
 P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Live resource template discovery
+
+The negotiated stdio connection now traverses resources/templates/list with modern or legacy metadata. It retains partial pages locally and publishes only a complete scoped catalog. A single deadline spans pagination; duplicate template identities, cursor cycles, over 100 pages, over 10,000 templates or over 4 MiB of aggregate wire evidence fail closed. Template expansion and interpretation do not occur. The boundary remains internal pending separate authorization and redacted presentation.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- `swift package --package-path Packages/AgentDeskRuntime clean` refreshed the dependency graph for the new shared decoder, followed by `swift test --package-path Packages/AgentDeskRuntime`: 215 tests passed (`TestResults/p3-07-live-resource-templates.log`). Three added live synthetic-process regressions cover both protocol modes, two-page identity/scope, duplicate templates, cursor cycles, aggregate page/item/byte limits, timeout/cancellation and continued connection health.
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-live-resource-templates-build.log`). This Mac-only traversal adds no Simulator coverage. Documentation/diff checks pass.
+
+Template authorization and presentation remain next. P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

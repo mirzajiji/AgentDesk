@@ -66,6 +66,22 @@ final class MCPNegotiatedStdioTests: XCTestCase {
                 if mode != 'legacy': result.update({'resultType':'complete','ttlMs':0,'cacheScope':'private'})
                 if index == 0 or mode in ['resource-cycle','resource-pages','resource-count','resource-bytes']:
                     result['nextCursor'] = '1' if mode == 'resource-cycle' else str(index+1)
+            elif method == 'resources/templates/list':
+                if mode == 'template-stall': continue
+                if mode == 'legacy':
+                    assert initialized and '_meta' not in r['params']
+                else: assert r['params']['_meta']['io.modelcontextprotocol/protocolVersion'] == '2026-07-28'
+                cursor = r['params'].get('cursor')
+                index = 0 if cursor is None else int(cursor)
+                resource = {'uriTemplate':'urn:synthetic:'+str(index),'name':'Evidence','mimeType':'text/plain'}
+                result = {'resourceTemplates':[resource]}
+                if mode == 'template-duplicate': result['resourceTemplates'][0]['uriTemplate'] = 'urn:duplicate'
+                if mode == 'template-pages': result['resourceTemplates'] = []
+                if mode == 'template-count': result['resourceTemplates'] = [{'uriTemplate':'urn:synthetic:'+str(index)+'-'+str(n),'name':'Evidence'} for n in range(200)]
+                if mode == 'template-bytes': result['resourceTemplates'] = [{'uriTemplate':'urn:synthetic:'+str(index)+'-'+str(n),'name':'Evidence','description':'x'*1000} for n in range(50)]
+                if mode != 'legacy': result.update({'resultType':'complete','ttlMs':0,'cacheScope':'private'})
+                if index == 0 or mode in ['template-cycle','template-pages','template-count','template-bytes']:
+                    result['nextCursor'] = '1' if mode == 'template-cycle' else str(index+1)
             elif method == 'tools/list':
                 if mode == 'stall': continue
                 if mode == 'legacy':
@@ -203,6 +219,45 @@ final class MCPNegotiatedStdioTests: XCTestCase {
         do { _ = try await connection.discoverResources(environmentID: EnvironmentID(), timeout: .milliseconds(50)); XCTFail("Stalled discovery completed") }
         catch { XCTAssertEqual(error as? MCPRequestError, .timedOut) }
         let operation = Task { try await connection.discoverResources(environmentID: EnvironmentID()) }
+        try await Task.sleep(for: .milliseconds(30)); operation.cancel()
+        do { _ = try await operation.value; XCTFail("Cancelled discovery completed") }
+        catch { XCTAssertTrue(error is CancellationError) }
+        do { _ = try await connection.ping() }
+        catch { await connection.close(); throw error }
+        await connection.close()
+    }
+    func testLiveResourceTemplateDiscoveryNegotiatesAndPreservesScope() async throws {
+        for mode in [MCPProtocolMode.modern, .legacy] {
+            let transport = try transport(mode == .modern ? "modern" : "legacy")
+            let connection = try await MCPNegotiatedStdioConnection.open(transport: transport, mode: mode)
+            do {
+                let environment = EnvironmentID()
+                let catalog = try await connection.discoverResourceTemplates(environmentID: environment)
+                XCTAssertEqual(catalog.resourceTemplates.map(\.uriTemplate), ["urn:synthetic:0", "urn:synthetic:1"])
+                XCTAssertEqual(catalog.pages.count, 2)
+                XCTAssertEqual(catalog.scope, transport.scope); XCTAssertEqual(catalog.connectionID, transport.connectionID)
+                XCTAssertEqual(catalog.environmentID, environment)
+                XCTAssertEqual(catalog.resourceTemplates.first?.mimeType, "text/plain")
+                await connection.close()
+            } catch { await connection.close(); throw error }
+        }
+    }
+    func testResourceTemplateTraversalRejectsDuplicateCyclesAndAggregateLimits() async throws {
+        for (fixture, expected): (String, MCPResourceTemplateTraversalError) in [
+            ("template-cycle", .repeatedCursor), ("template-duplicate", .duplicateTemplate),
+            ("template-pages", .limitExceeded), ("template-count", .limitExceeded), ("template-bytes", .limitExceeded)
+        ] {
+            let connection = try await MCPNegotiatedStdioConnection.open(transport: transport(fixture), mode: .modern)
+            do { _ = try await connection.discoverResourceTemplates(environmentID: EnvironmentID()); XCTFail("Unbounded resource catalog returned") }
+            catch { XCTAssertEqual(error as? MCPResourceTemplateTraversalError, expected) }
+            await connection.close()
+        }
+    }
+    func testStalledResourceTemplateDiscoveryTimesOutAndCanBeCancelled() async throws {
+        let connection = try await MCPNegotiatedStdioConnection.open(transport: transport("template-stall"), mode: .modern)
+        do { _ = try await connection.discoverResourceTemplates(environmentID: EnvironmentID(), timeout: .milliseconds(50)); XCTFail("Stalled discovery completed") }
+        catch { XCTAssertEqual(error as? MCPRequestError, .timedOut) }
+        let operation = Task { try await connection.discoverResourceTemplates(environmentID: EnvironmentID()) }
         try await Task.sleep(for: .milliseconds(30)); operation.cancel()
         do { _ = try await operation.value; XCTFail("Cancelled discovery completed") }
         catch { XCTAssertTrue(error is CancellationError) }

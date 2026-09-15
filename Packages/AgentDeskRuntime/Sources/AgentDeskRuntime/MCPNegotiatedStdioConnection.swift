@@ -21,6 +21,15 @@ struct MCPResourceCatalog: Sendable {
     var resources: [MCPResourceDescription] { pages.flatMap(\.resources) }
 }
 
+enum MCPResourceTemplateTraversalError: Error, Equatable, Sendable { case repeatedCursor, duplicateTemplate, limitExceeded }
+struct MCPResourceTemplateCatalog: Sendable {
+    let scope: ProjectScope
+    let environmentID: EnvironmentID
+    let connectionID: UUID
+    let pages: [MCPResourceTemplatePage]
+    var resourceTemplates: [MCPResourceTemplateDescription] { pages.flatMap(\.resourceTemplates) }
+}
+
 /// Process-lifetime protocol detection and handshake boundary. No server instructions or capabilities grant authority.
 actor MCPNegotiatedStdioConnection {
     nonisolated let server: MCPServerDescription
@@ -139,6 +148,33 @@ actor MCPNegotiatedStdioConnection {
         } while cursor != nil
         try Task.checkCancellation()
         return MCPResourceCatalog(scope: scope, environmentID: environmentID, connectionID: connectionID, pages: pages)
+    }
+    /// Internal template traversal; templates remain unexpanded and unredacted.
+    func discoverResourceTemplates(environmentID: EnvironmentID, timeout: Duration = .seconds(30)) async throws -> MCPResourceTemplateCatalog {
+        let clock = ContinuousClock(), deadline = ContinuousClock.now.advanced(by: timeout)
+        var cursor: String?, pages: [MCPResourceTemplatePage] = []
+        var cursors = Set<String>(), uris = Set<String>(), bytes = 0
+        repeat {
+            try Task.checkCancellation()
+            let remaining = clock.now.duration(to: deadline)
+            guard remaining > .zero else { throw MCPRequestError.timedOut }
+            let response = try await session.request(method: "resources/templates/list",
+                params: MCPResourceTemplateDiscovery.parameters(mode: server.mode, cursor: cursor), timeout: remaining)
+            let page = try MCPResourceTemplateDiscovery.decode(response, mode: server.mode, scope: scope,
+                environmentID: environmentID, connectionID: connectionID)
+            guard pages.count < 100, page.resourceTemplates.count <= 10_000 - uris.count,
+                  page.response.count <= 4_194_304 - bytes else { throw MCPResourceTemplateTraversalError.limitExceeded }
+            for resource in page.resourceTemplates {
+                guard uris.insert(resource.uriTemplate).inserted else { throw MCPResourceTemplateTraversalError.duplicateTemplate }
+            }
+            if let next = page.nextCursor {
+                guard next != cursor, cursors.insert(next).inserted else { throw MCPResourceTemplateTraversalError.repeatedCursor }
+                guard pages.count + 1 < 100 else { throw MCPResourceTemplateTraversalError.limitExceeded }
+            }
+            pages.append(page); bytes += page.response.count; cursor = page.nextCursor
+        } while cursor != nil
+        try Task.checkCancellation()
+        return MCPResourceTemplateCatalog(scope: scope, environmentID: environmentID, connectionID: connectionID, pages: pages)
     }
     /// Internal read boundary; the host must authorize the exact URI and redact returned content.
     func readResource(uri: String, environmentID: EnvironmentID, timeout: Duration = .seconds(30)) async throws -> MCPResourceReadResult {

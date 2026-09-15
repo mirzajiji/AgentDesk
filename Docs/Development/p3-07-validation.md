@@ -112,3 +112,17 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-prompt-authorization-build.log`). Documentation/diff checks pass. This Mac-only integration adds no Simulator coverage.
 
 Native prompt browsing UI remains next. P3-07/P3-08 remain in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Resource discovery metadata
+
+`MCPResourceDiscovery` now decodes scoped resources/list metadata pages. It bounds page entries/cursors and display fields, validates absolute URI syntax without normalization or fetching, rejects duplicate URI entries and malformed sizes, and preserves exact unsigned byte counts and the original response. Identical display names may identify distinct URIs. MIME types, descriptions and unknown annotations remain server claims. A file URI is not interpreted as local filesystem authority.
+
+Fields were checked against the [official 2026-07-28 resource schema](https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/schema/2026-07-28/schema.ts) on 2026-09-15. The local decoder accepts nonnegative integral byte sizes within UInt64, preserves custom URI schemes and URNs, and supports modern/legacy list metadata. Resource content, templates, live paging and policy/UI integration are separate remaining work.
+
+Validation on macOS 26.5.2 / Xcode 26.0, iPhone 16 Pro / iOS 26.0:
+
+- `swift test --package-path Packages/AgentDeskMCP`: all 27 tests passed (`TestResults/p3-07-resource-metadata.log`). New regressions cover custom/encoded URIs, equal labels with distinct URIs, all scope fields, exact size 9007199254740993, preserved raw annotations, opaque cursor encoding, malformed/relative/duplicate URIs, invalid sizes/MIME controls, bounds and cancellation.
+- From `Packages/AgentDeskMCP`: `xcodebuild -scheme AgentDeskMCP -destination 'platform=iOS Simulator,id=C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE' -derivedDataPath ../../TestResults/p3-06/MCPIPhone -resultBundlePath ../../TestResults/p3-07-resource-metadata-iphone.xcresult -parallel-testing-enabled NO test`: all 27 tests passed (`TestResults/p3-07-resource-metadata-iphone.log`).
+- Both native app builds passed with the standard Mac and primary-iPhone build commands (`TestResults/p3-07-resource-metadata-mac-build.log`, `TestResults/p3-07-resource-metadata-iphone-build.log`). Documentation/diff checks pass.
+
+P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

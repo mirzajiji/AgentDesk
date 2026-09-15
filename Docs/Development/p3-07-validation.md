@@ -185,3 +185,16 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-resource-read-policy-build.log`). No new Simulator coverage is claimed for this Mac-only boundary.
 
 The policy boundary is internal; native resource-read dispatch and redacted content presentation are still pending. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Authorized resource content presentation
+
+NativeMCPConnection now exposes resource-read preparation, review and execution through the exact-URI gate. Resource discovery issues opaque UUID selections; original URIs remain in a bounded connection-owned mapping and never come from redacted labels. Refresh clears prior selections, concurrent discovery generations cannot publish older mappings, and close releases mappings. Unknown or stale selections fail closed. The runtime rechecks selection validity before returning content.
+
+Text, returned URI and MIME metadata use the retained credential-aware scoped redactor. Binary contents are represented only by a redacted byte count; binary rendering/export and raw evidence persistence are not implemented by this presentation boundary. No returned text is executed or adopted as instructions.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- `swift test --package-path Packages/AgentDeskRuntime`: 212 tests passed (`TestResults/p3-07-resource-read-presentation.log`). Expanded synthetic-process integration exercises allowed and independently approved reads using the original secret-bearing URI, listing-approval rejection, unknown/refreshed/closed selection rejection, redacted text/URI/MIME fields, binary byte-count presentation, exact scope/environment/connection identity and a single credential read for the connection lifetime. The integration's outer failure assertion was strengthened so expected startup denial cannot hide errors after an authorized launch.
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-resource-read-presentation-build.log`). No new Simulator coverage is claimed for this Mac-only API.
+
+Native read controls/content UI remain next. P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

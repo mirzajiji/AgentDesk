@@ -52,6 +52,7 @@ public struct MCPPromptCatalogPresentation: Sendable {
 
 /// Redacted metadata only. URI labels are not executable URLs or filesystem grants.
 public struct MCPResourcePresentation: Sendable {
+    public let id = UUID()
     public let uri: RedactedText
     public let name: RedactedText
     public let title: RedactedText?
@@ -64,6 +65,24 @@ public struct MCPResourceCatalogPresentation: Sendable {
     public let environmentID: EnvironmentID
     public let connectionID: UUID
     public let resources: [MCPResourcePresentation]
+}
+
+/// Content is untrusted display data. Binary payloads are withheld from presentation.
+public enum MCPResourceBodyPresentation: Sendable {
+    case text(RedactedText)
+    case binary(byteCount: RedactedText)
+}
+public struct MCPResourceContentPresentation: Sendable {
+    public let uri: RedactedText
+    public let mimeType: RedactedText?
+    public let body: MCPResourceBodyPresentation
+}
+public struct MCPResourceReadPresentation: Sendable {
+    public let scope: ProjectScope
+    public let environmentID: EnvironmentID
+    public let connectionID: UUID
+    public let resourceID: UUID
+    public let contents: [MCPResourceContentPresentation]
 }
 
 /// Internal Mac integration. The host retains registered filesystem access for this lifetime.
@@ -83,6 +102,8 @@ actor MCPApprovedStdioLaunch {
     private var connection: MCPNegotiatedStdioConnection?
     private var redactor: ContentRedactor?
     private var repositoryAccess: RepositoryAccess?
+    private var resourceURIs: [UUID: String] = [:]
+    private var resourceGeneration = UUID()
     private var closed = false
     private var starting = false
     private var launchTask: Task<PolicyExecutionResult<Opened>, any Error>?
@@ -245,6 +266,9 @@ actor MCPApprovedStdioLaunch {
     }
     func discoverResources(approvalID: UUID? = nil) async throws -> MCPResourceCatalogPresentation {
         guard !closed, let connection, let redactor else { throw MCPProcessError.closed }
+        resourceURIs.removeAll()
+        resourceGeneration = UUID()
+        let generation = resourceGeneration
         let environment = configuration.environmentID
         let result = try await gate.discover(approvalID: approvalID, kind: .resources) {
             let catalog = try await connection.discoverResources(environmentID: environment)
@@ -257,12 +281,48 @@ actor MCPApprovedStdioLaunch {
                     mimeType: resource.mimeType.map { try redactor.redactText($0, in: redactor.context) },
                     sizeBytes: resource.size.map { try redactor.redactText(String($0), in: redactor.context) })
             }
-            return MCPResourceCatalogPresentation(scope: catalog.scope, environmentID: catalog.environmentID,
-                connectionID: catalog.connectionID, resources: resources)
+            let bindings = Dictionary(uniqueKeysWithValues: zip(resources, catalog.resources).map { ($0.id, $1.uri) })
+            return (MCPResourceCatalogPresentation(scope: catalog.scope, environmentID: catalog.environmentID,
+                connectionID: catalog.connectionID, resources: resources), bindings)
         }
         try Task.checkCancellation()
-        guard !closed, case .executed(let catalog) = result else { throw AuthorizationError.denied }
+        guard !closed, generation == resourceGeneration, case .executed(let (catalog, bindings)) = result else { throw AuthorizationError.denied }
+        resourceURIs = bindings
         return catalog
+    }
+    private func resourceURI(_ id: UUID) throws -> String {
+        guard !closed, connection != nil else { throw MCPProcessError.closed }
+        guard let uri = resourceURIs[id] else { throw AuthorizationError.invalidInput }
+        return uri
+    }
+    func prepareResourceRead(resourceID: UUID) async throws -> PolicyPreparation {
+        try await gate.prepareResourceRead(uri: resourceURI(resourceID))
+    }
+    func reviewResourceRead(_ id: UUID, resourceID: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        try await gate.reviewResourceRead(id, uri: resourceURI(resourceID), approve: approve, expectedSequence: expectedSequence)
+    }
+    func readResource(resourceID: UUID, approvalID: UUID? = nil) async throws -> MCPResourceReadPresentation {
+        let uri = try resourceURI(resourceID)
+        guard let connection, let redactor else { throw MCPProcessError.closed }
+        let environment = configuration.environmentID
+        let result = try await gate.readResource(uri: uri, approvalID: approvalID) {
+            let read = try await connection.readResource(uri: uri, environmentID: environment)
+            let contents = try read.contents.map { content in
+                try Task.checkCancellation()
+                let body: MCPResourceBodyPresentation
+                switch content.body {
+                case .text(let text): body = .text(try redactor.redactText(text, in: redactor.context))
+                case .blob(let bytes): body = .binary(byteCount: try redactor.redactText(String(bytes.count), in: redactor.context))
+                }
+                return try MCPResourceContentPresentation(uri: redactor.redactText(content.uri, in: redactor.context),
+                    mimeType: content.mimeType.map { try redactor.redactText($0, in: redactor.context) }, body: body)
+            }
+            return MCPResourceReadPresentation(scope: read.scope, environmentID: read.environmentID,
+                connectionID: read.connectionID, resourceID: resourceID, contents: contents)
+        }
+        try Task.checkCancellation()
+        guard try resourceURI(resourceID) == uri, case .executed(let presentation) = result else { throw AuthorizationError.denied }
+        return presentation
     }
     func ping() async throws {
         guard !closed, let connection else { throw MCPProcessError.closed }
@@ -270,6 +330,8 @@ actor MCPApprovedStdioLaunch {
     }
     func close() async {
         closed = true
+        resourceURIs.removeAll()
+        resourceGeneration = UUID()
         let pending = launchTask
         pending?.cancel()
         await gate.close()

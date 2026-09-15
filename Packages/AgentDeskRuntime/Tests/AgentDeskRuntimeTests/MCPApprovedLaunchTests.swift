@@ -55,6 +55,10 @@ import XCTest
             result = {'resultType':'complete'}
             if r['method'] == 'server/discover':
                 result.update({'supportedVersions':['2026-07-28'],'capabilities':{'tools':{}},'_meta':{'io.modelcontextprotocol/serverInfo':{'name':os.environ['SYNTHETIC_TOKEN'],'version':'1'}}})
+            elif r['method'] == 'resources/read':
+                value = os.environ['SYNTHETIC_TOKEN']
+                assert r['params']['uri'] == 'urn:'+value
+                result.update({'ttlMs':0,'cacheScope':'private','contents':[{'uri':'urn:'+value,'mimeType':value,'text':value},{'uri':'urn:binary','blob':'AP9B'}]})
             elif r['method'] == 'resources/list':
                 value = os.environ['SYNTHETIC_TOKEN']
                 result.update({'ttlMs':0,'cacheScope':'private','resources':[{'uri':'urn:'+value,'name':value,'title':value,'description':value,'mimeType':value,'size':42}]})
@@ -152,6 +156,35 @@ import XCTest
             }
             XCTAssertEqual(resource.sizeBytes?.text, "42")
             XCTAssertEqual(resource.sizeBytes?.context.scope, scope)
+            do { _ = try await launch.readResource(resourceID: UUID()); XCTFail("Unknown resource handle read") }
+            catch { XCTAssertEqual(error as? AuthorizationError, .invalidInput) }
+            var readApproval: UUID?
+            if review {
+                do { _ = try await launch.readResource(resourceID: resource.id); XCTFail("Read skipped approval") }
+                catch { XCTAssertEqual(error as? AuthorizationError, .approvalRequired) }
+                do { _ = try await launch.readResource(resourceID: resource.id, approvalID: resourceApproval); XCTFail("Listing approval authorized read") }
+                catch { XCTAssertEqual(error as? AuthorizationError, .invalidApproval) }
+                guard case .approval(let read) = try await launch.prepareResourceRead(resourceID: resource.id) else { return XCTFail("Missing read review") }
+                _ = try await launch.reviewResourceRead(read.id, resourceID: resource.id, approve: true, expectedSequence: read.sequence)
+                readApproval = read.id
+            }
+            let content = try await launch.readResource(resourceID: resource.id, approvalID: readApproval)
+            XCTAssertEqual(content.scope, scope); XCTAssertEqual(content.environmentID, environment)
+            XCTAssertEqual(content.connectionID, id); XCTAssertEqual(content.resourceID, resource.id)
+            XCTAssertEqual(content.contents.count, 2)
+            let first = try XCTUnwrap(content.contents.first)
+            guard case .text(let text) = first.body else { return XCTFail("Missing text body") }
+            for field in [first.uri, try XCTUnwrap(first.mimeType), text] {
+                XCTAssertFalse(field.text.contains("fixture-value")); XCTAssertGreaterThan(field.redactionCount, 0)
+                XCTAssertEqual(field.context.scope, scope); XCTAssertEqual(field.context.environmentID, environment)
+            }
+            guard case .binary(let size) = content.contents[1].body else { return XCTFail("Binary exposed as text") }
+            XCTAssertEqual(size.text, "3"); XCTAssertEqual(size.context.scope, scope)
+            if !review {
+                _ = try await launch.discoverResources()
+                do { _ = try await launch.readResource(resourceID: resource.id); XCTFail("Refreshed handle remained valid") }
+                catch { XCTAssertEqual(error as? AuthorizationError, .invalidInput) }
+            }
             let promptCatalog = try await launch.discoverPrompts(approvalID: promptApproval)
             XCTAssertEqual(promptCatalog.scope, scope); XCTAssertEqual(promptCatalog.environmentID, environment)
             XCTAssertEqual(promptCatalog.connectionID, id); XCTAssertEqual(promptCatalog.prompts.count, 1)
@@ -179,11 +212,14 @@ import XCTest
             XCTAssertNil(tool.destructiveHint)
             try await launch.ping()
         } catch {
+            XCTAssertFalse(disposition == .allow || review, "Authorized integration failed: \(error)")
             XCTAssertEqual(error as? AuthorizationError, disposition == .deny ? .denied : .approvalRequired)
         }
         let reads = await secrets.reads
         XCTAssertEqual(reads, (disposition == .allow || review) ? 1 : 0)
         await launch.close()
+        do { _ = try await launch.readResource(resourceID: UUID()); XCTFail("Closed resource read succeeded") }
+        catch { XCTAssertEqual(error as? MCPProcessError, .closed) }
         do { _ = try await launch.discoverResources(); XCTFail("Closed resource discovery succeeded") }
         catch { XCTAssertEqual(error as? MCPProcessError, .closed) }
         do { _ = try await launch.discoverPrompts(); XCTFail("Closed prompt discovery succeeded") }

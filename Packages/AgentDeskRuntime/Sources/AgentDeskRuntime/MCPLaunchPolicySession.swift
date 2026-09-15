@@ -5,7 +5,7 @@ import AgentDeskPersistence
 import AgentDeskSecurity
 import Foundation
 
-enum MCPDiscoveryKind: Sendable { case tools, prompts, resources }
+enum MCPDiscoveryKind: Sendable { case tools, prompts, resources, resourceTemplates }
 
 /// Trusted Mac host boundary. Resource resolution must validate physical project/executable identity.
 /// Neither configuration nor the resource fingerprint is itself launch authority.
@@ -16,6 +16,7 @@ actor MCPLaunchPolicySession {
     private let credentialAction: PolicyAction
     private let discoveryAction: PolicyAction
     private let promptDiscoveryAction: PolicyAction
+    private let templateDiscoveryAction: PolicyAction
     private let resourceDiscoveryAction: PolicyAction
     private let resourceReadActionID = UUID()
     private let requesterID: UUID
@@ -41,6 +42,8 @@ actor MCPLaunchPolicySession {
             resource: action.resource, payload: ActionFingerprint.canonical(DiscoveryPayload(configuration: action.payload, method: "prompts/list")))
         resourceDiscoveryAction = try PolicyAction(scope: action.scope, environmentID: action.environmentID, operation: .readEvidence,
             resource: action.resource, payload: ActionFingerprint.canonical(DiscoveryPayload(configuration: action.payload, method: "resources/list")))
+        templateDiscoveryAction = try PolicyAction(scope: action.scope, environmentID: action.environmentID, operation: .readEvidence,
+            resource: action.resource, payload: ActionFingerprint.canonical(DiscoveryPayload(configuration: action.payload, method: "resources/templates/list")))
         self.configuration = configuration
         self.action = action; self.requesterID = requesterID; self.validate = validate
         policyFingerprint = try policy.fingerprint
@@ -104,6 +107,7 @@ actor MCPLaunchPolicySession {
         case .tools: discoveryAction
         case .prompts: promptDiscoveryAction
         case .resources: resourceDiscoveryAction
+        case .resourceTemplates: templateDiscoveryAction
         }
     }
     func prepareDiscovery(kind: MCPDiscoveryKind = .tools) async throws -> PolicyPreparation {

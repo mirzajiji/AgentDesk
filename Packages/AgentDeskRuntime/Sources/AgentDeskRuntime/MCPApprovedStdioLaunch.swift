@@ -67,6 +67,22 @@ public struct MCPResourceCatalogPresentation: Sendable {
     public let resources: [MCPResourcePresentation]
 }
 
+/// Redacted template descriptions; no expansion or resource access is performed.
+public struct MCPResourceTemplatePresentation: Sendable {
+    public let id = UUID()
+    public let uriTemplate: RedactedText
+    public let name: RedactedText
+    public let title: RedactedText?
+    public let description: RedactedText?
+    public let mimeType: RedactedText?
+}
+public struct MCPResourceTemplateCatalogPresentation: Sendable {
+    public let scope: ProjectScope
+    public let environmentID: EnvironmentID
+    public let connectionID: UUID
+    public let resourceTemplates: [MCPResourceTemplatePresentation]
+}
+
 /// Content is untrusted display data. Binary payloads are withheld from presentation.
 public enum MCPResourceBodyPresentation: Sendable {
     case text(RedactedText)
@@ -288,6 +304,34 @@ actor MCPApprovedStdioLaunch {
         try Task.checkCancellation()
         guard !closed, generation == resourceGeneration, case .executed(let (catalog, bindings)) = result else { throw AuthorizationError.denied }
         resourceURIs = bindings
+        return catalog
+    }
+    func prepareResourceTemplateDiscovery() async throws -> PolicyPreparation {
+        guard !closed, connection != nil else { throw MCPProcessError.closed }
+        return try await gate.prepareDiscovery(kind: .resourceTemplates)
+    }
+    func reviewResourceTemplateDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        guard !closed, connection != nil else { throw MCPProcessError.closed }
+        return try await gate.reviewDiscovery(id, approve: approve, expectedSequence: expectedSequence, kind: .resourceTemplates)
+    }
+    func discoverResourceTemplates(approvalID: UUID? = nil) async throws -> MCPResourceTemplateCatalogPresentation {
+        guard !closed, let connection, let redactor else { throw MCPProcessError.closed }
+        let environment = configuration.environmentID
+        let result = try await gate.discover(approvalID: approvalID, kind: .resourceTemplates) {
+            let catalog = try await connection.discoverResourceTemplates(environmentID: environment)
+            let resources = try catalog.resourceTemplates.map { resource in
+                try Task.checkCancellation()
+                return try MCPResourceTemplatePresentation(uriTemplate: redactor.redactText(resource.uriTemplate, in: redactor.context),
+                    name: redactor.redactText(resource.name, in: redactor.context),
+                    title: resource.title.map { try redactor.redactText($0, in: redactor.context) },
+                    description: resource.description.map { try redactor.redactText($0, in: redactor.context) },
+                    mimeType: resource.mimeType.map { try redactor.redactText($0, in: redactor.context) })
+            }
+            return MCPResourceTemplateCatalogPresentation(scope: catalog.scope, environmentID: catalog.environmentID,
+                connectionID: catalog.connectionID, resourceTemplates: resources)
+        }
+        try Task.checkCancellation()
+        guard !closed, case .executed(let catalog) = result else { throw AuthorizationError.denied }
         return catalog
     }
     private func resourceURI(_ id: UUID) throws -> String {

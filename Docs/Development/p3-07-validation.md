@@ -223,3 +223,14 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-live-resource-templates-build.log`). This Mac-only traversal adds no Simulator coverage. Documentation/diff checks pass.
 
 Template authorization and presentation remain next. P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Authorized template metadata presentation
+
+NativeMCPConnection now exposes template discovery preparation, review and execution. resources/templates/list has its own immutable read-evidence action, independent of tools/list, prompts/list and resources/list. The existing gate revalidates scope/configuration/resource/policy before dispatch and before publishing metadata. Template URI text, name, title, description and MIME type use the retained scoped credential-aware redactor. These are display descriptions; their IDs do not authorize expansion or reads.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- `swift test --package-path Packages/AgentDeskRuntime`: 215 tests passed (`TestResults/p3-07-template-authorization.log`). Expanded live synthetic-process tests cover allowed/independently approved template discovery, rejection of tool/prompt/resource-list approvals without consuming them, redaction of all five display fields, project/environment/connection identity, unchanged credential-read count, missing read authority and closed connection rejection.
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-template-authorization-build.log`). This Mac-only integration adds no Simulator coverage. Documentation/diff checks pass.
+
+Native template browsing and grammar/expansion remain pending. P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

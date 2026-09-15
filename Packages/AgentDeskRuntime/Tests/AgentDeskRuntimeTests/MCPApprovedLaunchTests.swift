@@ -59,6 +59,9 @@ import XCTest
                 value = os.environ['SYNTHETIC_TOKEN']
                 assert r['params']['uri'] == 'urn:'+value
                 result.update({'ttlMs':0,'cacheScope':'private','contents':[{'uri':'urn:'+value,'mimeType':value,'text':value},{'uri':'urn:binary','blob':'AP9B'}]})
+            elif r['method'] == 'resources/templates/list':
+                value = os.environ['SYNTHETIC_TOKEN']
+                result.update({'ttlMs':0,'cacheScope':'private','resourceTemplates':[{'uriTemplate':'urn:'+value+':{item}','name':value,'title':value,'description':value,'mimeType':value}]})
             elif r['method'] == 'resources/list':
                 value = os.environ['SYNTHETIC_TOKEN']
                 result.update({'ttlMs':0,'cacheScope':'private','resources':[{'uri':'urn:'+value,'name':value,'title':value,'description':value,'mimeType':value,'size':42}]})
@@ -145,6 +148,25 @@ import XCTest
                 _ = try await launch.reviewResourceDiscovery(resource.id, approve: true, expectedSequence: resource.sequence)
                 resourceApproval = resource.id
             }
+            var templateApproval: UUID?
+            if review {
+                for other in [discoveryApproval, promptApproval, resourceApproval].compactMap({ $0 }) {
+                    do { _ = try await launch.discoverResourceTemplates(approvalID: other); XCTFail("Other listing approval authorized templates") }
+                    catch { XCTAssertEqual(error as? AuthorizationError, .invalidApproval) }
+                }
+                guard case .approval(let template) = try await launch.prepareResourceTemplateDiscovery() else { return XCTFail("Missing template review") }
+                _ = try await launch.reviewResourceTemplateDiscovery(template.id, approve: true, expectedSequence: template.sequence)
+                templateApproval = template.id
+            }
+            let templates = try await launch.discoverResourceTemplates(approvalID: templateApproval)
+            XCTAssertEqual(templates.scope, scope); XCTAssertEqual(templates.environmentID, environment)
+            XCTAssertEqual(templates.connectionID, id); XCTAssertEqual(templates.resourceTemplates.count, 1)
+            let template = try XCTUnwrap(templates.resourceTemplates.first)
+            for field in [template.uriTemplate, template.name, try XCTUnwrap(template.title),
+                          try XCTUnwrap(template.description), try XCTUnwrap(template.mimeType)] {
+                XCTAssertFalse(field.text.contains("fixture-value")); XCTAssertGreaterThan(field.redactionCount, 0)
+                XCTAssertEqual(field.context.scope, scope); XCTAssertEqual(field.context.environmentID, environment)
+            }
             let resourceCatalog = try await launch.discoverResources(approvalID: resourceApproval)
             XCTAssertEqual(resourceCatalog.scope, scope); XCTAssertEqual(resourceCatalog.environmentID, environment)
             XCTAssertEqual(resourceCatalog.connectionID, id); XCTAssertEqual(resourceCatalog.resources.count, 1)
@@ -220,6 +242,8 @@ import XCTest
         await launch.close()
         do { _ = try await launch.readResource(resourceID: UUID()); XCTFail("Closed resource read succeeded") }
         catch { XCTAssertEqual(error as? MCPProcessError, .closed) }
+        do { _ = try await launch.discoverResourceTemplates(); XCTFail("Closed template discovery succeeded") }
+        catch { XCTAssertEqual(error as? MCPProcessError, .closed) }
         do { _ = try await launch.discoverResources(); XCTFail("Closed resource discovery succeeded") }
         catch { XCTAssertEqual(error as? MCPProcessError, .closed) }
         do { _ = try await launch.discoverPrompts(); XCTFail("Closed prompt discovery succeeded") }
@@ -272,6 +296,8 @@ import XCTest
         let server = try await launch.start(approvalID: pending.id)
         XCTAssertEqual(server.mode, .modern)
         try await launch.ping()
+        do { _ = try await launch.discoverResourceTemplates(); XCTFail("Launch-only authority listed templates") }
+        catch { XCTAssertEqual(error as? AuthorizationError, .denied) }
         do { _ = try await launch.discoverResources(); XCTFail("Launch-only authority listed resources") }
         catch { XCTAssertEqual(error as? AuthorizationError, .denied) }
         do { _ = try await launch.discoverPrompts(); XCTFail("Launch-only authority listed prompts") }

@@ -77,6 +77,22 @@ struct NativeMCPLifecycleView: View {
                         Text("These are server-provided descriptions. No prompt content has been loaded or applied.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
+                    if let catalog = model.resourceCatalog {
+                        Text("Resources (\(catalog.resources.count))").font(.headline)
+                        ForEach(Array(catalog.resources.enumerated()), id: \.offset) { index, resource in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(verbatim: resource.title?.text ?? resource.name.text).font(.headline)
+                                    .accessibilityIdentifier("mcp.resource.\(index)")
+                                Text(verbatim: resource.name.text).font(.caption).foregroundStyle(.secondary)
+                                Text(verbatim: resource.uri.text).textSelection(.enabled)
+                                if let description = resource.description { Text(verbatim: description.text).textSelection(.enabled) }
+                                if let mime = resource.mimeType { Text("Type: \(mime.text)").font(.caption) }
+                                if let size = resource.sizeBytes { Text("Size: \(size.text) bytes").font(.caption) }
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                        Text("Resource descriptions only. Contents have not been read.").font(.caption).foregroundStyle(.secondary)
+                    }
                     Text("Closing this window stops this connection. Server capabilities do not grant permission to use tools.")
                         .font(.caption).foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity, alignment: .leading)
@@ -84,11 +100,14 @@ struct NativeMCPLifecycleView: View {
             Text(model.message).accessibilityIdentifier("mcp.lifecycle.message")
             if model.busy { ProgressView() }
             if model.pending != nil {
-                Button(model.reviewingPrompts ? "Approve Prompt Discovery" : model.reviewingDiscovery ? "Approve Tool Discovery" : model.reviewingCredentials ? "Approve Credential Access" : "Approve and Start") { model.approve() }
+                Button(model.reviewingResources ? "Approve Resource Discovery" : model.reviewingPrompts ? "Approve Prompt Discovery" : model.reviewingDiscovery ? "Approve Tool Discovery" : model.reviewingCredentials ? "Approve Credential Access" : "Approve and Start") { model.approve() }
                     .disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.approve")
             } else if model.connected {
-                Button("Discover Tools") { model.discover() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.discover")
-                Button("Discover Prompts") { model.discoverPrompts() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.prompts")
+                HStack {
+                    Button("Discover Tools") { model.discover() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.discover")
+                    Button("Discover Prompts") { model.discoverPrompts() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.prompts")
+                    Button("Discover Resources") { model.discoverResources() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.resources")
+                }
                 Button("Check Health") { model.checkHealth() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.health")
             } else {
                 Button("Review Start") { model.prepare() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.review")

@@ -141,3 +141,19 @@ xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform
 Passed: 12 native model tests and 1 native UI test, zero failures (`TestResults/p3-08-prompt-ui.log`). Three new model regressions cover separate prompt review/empty results/stop clearing, denial with fixed diagnostics, and late completion after Stop. The UI test exercises two real synthetic process cycles with tool and prompt discovery, their distinct approval buttons, visible prompt title and argument description, health and Stop. Exported prompt screenshot `TestResults/p3-08-prompt-ui-images/EB1A0CC3-F871-45D2-A117-9D0D37B6BABB.png` was visually inspected; the complete prompt card and fixed controls are readable.
 
 Normal signed Mac build passed using the standard Mac build command (`TestResults/p3-08-prompt-ui-build.log`). Documentation/diff checks pass. This Mac-only UI adds no Simulator or physical-display coverage. Resource discovery, prompt retrieval, tool invocation and remaining manager/transport requirements remain outstanding: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Native resource browsing
+
+The connection screen now lists scoped redacted resource metadata after its independent discovery approval. Resource cards display title/name, opaque URI, description, MIME type and byte-size text; they offer no URI-opening or content-reading action. Empty results have a dedicated state. Stop/failure clear the catalog, and late results cannot restore stopped state. Tool, prompt and resource discovery buttons share a compact fixed row, retaining a larger scroll area for descriptions.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+```sh
+xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac -resultBundlePath TestResults/p3-08-resource-ui.xcresult -only-testing:AgentDeskTests/NativeMCPLifecycleModelTests -only-testing:AgentDeskUITests/NativeMCPConnectionsUITests/testReviewedNativeProcessStartHealthStopAndRestart -parallel-testing-enabled NO test
+```
+
+All 15 native model tests passed. The first UI attempt ended with a macOS application-activation failure (app remained Running Background), before entering the feature flow (`TestResults/p3-08-resource-ui.log`). After confirming that run was terminal, selecting the exact built app through native UI automation and raising its window, the focused UI test passed with result bundle `TestResults/p3-08-resource-ui-retry.xcresult` and log `TestResults/p3-08-resource-ui-retry.log`. The retry used the same command with only the UI test selected; no production source changed between runs.
+
+The real synthetic process test performs two start/discovery/stop cycles across tools, prompts and resources, verifies each independent approval, checks resource title and byte-size text, and scrolls the card into view. New model regressions cover independent resource review, empty results, denial without raw errors, and late completion after Stop. Exported screenshot `TestResults/p3-08-resource-ui-images/222406B6-B246-469F-9AE2-10E5083EE0A6.png` was visually inspected; the full resource card and fixed controls are visible. Normal signed Mac build passed (`TestResults/p3-08-resource-ui-build.log`). Documentation/diff checks pass. No new iPhone or physical-display coverage is claimed for this Mac-only UI.
+
+Resource reading/templates, prompt retrieval, tool invocation and remaining lifecycle/manager work remain outstanding: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

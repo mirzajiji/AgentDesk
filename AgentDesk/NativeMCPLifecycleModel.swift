@@ -19,6 +19,9 @@ protocol NativeMCPLifecycle: Sendable {
     func preparePromptDiscovery() async throws -> PolicyPreparation
     func reviewPromptDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord
     func discoverPrompts(approvalID: UUID?) async throws -> MCPPromptCatalogPresentation
+    func prepareResourceDiscovery() async throws -> PolicyPreparation
+    func reviewResourceDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord
+    func discoverResources(approvalID: UUID?) async throws -> MCPResourceCatalogPresentation
     func ping() async throws
     func close() async
 }
@@ -31,6 +34,8 @@ extension NativeMCPConnection: NativeMCPLifecycle {}
     @Published private(set) var reviewingCredentials = false
     @Published private(set) var reviewingDiscovery = false
     @Published private(set) var reviewingPrompts = false
+    @Published private(set) var reviewingResources = false
+    @Published private(set) var resourceCatalog: MCPResourceCatalogPresentation?
     @Published private(set) var promptCatalog: MCPPromptCatalogPresentation?
     @Published private(set) var catalog: MCPToolCatalogPresentation?
     @Published private(set) var message = "Review this connection before starting its process."
@@ -62,10 +67,13 @@ extension NativeMCPConnection: NativeMCPLifecycle {}
     }
     func approve() {
         guard !busy, let pending, let session else { return }
-        busy = true; let token = generation, credentials = reviewingCredentials, discovery = reviewingDiscovery, prompts = reviewingPrompts
+        busy = true; let token = generation, credentials = reviewingCredentials, discovery = reviewingDiscovery, prompts = reviewingPrompts, resources = reviewingResources
         task = Task {
             do {
-                if prompts {
+                if resources {
+                    _ = try await session.reviewResourceDiscovery(pending.id, approve: true, expectedSequence: pending.sequence)
+                    try await loadResources(session, approvalID: pending.id, token: token)
+                } else if prompts {
                     _ = try await session.reviewPromptDiscovery(pending.id, approve: true, expectedSequence: pending.sequence)
                     try await loadPrompts(session, approvalID: pending.id, token: token)
                 } else if discovery {
@@ -143,6 +151,31 @@ extension NativeMCPConnection: NativeMCPLifecycle {}
         promptCatalog = result; pending = nil; reviewingPrompts = false
         message = result.prompts.isEmpty ? "This server returned no prompts." : "Prompt descriptions loaded."
     }
+    func discoverResources() {
+        guard connected, !busy, pending == nil, let session else { return }
+        busy = true; resourceCatalog = nil; let token = generation
+        task = Task {
+            do {
+                let preparation = try await session.prepareResourceDiscovery()
+                guard token == generation, !Task.isCancelled else { return }
+                switch preparation {
+                case .approval(let record):
+                    pending = record; reviewingResources = true
+                    message = "Approve listing resource descriptions from this connection."
+                case .allowed: try await loadResources(session, approvalID: nil, token: token)
+                case .denied: throw AuthorizationError.denied
+                }
+            } catch { await failed(token) }
+            if token == generation { busy = false }
+        }
+    }
+    private func loadResources(_ session: any NativeMCPLifecycle, approvalID: UUID?, token: UUID) async throws {
+        guard token == generation, !Task.isCancelled else { throw CancellationError() }
+        let result = try await session.discoverResources(approvalID: approvalID)
+        guard token == generation, !Task.isCancelled else { return }
+        resourceCatalog = result; pending = nil; reviewingResources = false
+        message = result.resources.isEmpty ? "This server returned no resources." : "Resource descriptions loaded."
+    }
     func checkHealth() {
         guard connected, !busy, let session else { return }
         busy = true; let token = generation
@@ -158,7 +191,7 @@ extension NativeMCPConnection: NativeMCPLifecycle {}
         guard !stopping else { return }; stopping = true
         generation = UUID(); task?.cancel(); task = nil
         let old = session; session = nil; pending = nil; launchApproval = nil
-        connected = false; reviewingCredentials = false; reviewingDiscovery = false; catalog = nil; reviewingPrompts = false; promptCatalog = nil; busy = true; message = "Stopping…"
+        connected = false; reviewingCredentials = false; reviewingDiscovery = false; catalog = nil; reviewingPrompts = false; promptCatalog = nil; reviewingResources = false; resourceCatalog = nil; busy = true; message = "Stopping…"
         let token = generation, cleanup = enqueueCleanup(old)
         task = Task {
             await cleanup.value
@@ -174,7 +207,7 @@ extension NativeMCPConnection: NativeMCPLifecycle {}
     }
     private func failed(_ token: UUID) async {
         guard token == generation else { return }
-        let old = session; session = nil; pending = nil; launchApproval = nil; connected = false; reviewingCredentials = false; reviewingDiscovery = false; catalog = nil; reviewingPrompts = false; promptCatalog = nil
+        let old = session; session = nil; pending = nil; launchApproval = nil; connected = false; reviewingCredentials = false; reviewingDiscovery = false; catalog = nil; reviewingPrompts = false; promptCatalog = nil; reviewingResources = false; resourceCatalog = nil
         let cleanup = enqueueCleanup(old)
         await cleanup.value
         if token == generation {

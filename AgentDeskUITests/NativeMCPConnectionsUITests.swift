@@ -59,6 +59,21 @@ final class NativeMCPConnectionsUITests: XCTestCase {
             XCTAssertTrue(details.frame.contains(argument.frame))
             let promptShot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
             promptShot.name = "Native MCP prompt descriptions"; promptShot.lifetime = .keepAlways; add(promptShot)
+            app.buttons["mcp.lifecycle.resources"].click()
+            XCTAssertTrue(app.buttons["Approve Resource Discovery"].waitForExistence(timeout: 10))
+            XCTAssertFalse(app.staticTexts["mcp.resource.0"].exists)
+            app.buttons["Approve Resource Discovery"].click()
+            let resource = app.staticTexts["mcp.resource.0"]
+            XCTAssertTrue(resource.waitForExistence(timeout: 10))
+            XCTAssertEqual(resource.value as? String ?? resource.label, "Synthetic evidence resource")
+            let size = app.staticTexts["Size: 42 bytes"]
+            XCTAssertTrue(size.exists)
+            for _ in 0..<16 where !details.frame.contains(size.frame) {
+                details.scroll(byDeltaX: 0, deltaY: size.frame.minY < details.frame.minY ? -150 : 150)
+            }
+            XCTAssertTrue(details.frame.contains(size.frame))
+            let resourceShot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+            resourceShot.name = "Native MCP resource descriptions"; resourceShot.lifetime = .keepAlways; add(resourceShot)
             app.buttons["mcp.lifecycle.stop"].click()
             XCTAssertTrue(app.staticTexts["Stopped."].waitForExistence(timeout: 10))
         }

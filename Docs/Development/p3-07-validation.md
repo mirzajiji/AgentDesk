@@ -248,3 +248,17 @@ Validation on macOS 26.5.2 / Xcode 26.0 and iPhone 16 Pro / iOS 26.0:
 - Both native app builds passed using the standard commands (`TestResults/p3-07-template-grammar-mac-build.log`, `TestResults/p3-07-template-grammar-iphone-build.log`). Documentation/diff checks pass.
 
 Expansion, scoped parameter input and review of the final resource URI remain outstanding. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Deterministic template expansion
+
+MCPURITemplate expands strings, lists and associative values using parsed operators/modifiers. It handles omitted versus empty values, UTF-8 percent encoding, reserved expansions, Unicode/pct-encoded prefixes, and explode behavior. Associative keys use deterministic sorted order. Prefixes on composite values fail. Input counts/bytes and output bytes are bounded; cancellation is checked before returning. The result remains an untrusted URI reference, with no filesystem/network access or permission grant. Host validation of the final URI, scoped native parameter entry and exact read review remain next.
+
+Expansion behavior follows [RFC 6570 section 3](https://www.rfc-editor.org/rfc/rfc6570.html#section-3). This is a local deterministic processor; values do not flow to Codex or any external service.
+
+Validation on macOS 26.5.2 / Xcode 26.0 and iPhone 16 Pro / iOS 26.0:
+
+- `swift test --package-path Packages/AgentDeskMCP`: 39 tests passed (`TestResults/p3-07-template-expansion-final.log`). Scalar/operator, composite, Unicode/pct-prefix, malformed percent, omitted/empty, output/input bounds and cancellation regressions passed. After the initial passing run, empty-collection name bounds and collection preallocation limits were strengthened and rerun.
+- From `Packages/AgentDeskMCP`: `xcodebuild -scheme AgentDeskMCP -destination 'platform=iOS Simulator,id=C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE' -derivedDataPath ../../TestResults/p3-06/MCPIPhone -resultBundlePath ../../TestResults/p3-07-template-expansion-iphone.xcresult -parallel-testing-enabled NO test`: 39 tests passed (`TestResults/p3-07-template-expansion-iphone.log`).
+- Both native app builds passed with the standard commands (`TestResults/p3-07-template-expansion-mac-build.log`, `TestResults/p3-07-template-expansion-iphone-build.log`). Documentation/diff checks pass.
+
+P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

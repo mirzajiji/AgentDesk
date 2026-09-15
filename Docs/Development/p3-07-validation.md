@@ -198,3 +198,17 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-resource-read-presentation-build.log`). No new Simulator coverage is claimed for this Mac-only API.
 
 Native read controls/content UI remain next. P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Resource template metadata decoding
+
+MCPResourceTemplateDiscovery decodes bounded resources/templates/list pages with project/environment/connection identity, exact raw evidence and opaque cursors. It preserves template expressions and optional description/title/MIME metadata, rejects duplicate templates, missing fields and oversized pages, and checks modern completion/cache metadata. Template text remains an untrusted claim: this decoder does not validate RFC 6570 grammar, expand variables, dispatch discovery or grant read permission. Relative template expressions are preserved rather than passed through an absolute-URL parser.
+
+Fields were checked against the [official 2026-07-28 schema](https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/schema/2026-07-28/schema.ts) on 2026-09-15. Template grammar/expansion, runtime traversal, authorization and native presentation remain outstanding.
+
+Validation on macOS 26.5.2 / Xcode 26.0 and iPhone 16 Pro / iOS 26.0:
+
+- `swift test --package-path Packages/AgentDeskMCP`: all 33 tests passed (`TestResults/p3-07-resource-templates.log`). Three new regressions cover opaque expressions, exact extension evidence, scopes/cursors, metadata failures, duplicate templates, page limits and cancellation.
+- From `Packages/AgentDeskMCP`: `xcodebuild -scheme AgentDeskMCP -destination 'platform=iOS Simulator,id=C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE' -derivedDataPath ../../TestResults/p3-06/MCPIPhone -resultBundlePath ../../TestResults/p3-07-resource-templates-iphone.xcresult -parallel-testing-enabled NO test`: all 33 tests passed (`TestResults/p3-07-resource-templates-iphone.log`).
+- Both native app builds passed with the standard Mac and primary-iPhone commands (`TestResults/p3-07-resource-templates-mac-build.log`, `TestResults/p3-07-resource-templates-iphone-build.log`). Documentation/diff checks pass.
+
+P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

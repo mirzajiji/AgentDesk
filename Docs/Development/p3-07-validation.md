@@ -126,3 +126,15 @@ Validation on macOS 26.5.2 / Xcode 26.0, iPhone 16 Pro / iOS 26.0:
 - Both native app builds passed with the standard Mac and primary-iPhone build commands (`TestResults/p3-07-resource-metadata-mac-build.log`, `TestResults/p3-07-resource-metadata-iphone-build.log`). Documentation/diff checks pass.
 
 P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Live resource traversal
+
+The internal negotiated Mac session now follows resources/list cursors under a single deadline. It preserves scoped original pages and accepts distinct URIs with identical display names, while rejecting repeated URIs, cursor cycles and catalogs exceeding 100 pages, 10,000 resources or 4 MiB. Partial results remain local and are discarded on error/cancellation. Discovery does not open any resource URI or read its content.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- Refreshed generated runtime dependency metadata with `swift package --package-path Packages/AgentDeskRuntime clean` after adding the shared resource source.
+- `swift test --package-path Packages/AgentDeskRuntime`: all 208 tests passed (`TestResults/p3-07-live-resources.log`). Three additional real-process tests cover modern/legacy metadata and scope, equal names with distinct URIs, repeated URIs/cursors, each aggregate bound, timeout, cancellation and a subsequent successful ping.
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-live-resources-build.log`). Documentation/diff checks pass. This Mac-only integration adds no Simulator coverage.
+
+Resource-specific authorization, redacted native presentation and resource reading/templates remain outstanding. P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

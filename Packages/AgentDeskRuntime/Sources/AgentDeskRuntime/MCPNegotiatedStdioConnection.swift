@@ -12,6 +12,15 @@ struct MCPPromptCatalog: Sendable {
     var prompts: [MCPPromptDescription] { pages.flatMap(\.prompts) }
 }
 
+enum MCPResourceTraversalError: Error, Equatable, Sendable { case repeatedCursor, duplicateURI, limitExceeded }
+struct MCPResourceCatalog: Sendable {
+    let scope: ProjectScope
+    let environmentID: EnvironmentID
+    let connectionID: UUID
+    let pages: [MCPResourcePage]
+    var resources: [MCPResourceDescription] { pages.flatMap(\.resources) }
+}
+
 /// Process-lifetime protocol detection and handshake boundary. No server instructions or capabilities grant authority.
 actor MCPNegotiatedStdioConnection {
     nonisolated let server: MCPServerDescription
@@ -103,6 +112,33 @@ actor MCPNegotiatedStdioConnection {
         } while cursor != nil
         try Task.checkCancellation()
         return MCPPromptCatalog(scope: scope, environmentID: environmentID, connectionID: connectionID, pages: pages)
+    }
+    /// Keeps partial pages local; failed or cancelled traversals never publish a catalog.
+    func discoverResources(environmentID: EnvironmentID, timeout: Duration = .seconds(30)) async throws -> MCPResourceCatalog {
+        let clock = ContinuousClock(), deadline = ContinuousClock.now.advanced(by: timeout)
+        var cursor: String?, pages: [MCPResourcePage] = []
+        var cursors = Set<String>(), uris = Set<String>(), bytes = 0
+        repeat {
+            try Task.checkCancellation()
+            let remaining = clock.now.duration(to: deadline)
+            guard remaining > .zero else { throw MCPRequestError.timedOut }
+            let response = try await session.request(method: "resources/list",
+                params: MCPResourceDiscovery.parameters(mode: server.mode, cursor: cursor), timeout: remaining)
+            let page = try MCPResourceDiscovery.decode(response, mode: server.mode, scope: scope,
+                environmentID: environmentID, connectionID: connectionID)
+            guard pages.count < 100, page.resources.count <= 10_000 - uris.count,
+                  page.response.count <= 4_194_304 - bytes else { throw MCPResourceTraversalError.limitExceeded }
+            for resource in page.resources {
+                guard uris.insert(resource.uri).inserted else { throw MCPResourceTraversalError.duplicateURI }
+            }
+            if let next = page.nextCursor {
+                guard next != cursor, cursors.insert(next).inserted else { throw MCPResourceTraversalError.repeatedCursor }
+                guard pages.count + 1 < 100 else { throw MCPResourceTraversalError.limitExceeded }
+            }
+            pages.append(page); bytes += page.response.count; cursor = page.nextCursor
+        } while cursor != nil
+        try Task.checkCancellation()
+        return MCPResourceCatalog(scope: scope, environmentID: environmentID, connectionID: connectionID, pages: pages)
     }
     func close() async { await session.close() }
 }

@@ -234,3 +234,17 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-template-authorization-build.log`). This Mac-only integration adds no Simulator coverage. Documentation/diff checks pass.
 
 Native template browsing and grammar/expansion remain pending. P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## URI template syntax boundary
+
+MCPURITemplate parses bounded RFC 6570 syntax into literal and expression segments for subsequent expansion. It preserves case-sensitive and percent-encoded variable names, encounter order, operators, prefix and explode modifiers. It rejects malformed braces/variables/percent triplets, incompatible modifiers, invalid prefix lengths and excluded literal code points. Reserved extension operators have a distinct unsupported error. Parsing accepts empty or relative templates as syntax; it does not grant a read, validate an expanded absolute URI or apply values. Discovery remains descriptive; parser integration with expansion is next.
+
+Syntax was checked against [RFC 6570 sections 2–2.4](https://www.rfc-editor.org/rfc/rfc6570.html#section-2). Limits are 4096 UTF-8 bytes, 128 expressions and 256 variable occurrences. Parsing supports cancellation and retains no partial result after errors.
+
+Validation on macOS 26.5.2 / Xcode 26.0 and iPhone 16 Pro / iOS 26.0:
+
+- `swift test --package-path Packages/AgentDeskMCP`: all 36 tests passed (`TestResults/p3-07-template-grammar-final.log`). After the initial pass, regressions were extended for trailing-newline variable/prefix input and excluded Unicode plane-14 characters; final tests passed. Coverage includes all supported operators, modifiers, opaque names, malformed expressions, resource bounds and cancellation.
+- From `Packages/AgentDeskMCP`: `xcodebuild -scheme AgentDeskMCP -destination 'platform=iOS Simulator,id=C1729D51-EE0A-4A77-80E9-9CE5A7EDA6FE' -derivedDataPath ../../TestResults/p3-06/MCPIPhone -resultBundlePath ../../TestResults/p3-07-template-grammar-iphone.xcresult -parallel-testing-enabled NO test`: all 36 tests passed (`TestResults/p3-07-template-grammar-iphone.log`).
+- Both native app builds passed using the standard commands (`TestResults/p3-07-template-grammar-mac-build.log`, `TestResults/p3-07-template-grammar-iphone-build.log`). Documentation/diff checks pass.
+
+Expansion, scoped parameter input and review of the final resource URI remain outstanding. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

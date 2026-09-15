@@ -18,7 +18,7 @@ actor MCPLaunchPolicySession {
     private let promptDiscoveryAction: PolicyAction
     private let templateDiscoveryAction: PolicyAction
     private let resourceDiscoveryAction: PolicyAction
-    private let resourceReadActionID = UUID()
+    private var resourceReadActionIDs: [String: UUID] = [:]
     private let requesterID: UUID
     private let policyFingerprint: ActionFingerprint
     private let validate: @Sendable () async throws -> (PolicyAction, PolicySnapshot)
@@ -135,16 +135,19 @@ actor MCPLaunchPolicySession {
         let method = "resources/read"
         let uri: String
     }
-    private func resourceReadAction(uri: String) throws -> PolicyAction {
+    private func resourceReadAction(uri: String, renew: Bool = false) throws -> PolicyAction {
         // Reuse the wire validator without normalizing opaque server resource identities.
         _ = try MCPResourceRead.parameters(mode: .legacy, uri: uri)
-        return try PolicyAction(id: resourceReadActionID, scope: action.scope, environmentID: action.environmentID,
+        guard resourceReadActionIDs[uri] != nil || resourceReadActionIDs.count < 256 else { throw AuthorizationError.invalidInput }
+        if renew || resourceReadActionIDs[uri] == nil { resourceReadActionIDs[uri] = UUID() }
+        guard let id = resourceReadActionIDs[uri] else { throw AuthorizationError.invalidInput }
+        return try PolicyAction(id: id, scope: action.scope, environmentID: action.environmentID,
             operation: .readEvidence, resource: action.resource,
             payload: ActionFingerprint.canonical(ResourceReadPayload(configuration: action.payload, uri: uri)))
     }
     func prepareResourceRead(uri: String) async throws -> PolicyPreparation {
         try await check()
-        return try await gate.prepare(resourceReadAction(uri: uri), requesterID: requesterID)
+        return try await gate.prepare(resourceReadAction(uri: uri, renew: true), requesterID: requesterID)
     }
     func reviewResourceRead(_ id: UUID, uri: String, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
         try await check()
@@ -199,6 +202,6 @@ actor MCPLaunchPolicySession {
         guard case .executed(let values) = result else { throw AuthorizationError.denied }
         return values
     }
-    func close() async { closed = true; await gate.removeAuthority(requesterID) }
+    func close() async { closed = true; resourceReadActionIDs.removeAll(); await gate.removeAuthority(requesterID) }
 }
 #endif

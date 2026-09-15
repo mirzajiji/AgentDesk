@@ -57,7 +57,7 @@ import XCTest
                 result.update({'supportedVersions':['2026-07-28'],'capabilities':{'tools':{}},'_meta':{'io.modelcontextprotocol/serverInfo':{'name':os.environ['SYNTHETIC_TOKEN'],'version':'1'}}})
             elif r['method'] == 'resources/read':
                 value = os.environ['SYNTHETIC_TOKEN']
-                assert r['params']['uri'] == 'urn:'+value
+                assert r['params']['uri'] in ['urn:'+value, 'urn:'+value+':chosen%2Fitem']
                 result.update({'ttlMs':0,'cacheScope':'private','contents':[{'uri':'urn:'+value,'mimeType':value,'text':value},{'uri':'urn:binary','blob':'AP9B'}]})
             elif r['method'] == 'resources/templates/list':
                 value = os.environ['SYNTHETIC_TOKEN']
@@ -167,7 +167,35 @@ import XCTest
                 XCTAssertFalse(field.text.contains("fixture-value")); XCTAssertGreaterThan(field.redactionCount, 0)
                 XCTAssertEqual(field.context.scope, scope); XCTAssertEqual(field.context.environmentID, environment)
             }
+            do { _ = try await launch.expandResourceTemplate(templateID: UUID(), values: [:]); XCTFail("Unknown template expanded") }
+            catch { XCTAssertEqual(error as? AuthorizationError, .invalidInput) }
+            do { _ = try await launch.expandResourceTemplate(templateID: template.id, values: ["unknown": .string("x")]); XCTFail("Unknown variable accepted") }
+            catch { XCTAssertEqual(error as? AuthorizationError, .invalidInput) }
+            let candidate = try await launch.expandResourceTemplate(templateID: template.id, values: ["item": .string("chosen/item")])
+            XCTAssertFalse(candidate.uri.text.contains("fixture-value")); XCTAssertTrue(candidate.uri.text.hasSuffix(":chosen%2Fitem"))
+            var candidateApproval: UUID?
+            if review {
+                do { _ = try await launch.readResource(resourceID: candidate.id, approvalID: templateApproval); XCTFail("Template listing authorized reading") }
+                catch { XCTAssertEqual(error as? AuthorizationError, .invalidApproval) }
+                guard case .approval(let pendingRead) = try await launch.prepareResourceRead(resourceID: candidate.id) else { return XCTFail("Missing expanded read review") }
+                _ = try await launch.reviewResourceRead(pendingRead.id, resourceID: candidate.id, approve: true, expectedSequence: pendingRead.sequence)
+                candidateApproval = pendingRead.id
+            }
+            let expandedContent = try await launch.readResource(resourceID: candidate.id, approvalID: candidateApproval)
+            XCTAssertEqual(expandedContent.resourceID, candidate.id); XCTAssertEqual(expandedContent.scope, scope)
+            if review {
+                guard case .approval(let repeatRead) = try await launch.prepareResourceRead(resourceID: candidate.id) else { return XCTFail("Missing repeat read approval") }
+                XCTAssertNotEqual(repeatRead.id, candidateApproval)
+                _ = try await launch.reviewResourceRead(repeatRead.id, resourceID: candidate.id, approve: true, expectedSequence: repeatRead.sequence)
+                _ = try await launch.readResource(resourceID: candidate.id, approvalID: repeatRead.id)
+            }
+            let replacement = try await launch.expandResourceTemplate(templateID: template.id, values: ["item": .string("other")])
+            XCTAssertNotEqual(replacement.id, candidate.id)
+            do { _ = try await launch.prepareResourceRead(resourceID: candidate.id); XCTFail("Replaced candidate remained usable") }
+            catch { XCTAssertEqual(error as? AuthorizationError, .invalidInput) }
             let resourceCatalog = try await launch.discoverResources(approvalID: resourceApproval)
+            do { _ = try await launch.prepareResourceRead(resourceID: replacement.id); XCTFail("Refresh retained expanded candidate") }
+            catch { XCTAssertEqual(error as? AuthorizationError, .invalidInput) }
             XCTAssertEqual(resourceCatalog.scope, scope); XCTAssertEqual(resourceCatalog.environmentID, environment)
             XCTAssertEqual(resourceCatalog.connectionID, id); XCTAssertEqual(resourceCatalog.resources.count, 1)
             let resource = try XCTUnwrap(resourceCatalog.resources.first)

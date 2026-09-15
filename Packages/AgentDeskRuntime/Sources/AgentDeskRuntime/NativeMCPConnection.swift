@@ -66,6 +66,9 @@ public actor NativeMCPConnection {
     public func discoverResourceTemplates(approvalID: UUID? = nil) async throws -> MCPResourceTemplateCatalogPresentation {
         try await launch.discoverResourceTemplates(approvalID: approvalID)
     }
+    public func expandResourceTemplate(templateID: UUID, values: [String: MCPURITemplateValue]) async throws -> MCPResourcePresentation {
+        try await launch.expandResourceTemplate(templateID: templateID, values: values)
+    }
     public func prepareResourceRead(resourceID: UUID) async throws -> PolicyPreparation {
         try await launch.prepareResourceRead(resourceID: resourceID)
     }

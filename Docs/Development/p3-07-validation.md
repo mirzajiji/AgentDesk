@@ -262,3 +262,16 @@ Validation on macOS 26.5.2 / Xcode 26.0 and iPhone 16 Pro / iOS 26.0:
 - Both native app builds passed with the standard commands (`TestResults/p3-07-template-expansion-mac-build.log`, `TestResults/p3-07-template-expansion-iphone-build.log`). Documentation/diff checks pass.
 
 P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Retained-template expansion and authorized reads
+
+The native runtime retains original templates behind opaque discovery IDs. Local expansion rejects unknown template/variable IDs, parses the retained source, expands typed values, validates the final absolute URI and returns only a redacted candidate. One candidate is retained at a time; replacement, resource/template refresh and connection closure invalidate it. Reading uses the existing exact-URI policy/redaction path. Template discovery approval cannot authorize that read. Native parameter-entry controls remain pending.
+
+The integration exposed an earlier policy defect: one read action ID was reused across distinct URI payloads, conflicting with the durable approval store. Read action IDs are now URI-specific, capped at 256 distinct URIs per connection, and fresh preparation renews the action ID so a repeated read can obtain a new approval. Old approvals cannot authorize the renewed action. This supersedes the single-identifier implementation described in the earlier policy entry.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- After `swift package --package-path Packages/AgentDeskRuntime clean`, the initial runtime test run detected the distinct-URI approval conflict (`TestResults/p3-07-template-expansion-integration.log`). After correction, `swift test --package-path Packages/AgentDeskRuntime` passed all 215 tests (`TestResults/p3-07-template-expansion-integration-final.log`). Expanded synthetic-process coverage verifies unknown input rejection, secret-bearing original templates, redacted candidate URIs, encoding, separate read approval, repeated approval/read, distinct URI reads and candidate invalidation.
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-template-expansion-integration-build.log`). No new Simulator coverage is claimed for this Mac-only integration. Documentation/diff checks pass.
+
+User-requested pause: finish this task and its commit/push, then stop work until the user resumes tomorrow. Next work is scoped native template parameter entry and candidate review, followed by remaining MCP capabilities. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

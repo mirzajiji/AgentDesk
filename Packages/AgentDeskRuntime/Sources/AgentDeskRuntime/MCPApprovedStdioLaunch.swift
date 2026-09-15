@@ -119,6 +119,9 @@ actor MCPApprovedStdioLaunch {
     private var redactor: ContentRedactor?
     private var repositoryAccess: RepositoryAccess?
     private var resourceURIs: [UUID: String] = [:]
+    private var templateSources: [UUID: String] = [:]
+    private var templateGeneration = UUID()
+    private var expandedResource: (id: UUID, uri: String)?
     private var resourceGeneration = UUID()
     private var closed = false
     private var starting = false
@@ -282,7 +285,7 @@ actor MCPApprovedStdioLaunch {
     }
     func discoverResources(approvalID: UUID? = nil) async throws -> MCPResourceCatalogPresentation {
         guard !closed, let connection, let redactor else { throw MCPProcessError.closed }
-        resourceURIs.removeAll()
+        resourceURIs.removeAll(); expandedResource = nil
         resourceGeneration = UUID()
         let generation = resourceGeneration
         let environment = configuration.environmentID
@@ -316,6 +319,8 @@ actor MCPApprovedStdioLaunch {
     }
     func discoverResourceTemplates(approvalID: UUID? = nil) async throws -> MCPResourceTemplateCatalogPresentation {
         guard !closed, let connection, let redactor else { throw MCPProcessError.closed }
+        templateSources.removeAll(); expandedResource = nil
+        templateGeneration = UUID(); let generation = templateGeneration
         let environment = configuration.environmentID
         let result = try await gate.discover(approvalID: approvalID, kind: .resourceTemplates) {
             let catalog = try await connection.discoverResourceTemplates(environmentID: environment)
@@ -327,15 +332,34 @@ actor MCPApprovedStdioLaunch {
                     description: resource.description.map { try redactor.redactText($0, in: redactor.context) },
                     mimeType: resource.mimeType.map { try redactor.redactText($0, in: redactor.context) })
             }
-            return MCPResourceTemplateCatalogPresentation(scope: catalog.scope, environmentID: catalog.environmentID,
-                connectionID: catalog.connectionID, resourceTemplates: resources)
+            let bindings = Dictionary(uniqueKeysWithValues: zip(resources, catalog.resourceTemplates).map { ($0.id, $1.uriTemplate) })
+            return (MCPResourceTemplateCatalogPresentation(scope: catalog.scope, environmentID: catalog.environmentID,
+                connectionID: catalog.connectionID, resourceTemplates: resources), bindings)
         }
         try Task.checkCancellation()
-        guard !closed, case .executed(let catalog) = result else { throw AuthorizationError.denied }
+        guard !closed, generation == templateGeneration, case .executed(let (catalog, bindings)) = result else { throw AuthorizationError.denied }
+        templateSources = bindings
         return catalog
+    }
+    /// Pure local preparation. Only the subsequent exact-URI policy gate can authorize a read.
+    func expandResourceTemplate(templateID: UUID, values: [String: MCPURITemplateValue]) throws -> MCPResourcePresentation {
+        try Task.checkCancellation()
+        guard !closed, connection != nil, let redactor else { throw MCPProcessError.closed }
+        expandedResource = nil
+        guard let source = templateSources[templateID] else { throw AuthorizationError.invalidInput }
+        let template = try MCPURITemplate(source)
+        guard Set(values.keys).isSubset(of: Set(template.variableNames)) else { throw AuthorizationError.invalidInput }
+        let uri = try template.expand(values)
+        _ = try MCPResourceRead.parameters(mode: .legacy, uri: uri)
+        let label = try redactor.redactText(uri, in: redactor.context)
+        let candidate = MCPResourcePresentation(uri: label, name: label, title: nil, description: nil, mimeType: nil, sizeBytes: nil)
+        try Task.checkCancellation()
+        expandedResource = (candidate.id, uri)
+        return candidate
     }
     private func resourceURI(_ id: UUID) throws -> String {
         guard !closed, connection != nil else { throw MCPProcessError.closed }
+        if let expandedResource, expandedResource.id == id { return expandedResource.uri }
         guard let uri = resourceURIs[id] else { throw AuthorizationError.invalidInput }
         return uri
     }
@@ -374,7 +398,8 @@ actor MCPApprovedStdioLaunch {
     }
     func close() async {
         closed = true
-        resourceURIs.removeAll()
+        templateSources.removeAll(); templateGeneration = UUID()
+        resourceURIs.removeAll(); expandedResource = nil
         resourceGeneration = UUID()
         let pending = launchTask
         pending?.cancel()

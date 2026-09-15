@@ -101,3 +101,14 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-live-prompts-mac-build.log`). Documentation/diff checks pass. The traversal is Mac-only; no new Simulator coverage is claimed.
 
 This internal API still requires prompt-specific policy integration and redacted native presentation before exposure. P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Authorized prompt presentation
+
+The native connection now exposes prompt discovery preparation, review and execution. `prompts/list` receives an independent read-evidence action bound to the configuration revision, resource and scope; a tools/list approval cannot substitute for it. The existing before/after policy checks apply to the selected discovery action. The returned catalog contains scoped redacted names, titles and descriptions for prompts and each argument, preserving optional required flags. It exposes no raw wire pages and never fetches or adopts prompt content. The launch's existing known-secret redaction policy is reused without another credential read.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- `swift test --package-path Packages/AgentDeskRuntime`: all 205 tests passed (`TestResults/p3-07-prompt-authorization.log`). The live credential/process integration now checks allowed and approved prompt discovery, rejection of tool-approval substitution without consuming the valid tool approval, all six redacted prompt/argument text fields, scope/identity, unchanged secret-read count, missing authority and closed connection rejection.
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-prompt-authorization-build.log`). Documentation/diff checks pass. This Mac-only integration adds no Simulator coverage.
+
+Native prompt browsing UI remains next. P3-07/P3-08 remain in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

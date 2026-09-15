@@ -5,6 +5,8 @@ import AgentDeskPersistence
 import AgentDeskSecurity
 import Foundation
 
+enum MCPDiscoveryKind: Sendable { case tools, prompts }
+
 /// Trusted Mac host boundary. Resource resolution must validate physical project/executable identity.
 /// Neither configuration nor the resource fingerprint is itself launch authority.
 actor MCPLaunchPolicySession {
@@ -13,6 +15,7 @@ actor MCPLaunchPolicySession {
     private let action: PolicyAction
     private let credentialAction: PolicyAction
     private let discoveryAction: PolicyAction
+    private let promptDiscoveryAction: PolicyAction
     private let requesterID: UUID
     private let policyFingerprint: ActionFingerprint
     private let validate: @Sendable () async throws -> (PolicyAction, PolicySnapshot)
@@ -32,6 +35,8 @@ actor MCPLaunchPolicySession {
         // Bind this review to listing tools, not arbitrary MCP requests or the launch itself.
         discoveryAction = try PolicyAction(scope: action.scope, environmentID: action.environmentID, operation: .readEvidence,
             resource: action.resource, payload: ActionFingerprint.canonical(DiscoveryPayload(configuration: action.payload, method: "tools/list")))
+        promptDiscoveryAction = try PolicyAction(scope: action.scope, environmentID: action.environmentID, operation: .readEvidence,
+            resource: action.resource, payload: ActionFingerprint.canonical(DiscoveryPayload(configuration: action.payload, method: "prompts/list")))
         self.configuration = configuration
         self.action = action; self.requesterID = requesterID; self.validate = validate
         policyFingerprint = try policy.fingerprint
@@ -90,19 +95,19 @@ actor MCPLaunchPolicySession {
             return try await launch()
         }
     }
-    func prepareDiscovery() async throws -> PolicyPreparation {
+    func prepareDiscovery(kind: MCPDiscoveryKind = .tools) async throws -> PolicyPreparation {
         try await check()
-        return try await gate.prepare(discoveryAction, requesterID: requesterID)
+        return try await gate.prepare(kind == .tools ? discoveryAction : promptDiscoveryAction, requesterID: requesterID)
     }
-    func reviewDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+    func reviewDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64, kind: MCPDiscoveryKind = .tools) async throws -> ApprovalRecord {
         try await check()
-        return try await gate.review(id, expectedAction: discoveryAction, requesterID: requesterID, reviewerID: requesterID,
+        return try await gate.review(id, expectedAction: kind == .tools ? discoveryAction : promptDiscoveryAction, requesterID: requesterID, reviewerID: requesterID,
             approve: approve, expectedSequence: expectedSequence)
     }
-    func discover<Value: Sendable>(approvalID: UUID? = nil,
+    func discover<Value: Sendable>(approvalID: UUID? = nil, kind: MCPDiscoveryKind = .tools,
                                   read: @Sendable () async throws -> Value) async throws -> PolicyExecutionResult<Value> {
         try await check()
-        return try await gate.execute(discoveryAction, requesterID: requesterID, approvalID: approvalID) { _ in
+        return try await gate.execute(kind == .tools ? discoveryAction : promptDiscoveryAction, requesterID: requesterID, approvalID: approvalID) { _ in
             try await self.check()
             let value = try await read()
             // A configuration/policy change during the traversal invalidates the returned claims.

@@ -55,6 +55,9 @@ import XCTest
             result = {'resultType':'complete'}
             if r['method'] == 'server/discover':
                 result.update({'supportedVersions':['2026-07-28'],'capabilities':{'tools':{}},'_meta':{'io.modelcontextprotocol/serverInfo':{'name':os.environ['SYNTHETIC_TOKEN'],'version':'1'}}})
+            elif r['method'] == 'prompts/list':
+                value = os.environ['SYNTHETIC_TOKEN']
+                result.update({'ttlMs':0,'cacheScope':'private','prompts':[{'name':value,'title':value,'description':value,'arguments':[{'name':value,'title':value,'description':value,'required':True}]}]})
             elif r['method'] == 'tools/list':
                 value = os.environ['SYNTHETIC_TOKEN']
                 result.update({'ttlMs':0,'cacheScope':'private','tools':[{'name':value,'title':value,'description':value,'inputSchema':{'type':'object'},'annotations':{'readOnlyHint':True}}]})
@@ -117,6 +120,25 @@ import XCTest
                 _ = try await launch.reviewDiscovery(discovery.id, approve: true, expectedSequence: discovery.sequence)
                 discoveryApproval = discovery.id
             }
+            var promptApproval: UUID?
+            if review {
+                do { _ = try await launch.discoverPrompts(approvalID: discoveryApproval); XCTFail("Tool approval authorized prompt discovery") }
+                catch { XCTAssertTrue(error is AuthorizationError) }
+                guard case .approval(let prompt) = try await launch.preparePromptDiscovery() else { return XCTFail("Missing prompt review") }
+                _ = try await launch.reviewPromptDiscovery(prompt.id, approve: true, expectedSequence: prompt.sequence)
+                promptApproval = prompt.id
+            }
+            let promptCatalog = try await launch.discoverPrompts(approvalID: promptApproval)
+            XCTAssertEqual(promptCatalog.scope, scope); XCTAssertEqual(promptCatalog.environmentID, environment)
+            XCTAssertEqual(promptCatalog.connectionID, id); XCTAssertEqual(promptCatalog.prompts.count, 1)
+            let prompt = try XCTUnwrap(promptCatalog.prompts.first)
+            let argument = try XCTUnwrap(prompt.arguments?.first)
+            XCTAssertEqual(argument.required, true)
+            for field in [prompt.name, try XCTUnwrap(prompt.title), try XCTUnwrap(prompt.description),
+                          argument.name, try XCTUnwrap(argument.title), try XCTUnwrap(argument.description)] {
+                XCTAssertFalse(field.text.contains("fixture-value")); XCTAssertGreaterThan(field.redactionCount, 0)
+                XCTAssertEqual(field.context.scope, scope); XCTAssertEqual(field.context.environmentID, environment)
+            }
             let tools = try await launch.discoverTools(approvalID: discoveryApproval)
             XCTAssertEqual(tools.scope, scope)
             XCTAssertEqual(tools.environmentID, environment)
@@ -138,6 +160,8 @@ import XCTest
         let reads = await secrets.reads
         XCTAssertEqual(reads, (disposition == .allow || review) ? 1 : 0)
         await launch.close()
+        do { _ = try await launch.discoverPrompts(); XCTFail("Closed prompt discovery succeeded") }
+        catch { XCTAssertEqual(error as? MCPProcessError, .closed) }
         do { _ = try await launch.discoverTools(); XCTFail("Closed discovery succeeded") }
         catch { XCTAssertEqual(error as? MCPProcessError, .closed) }
         do { try await launch.ping(); XCTFail("Closed connection remained usable") }
@@ -186,6 +210,8 @@ import XCTest
         let server = try await launch.start(approvalID: pending.id)
         XCTAssertEqual(server.mode, .modern)
         try await launch.ping()
+        do { _ = try await launch.discoverPrompts(); XCTFail("Launch-only authority listed prompts") }
+        catch { XCTAssertEqual(error as? AuthorizationError, .denied) }
         do { _ = try await launch.discoverTools(); XCTFail("Launch-only authority listed tools") }
         catch { XCTAssertEqual(error as? AuthorizationError, .denied) }
         do { _ = try await launch.start(approvalID: pending.id); XCTFail("Repeated start succeeded") }

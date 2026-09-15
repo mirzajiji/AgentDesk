@@ -30,6 +30,26 @@ public struct MCPToolCatalogPresentation: Sendable {
     public let tools: [MCPToolPresentation]
 }
 
+/// Prompt metadata is display-only, never adopted as instructions by discovery.
+public struct MCPPromptPresentation: Sendable {
+    public let name: RedactedText
+    public let title: RedactedText?
+    public let description: RedactedText?
+    public let arguments: [MCPPromptArgumentPresentation]?
+}
+public struct MCPPromptArgumentPresentation: Sendable {
+    public let name: RedactedText
+    public let title: RedactedText?
+    public let description: RedactedText?
+    public let required: Bool?
+}
+public struct MCPPromptCatalogPresentation: Sendable {
+    public let scope: ProjectScope
+    public let environmentID: EnvironmentID
+    public let connectionID: UUID
+    public let prompts: [MCPPromptPresentation]
+}
+
 /// Internal Mac integration. The host retains registered filesystem access for this lifetime.
 /// Credential reads require independent readSecret policy permission.
 actor MCPApprovedStdioLaunch {
@@ -159,6 +179,41 @@ actor MCPApprovedStdioLaunch {
             }
             return MCPToolCatalogPresentation(scope: catalog.scope, environmentID: catalog.environmentID,
                 connectionID: catalog.connectionID, tools: tools)
+        }
+        try Task.checkCancellation()
+        guard !closed, case .executed(let catalog) = result else { throw AuthorizationError.denied }
+        return catalog
+    }
+    func preparePromptDiscovery() async throws -> PolicyPreparation {
+        guard !closed, connection != nil else { throw MCPProcessError.closed }
+        return try await gate.prepareDiscovery(kind: .prompts)
+    }
+    func reviewPromptDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        guard !closed, connection != nil else { throw MCPProcessError.closed }
+        return try await gate.reviewDiscovery(id, approve: approve, expectedSequence: expectedSequence, kind: .prompts)
+    }
+    func discoverPrompts(approvalID: UUID? = nil) async throws -> MCPPromptCatalogPresentation {
+        guard !closed, let connection, let redactor else { throw MCPProcessError.closed }
+        let environment = configuration.environmentID
+        let result = try await gate.discover(approvalID: approvalID, kind: .prompts) {
+            let catalog = try await connection.discoverPrompts(environmentID: environment)
+            let prompts = try catalog.prompts.map { prompt in
+                try Task.checkCancellation()
+                return try MCPPromptPresentation(name: redactor.redactText(prompt.name, in: redactor.context),
+                    title: prompt.title.map { try redactor.redactText($0, in: redactor.context) },
+                    description: prompt.description.map { try redactor.redactText($0, in: redactor.context) },
+                    arguments: prompt.arguments.map { arguments in
+                        try arguments.map { argument in
+                            try Task.checkCancellation()
+                            return try MCPPromptArgumentPresentation(name: redactor.redactText(argument.name, in: redactor.context),
+                                title: argument.title.map { try redactor.redactText($0, in: redactor.context) },
+                                description: argument.description.map { try redactor.redactText($0, in: redactor.context) },
+                                required: argument.required)
+                        }
+                    })
+            }
+            return MCPPromptCatalogPresentation(scope: catalog.scope, environmentID: catalog.environmentID,
+                connectionID: catalog.connectionID, prompts: prompts)
         }
         try Task.checkCancellation()
         guard !closed, case .executed(let catalog) = result else { throw AuthorizationError.denied }

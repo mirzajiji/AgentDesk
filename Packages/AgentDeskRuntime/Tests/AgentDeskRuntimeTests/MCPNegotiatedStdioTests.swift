@@ -25,6 +25,22 @@ final class MCPNegotiatedStdioTests: XCTestCase {
                     print(json.dumps({'jsonrpc':'2.0','id':r['id'],'error':{'code':int(mode.split(':')[1]),'message':'Synthetic rejection'}}), flush=True)
                     continue
                 result = {'resultType':'complete','supportedVersions':['unknown' if mode == 'bad' else '2026-07-28'],'capabilities':{'tools':{}}}
+            elif method == 'prompts/list':
+                if mode == 'prompt-stall': continue
+                if mode == 'legacy':
+                    assert initialized and '_meta' not in r['params']
+                else: assert r['params']['_meta']['io.modelcontextprotocol/protocolVersion'] == '2026-07-28'
+                cursor = r['params'].get('cursor')
+                index = 0 if cursor is None else int(cursor)
+                prompt = {'name':str(index),'arguments':[{'name':'context','required':True}]}
+                result = {'prompts':[prompt]}
+                if mode == 'prompt-duplicate': result['prompts'][0]['name'] = 'duplicate'
+                if mode == 'prompt-pages': result['prompts'] = []
+                if mode == 'prompt-count': result['prompts'] = [{'name':str(index)+'-'+str(n)} for n in range(200)]
+                if mode == 'prompt-bytes': result['prompts'] = [{'name':str(index)+'-'+str(n),'description':'x'*1000} for n in range(50)]
+                if mode != 'legacy': result.update({'resultType':'complete','ttlMs':0,'cacheScope':'private'})
+                if index == 0 or mode in ['prompt-cycle','prompt-pages','prompt-count','prompt-bytes']:
+                    result['nextCursor'] = '1' if mode == 'prompt-cycle' else str(index+1)
             elif method == 'tools/list':
                 if mode == 'stall': continue
                 if mode == 'legacy':
@@ -85,6 +101,45 @@ final class MCPNegotiatedStdioTests: XCTestCase {
             withUnsafeCurrentTask { $0?.cancel() }
             return try await connection.discoverTools(environmentID: EnvironmentID())
         }
+        do { _ = try await operation.value; XCTFail("Cancelled discovery completed") }
+        catch { XCTAssertTrue(error is CancellationError) }
+        do { _ = try await connection.ping() }
+        catch { await connection.close(); throw error }
+        await connection.close()
+    }
+    func testLivePromptDiscoveryNegotiatesAndPreservesScope() async throws {
+        for mode in [MCPProtocolMode.modern, .legacy] {
+            let transport = try transport(mode == .modern ? "modern" : "legacy")
+            let connection = try await MCPNegotiatedStdioConnection.open(transport: transport, mode: mode)
+            do {
+                let environment = EnvironmentID()
+                let catalog = try await connection.discoverPrompts(environmentID: environment)
+                XCTAssertEqual(catalog.prompts.map(\.name), ["0", "1"])
+                XCTAssertEqual(catalog.pages.count, 2)
+                XCTAssertEqual(catalog.scope, transport.scope); XCTAssertEqual(catalog.connectionID, transport.connectionID)
+                XCTAssertEqual(catalog.environmentID, environment)
+                XCTAssertEqual(catalog.prompts.first?.arguments?.first?.required, true)
+                await connection.close()
+            } catch { await connection.close(); throw error }
+        }
+    }
+    func testPromptTraversalRejectsDuplicateCyclesAndAggregateLimits() async throws {
+        for (fixture, expected): (String, MCPPromptTraversalError) in [
+            ("prompt-cycle", .repeatedCursor), ("prompt-duplicate", .duplicatePrompt),
+            ("prompt-pages", .limitExceeded), ("prompt-count", .limitExceeded), ("prompt-bytes", .limitExceeded)
+        ] {
+            let connection = try await MCPNegotiatedStdioConnection.open(transport: transport(fixture), mode: .modern)
+            do { _ = try await connection.discoverPrompts(environmentID: EnvironmentID()); XCTFail("Unbounded prompt catalog returned") }
+            catch { XCTAssertEqual(error as? MCPPromptTraversalError, expected) }
+            await connection.close()
+        }
+    }
+    func testStalledPromptDiscoveryTimesOutAndCanBeCancelled() async throws {
+        let connection = try await MCPNegotiatedStdioConnection.open(transport: transport("prompt-stall"), mode: .modern)
+        do { _ = try await connection.discoverPrompts(environmentID: EnvironmentID(), timeout: .milliseconds(50)); XCTFail("Stalled discovery completed") }
+        catch { XCTAssertEqual(error as? MCPRequestError, .timedOut) }
+        let operation = Task { try await connection.discoverPrompts(environmentID: EnvironmentID()) }
+        try await Task.sleep(for: .milliseconds(30)); operation.cancel()
         do { _ = try await operation.value; XCTFail("Cancelled discovery completed") }
         catch { XCTAssertTrue(error is CancellationError) }
         do { _ = try await connection.ping() }

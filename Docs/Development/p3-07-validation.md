@@ -89,3 +89,15 @@ Validation on macOS 26.5.2 / Xcode 26.0, local iPhone 16 Pro / iOS 26.0:
 - Both app builds passed using the standard Mac and primary-iPhone build commands (`TestResults/p3-07-prompts-mac-build.log`, `TestResults/p3-07-prompts-iphone-build.log`). Documentation/diff checks pass.
 
 Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining. This component does not complete P3-07.
+
+## Live prompt traversal
+
+The internal negotiated Mac connection now requests `prompts/list` using the negotiated protocol and follows opaque continuation cursors. A single deadline bounds the traversal. It caps results at 100 pages, 10,000 prompts and 4 MiB of original response bytes, rejects duplicate names and cursor cycles, and returns only a complete catalog. Workspace/project and connection identity come from the transport; environment identity comes from the trusted caller. Cancellation and failures release partial local state without publishing it. Prompt content is neither fetched nor applied.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- The first runtime build used stale generated SwiftPM metadata and could not see the newly added dependency source (`TestResults/p3-07-live-prompts.log`). `swift package --package-path Packages/AgentDeskRuntime clean` refreshed that build state.
+- `swift test --package-path Packages/AgentDeskRuntime`: all 205 tests passed (`TestResults/p3-07-live-prompts-final.log`). New real synthetic process tests cover modern and legacy request metadata, identity/argument preservation, repeated cursors, duplicate names, each aggregate limit, timeout, cancellation and a subsequent successful ping.
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-live-prompts-mac-build.log`). Documentation/diff checks pass. The traversal is Mac-only; no new Simulator coverage is claimed.
+
+This internal API still requires prompt-specific policy integration and redacted native presentation before exposure. P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

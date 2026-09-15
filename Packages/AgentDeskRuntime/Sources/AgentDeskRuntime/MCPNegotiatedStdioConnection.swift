@@ -3,6 +3,15 @@ import AgentDeskCore
 import AgentDeskMCP
 import Foundation
 
+enum MCPPromptTraversalError: Error, Equatable, Sendable { case repeatedCursor, duplicatePrompt, limitExceeded }
+struct MCPPromptCatalog: Sendable {
+    let scope: ProjectScope
+    let environmentID: EnvironmentID
+    let connectionID: UUID
+    let pages: [MCPPromptPage]
+    var prompts: [MCPPromptDescription] { pages.flatMap(\.prompts) }
+}
+
 /// Process-lifetime protocol detection and handshake boundary. No server instructions or capabilities grant authority.
 actor MCPNegotiatedStdioConnection {
     nonisolated let server: MCPServerDescription
@@ -67,6 +76,33 @@ actor MCPNegotiatedStdioConnection {
             }
             return try await traversal.catalog()
         } catch { await traversal.close(); throw error }
+    }
+    /// Keeps partial pages local; failed or cancelled traversals never publish a catalog.
+    func discoverPrompts(environmentID: EnvironmentID, timeout: Duration = .seconds(30)) async throws -> MCPPromptCatalog {
+        let clock = ContinuousClock(), deadline = ContinuousClock.now.advanced(by: timeout)
+        var cursor: String?, pages: [MCPPromptPage] = []
+        var cursors = Set<String>(), names = Set<String>(), bytes = 0
+        repeat {
+            try Task.checkCancellation()
+            let remaining = clock.now.duration(to: deadline)
+            guard remaining > .zero else { throw MCPRequestError.timedOut }
+            let response = try await session.request(method: "prompts/list",
+                params: MCPPromptDiscovery.parameters(mode: server.mode, cursor: cursor), timeout: remaining)
+            let page = try MCPPromptDiscovery.decode(response, mode: server.mode, scope: scope,
+                environmentID: environmentID, connectionID: connectionID)
+            guard pages.count < 100, page.prompts.count <= 10_000 - names.count,
+                  page.response.count <= 4_194_304 - bytes else { throw MCPPromptTraversalError.limitExceeded }
+            for prompt in page.prompts {
+                guard names.insert(prompt.name).inserted else { throw MCPPromptTraversalError.duplicatePrompt }
+            }
+            if let next = page.nextCursor {
+                guard next != cursor, cursors.insert(next).inserted else { throw MCPPromptTraversalError.repeatedCursor }
+                guard pages.count + 1 < 100 else { throw MCPPromptTraversalError.limitExceeded }
+            }
+            pages.append(page); bytes += page.response.count; cursor = page.nextCursor
+        } while cursor != nil
+        try Task.checkCancellation()
+        return MCPPromptCatalog(scope: scope, environmentID: environmentID, connectionID: connectionID, pages: pages)
     }
     func close() async { await session.close() }
 }

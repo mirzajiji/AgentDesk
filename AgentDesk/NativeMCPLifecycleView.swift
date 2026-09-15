@@ -52,6 +52,31 @@ struct NativeMCPLifecycleView: View {
                                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
                         }
                     }
+                    if let catalog = model.promptCatalog {
+                        Text("Prompts (\(catalog.prompts.count))").font(.headline)
+                        ForEach(Array(catalog.prompts.enumerated()), id: \.offset) { index, prompt in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(verbatim: prompt.title?.text ?? prompt.name.text).font(.headline)
+                                    .accessibilityIdentifier("mcp.prompt.\(index)")
+                                Text(verbatim: prompt.name.text).font(.caption).foregroundStyle(.secondary)
+                                if let description = prompt.description { Text(verbatim: description.text).textSelection(.enabled) }
+                                if let arguments = prompt.arguments, !arguments.isEmpty {
+                                    Text("Arguments").font(.subheadline).bold()
+                                    ForEach(Array(arguments.enumerated()), id: \.offset) { _, argument in
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(verbatim: argument.title?.text ?? argument.name.text).bold()
+                                            if argument.title != nil { Text(verbatim: argument.name.text).font(.caption) }
+                                            Text("Required: \(argument.required.map { $0 ? "Yes" : "No" } ?? "Unspecified")").font(.caption)
+                                            if let description = argument.description { Text(verbatim: description.text) }
+                                        }
+                                    }
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                        Text("These are server-provided descriptions. No prompt content has been loaded or applied.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     Text("Closing this window stops this connection. Server capabilities do not grant permission to use tools.")
                         .font(.caption).foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity, alignment: .leading)
@@ -59,10 +84,11 @@ struct NativeMCPLifecycleView: View {
             Text(model.message).accessibilityIdentifier("mcp.lifecycle.message")
             if model.busy { ProgressView() }
             if model.pending != nil {
-                Button(model.reviewingDiscovery ? "Approve Tool Discovery" : model.reviewingCredentials ? "Approve Credential Access" : "Approve and Start") { model.approve() }
+                Button(model.reviewingPrompts ? "Approve Prompt Discovery" : model.reviewingDiscovery ? "Approve Tool Discovery" : model.reviewingCredentials ? "Approve Credential Access" : "Approve and Start") { model.approve() }
                     .disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.approve")
             } else if model.connected {
                 Button("Discover Tools") { model.discover() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.discover")
+                Button("Discover Prompts") { model.discoverPrompts() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.prompts")
                 Button("Check Health") { model.checkHealth() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.health")
             } else {
                 Button("Review Start") { model.prepare() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.review")

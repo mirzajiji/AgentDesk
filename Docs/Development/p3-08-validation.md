@@ -127,3 +127,17 @@ Passed: 9 native model tests and 1 native UI test, zero failures (`TestResults/p
 Earlier attempts recorded a missing view import (`p3-08-discovery-ui.log`), the unreachable health control (`p3-08-discovery-ui-final.log`), and an accessibility assertion reading label instead of macOS static-text value (`p3-08-discovery-ui-footer.log`). Each was corrected before the passing run. Normal signed Mac build passed with the standard Mac build command (`TestResults/p3-08-discovery-ui-build.log`). Documentation/diff checks pass. This Mac-only change adds no iPhone Simulator coverage; physical display matrix remains deferred.
 
 Discovery UI is implemented, but schema browsing, tool invocation, resources/prompts and the remaining MCP management/transport scope keep P3-07/P3-08 in progress. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Native prompt browsing
+
+The running MCP connection now offers Discover Prompts, an independent Approve Prompt Discovery review when required, and scoped redacted prompt cards. Cards show prompt and argument names/titles/descriptions and optional required flags. Discovery only lists descriptions: it does not fetch prompt messages or adopt instructions. Empty results have an explicit state. Stop and failure clear prompt results; generation/cancellation checks prevent late responses from restoring a stopped catalog. Existing tool discovery remains independently reviewable.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+```sh
+xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac -resultBundlePath TestResults/p3-08-prompt-ui.xcresult -only-testing:AgentDeskTests/NativeMCPLifecycleModelTests -only-testing:AgentDeskUITests/NativeMCPConnectionsUITests/testReviewedNativeProcessStartHealthStopAndRestart -parallel-testing-enabled NO test
+```
+
+Passed: 12 native model tests and 1 native UI test, zero failures (`TestResults/p3-08-prompt-ui.log`). Three new model regressions cover separate prompt review/empty results/stop clearing, denial with fixed diagnostics, and late completion after Stop. The UI test exercises two real synthetic process cycles with tool and prompt discovery, their distinct approval buttons, visible prompt title and argument description, health and Stop. Exported prompt screenshot `TestResults/p3-08-prompt-ui-images/EB1A0CC3-F871-45D2-A117-9D0D37B6BABB.png` was visually inspected; the complete prompt card and fixed controls are readable.
+
+Normal signed Mac build passed using the standard Mac build command (`TestResults/p3-08-prompt-ui-build.log`). Documentation/diff checks pass. This Mac-only UI adds no Simulator or physical-display coverage. Resource discovery, prompt retrieval, tool invocation and remaining manager/transport requirements remain outstanding: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

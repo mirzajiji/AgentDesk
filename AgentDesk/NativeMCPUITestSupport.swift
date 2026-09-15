@@ -43,7 +43,9 @@ enum NativeMCPUITestSupport {
             if 'id' not in r: continue
             result = {'resultType':'complete'}
             if r['method'] == 'server/discover':
-                result.update({'supportedVersions':['2026-07-28'],'capabilities':{'tools':{}},'_meta':{'io.modelcontextprotocol/serverInfo':{'name':'Synthetic native server','version':'1'}}})
+                result.update({'supportedVersions':['2026-07-28'],'capabilities':{'tools':{},'prompts':{}},'_meta':{'io.modelcontextprotocol/serverInfo':{'name':'Synthetic native server','version':'1'}}})
+            elif r['method'] == 'prompts/list':
+                result.update({'ttlMs':0,'cacheScope':'private','prompts':[{'name':'synthetic_review','title':'Synthetic review prompt','description':'Reviews synthetic changes.','arguments':[{'name':'change','title':'Change','description':'The synthetic change to review.','required':True}]}]})
             elif r['method'] == 'tools/list':
                 result.update({'ttlMs':0,'cacheScope':'private','tools':[{'name':'synthetic_health','title':'Synthetic health tool','description':'Reports synthetic service status.','inputSchema':{'type':'object'},'annotations':{'readOnlyHint':True}}]})
             print(json.dumps({'jsonrpc':'2.0','id':r['id'],'result':result}), flush=True)

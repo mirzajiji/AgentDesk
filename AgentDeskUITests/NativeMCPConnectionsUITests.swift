@@ -44,6 +44,21 @@ final class NativeMCPConnectionsUITests: XCTestCase {
             XCTAssertTrue(details.frame.contains(tool.frame), "Discovered tool must be visible in the scroll area")
             let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
             shot.name = "Native MCP discovered tools"; shot.lifetime = .keepAlways; add(shot)
+            app.buttons["mcp.lifecycle.prompts"].click()
+            XCTAssertTrue(app.buttons["Approve Prompt Discovery"].waitForExistence(timeout: 10))
+            XCTAssertFalse(app.staticTexts["mcp.prompt.0"].exists)
+            app.buttons["Approve Prompt Discovery"].click()
+            let prompt = app.staticTexts["mcp.prompt.0"]
+            XCTAssertTrue(prompt.waitForExistence(timeout: 10))
+            XCTAssertEqual(prompt.value as? String ?? prompt.label, "Synthetic review prompt")
+            let argument = app.staticTexts["The synthetic change to review."]
+            XCTAssertTrue(argument.exists)
+            for _ in 0..<16 where !details.frame.contains(argument.frame) {
+                details.scroll(byDeltaX: 0, deltaY: argument.frame.minY < details.frame.minY ? -150 : 150)
+            }
+            XCTAssertTrue(details.frame.contains(argument.frame))
+            let promptShot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+            promptShot.name = "Native MCP prompt descriptions"; promptShot.lifetime = .keepAlways; add(promptShot)
             app.buttons["mcp.lifecycle.stop"].click()
             XCTAssertTrue(app.staticTexts["Stopped."].waitForExistence(timeout: 10))
         }

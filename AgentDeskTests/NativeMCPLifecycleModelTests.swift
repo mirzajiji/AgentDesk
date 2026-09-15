@@ -112,6 +112,38 @@ import AgentDeskPersistence
         try await Task.sleep(for: .milliseconds(30))
         XCTAssertNil(model.catalog); XCTAssertFalse(model.connected); XCTAssertNil(model.pending)
     }
+    func testPromptReviewIsSeparateAndStopClearsDescriptions() async throws {
+        let fake = try LifecycleFake()
+        let model = NativeMCPLifecycleModel(needsCredentials: false) { fake }
+        model.prepare(); try await settle(model); model.approve(); try await settle(model)
+        model.discoverPrompts(); try await settle(model)
+        XCTAssertTrue(model.reviewingPrompts); XCTAssertFalse(model.reviewingDiscovery)
+        XCTAssertEqual(model.pending?.id, fake.promptReview.id); XCTAssertEqual(fake.promptReads, 0)
+        model.approve(); try await settle(model)
+        XCTAssertNotNil(model.promptCatalog); XCTAssertEqual(fake.promptReads, 1)
+        XCTAssertEqual(model.message, "This server returned no prompts.")
+        model.stop(); try await settle(model); XCTAssertNil(model.promptCatalog)
+    }
+    func testDeniedPromptDiscoveryClosesWithoutRawError() async throws {
+        let fake = try LifecycleFake(); fake.denyPrompts = true
+        let model = NativeMCPLifecycleModel(needsCredentials: false) { fake }
+        model.prepare(); try await settle(model); model.approve(); try await settle(model)
+        model.discoverPrompts(); try await settle(model)
+        XCTAssertEqual(fake.promptReads, 0); XCTAssertEqual(fake.closes, 1)
+        XCTAssertNil(model.promptCatalog); XCTAssertFalse(model.message.contains("private-value"))
+    }
+    func testLatePromptDiscoveryCannotRestoreStoppedCatalog() async throws {
+        let fake = try LifecycleFake()
+        var release: CheckedContinuation<Void, Never>?
+        fake.beforePrompts = { await withCheckedContinuation { release = $0 } }
+        let model = NativeMCPLifecycleModel(needsCredentials: false) { fake }
+        model.prepare(); try await settle(model); model.approve(); try await settle(model)
+        model.discoverPrompts(); try await settle(model); model.approve()
+        for _ in 0..<100 where release == nil { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertNotNil(release); model.stop(); release?.resume(); try await settle(model)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertNil(model.promptCatalog); XCTAssertFalse(model.connected); XCTAssertNil(model.pending)
+    }
     private func settle(_ model: NativeMCPLifecycleModel) async throws {
         for _ in 0..<100 where model.busy { try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertFalse(model.busy)
@@ -121,6 +153,9 @@ import AgentDeskPersistence
     let launch: ApprovalRecord
     let credential: ApprovalRecord
     let discovery: ApprovalRecord
+    let promptReview: ApprovalRecord
+    var promptReads = 0, denyPrompts = false
+    var beforePrompts: (() async -> Void)?
     var discoveries = 0, denyDiscovery = false
     var beforeDiscovery: (() async -> Void)?
     var starts = 0, closes = 0, pings = 0
@@ -138,7 +173,7 @@ import AgentDeskPersistence
                 state: .pending, sequence: 1, createdAt: now, expiresAt: now.addingTimeInterval(600), updatedAt: now,
                 reviewerID: nil, reviewerRevision: nil)
         }
-        launch = try pending(.runShell); credential = try pending(.readSecret); discovery = try pending(.readEvidence)
+        launch = try pending(.runShell); credential = try pending(.readSecret); discovery = try pending(.readEvidence); promptReview = try pending(.readEvidence)
     }
     func prepare() async throws -> PolicyPreparation { .approval(launch) }
     func review(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
@@ -168,6 +203,18 @@ import AgentDeskPersistence
         await beforeDiscovery?()
         return MCPToolCatalogPresentation(scope: discovery.action.scope, environmentID: discovery.action.environmentID,
             connectionID: UUID(), tools: [])
+    }
+    func preparePromptDiscovery() async throws -> PolicyPreparation {
+        if denyPrompts { throw NSError(domain: "private-value", code: 1) }
+        return .approval(promptReview)
+    }
+    func reviewPromptDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        XCTAssertEqual(id, promptReview.id); XCTAssertTrue(approve); return promptReview
+    }
+    func discoverPrompts(approvalID: UUID?) async throws -> MCPPromptCatalogPresentation {
+        XCTAssertEqual(approvalID, promptReview.id); promptReads += 1; await beforePrompts?()
+        return MCPPromptCatalogPresentation(scope: promptReview.action.scope, environmentID: promptReview.action.environmentID,
+            connectionID: UUID(), prompts: [])
     }
     func ping() async throws { pings += 1 }
     func close() async { closes += 1; await beforeClose?() }

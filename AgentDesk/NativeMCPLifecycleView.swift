@@ -111,6 +111,21 @@ struct NativeMCPLifecycleView: View {
                         }
                         Text("Read a resource to view its contents. Server content is untrusted.").font(.caption).foregroundStyle(.secondary)
                     }
+                    if let catalog = model.templateCatalog {
+                        Text("Resource templates (\(catalog.resourceTemplates.count))").font(.headline)
+                        ForEach(catalog.resourceTemplates, id: \.id) { template in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(verbatim: template.title?.text ?? template.name.text).font(.headline)
+                                    .accessibilityIdentifier("mcp.template.title")
+                                Text(verbatim: template.name.text).font(.caption).foregroundStyle(.secondary)
+                                Text(verbatim: template.uriTemplate.text).textSelection(.enabled)
+                                if let description = template.description { Text(verbatim: description.text).textSelection(.enabled) }
+                                if let mime = template.mimeType { Text("Type: \(mime.text)").font(.caption) }
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                        Text("Template descriptions only. No variables have been expanded or resources read.").font(.caption).foregroundStyle(.secondary)
+                    }
                     Text("Closing this window stops this connection. Server capabilities do not grant permission to use tools.")
                         .font(.caption).foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity, alignment: .leading)
@@ -118,7 +133,7 @@ struct NativeMCPLifecycleView: View {
             Text(model.message).accessibilityIdentifier("mcp.lifecycle.message")
             if model.busy { ProgressView() }
             if model.pending != nil {
-                Button(model.readingResourceID != nil ? "Approve Resource Read" : model.reviewingResources ? "Approve Resource Discovery" : model.reviewingPrompts ? "Approve Prompt Discovery" : model.reviewingDiscovery ? "Approve Tool Discovery" : model.reviewingCredentials ? "Approve Credential Access" : "Approve and Start") { model.approve() }
+                Button(model.readingResourceID != nil ? "Approve Resource Read" : model.reviewingTemplates ? "Approve Template Discovery" : model.reviewingResources ? "Approve Resource Discovery" : model.reviewingPrompts ? "Approve Prompt Discovery" : model.reviewingDiscovery ? "Approve Tool Discovery" : model.reviewingCredentials ? "Approve Credential Access" : "Approve and Start") { model.approve() }
                     .disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.approve")
             } else if model.connected {
                 HStack {
@@ -126,7 +141,10 @@ struct NativeMCPLifecycleView: View {
                     Button("Discover Prompts") { model.discoverPrompts() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.prompts")
                     Button("Discover Resources") { model.discoverResources() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.resources")
                 }
-                Button("Check Health") { model.checkHealth() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.health")
+                HStack {
+                    Button("Discover Templates") { model.discoverResourceTemplates() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.templates")
+                    Button("Check Health") { model.checkHealth() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.health")
+                }
             } else {
                 Button("Review Start") { model.prepare() }.disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.review")
             }

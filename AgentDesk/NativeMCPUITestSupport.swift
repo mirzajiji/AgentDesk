@@ -47,6 +47,8 @@ enum NativeMCPUITestSupport {
             elif r['method'] == 'resources/read':
                 assert r['params']['uri'] == 'urn:synthetic:evidence'
                 result.update({'ttlMs':0,'cacheScope':'private','contents':[{'uri':'urn:synthetic:evidence','mimeType':'text/plain','text':'Synthetic evidence body.'},{'uri':'urn:synthetic:binary','blob':'AP9B'}]})
+            elif r['method'] == 'resources/templates/list':
+                result.update({'ttlMs':0,'cacheScope':'private','resourceTemplates':[{'uriTemplate':'urn:synthetic:{item}','name':'item','title':'Synthetic resource template','description':'Synthetic template metadata.','mimeType':'text/plain'}]})
             elif r['method'] == 'resources/list':
                 result.update({'ttlMs':0,'cacheScope':'private','resources':[{'uri':'urn:synthetic:evidence','name':'evidence','title':'Synthetic evidence resource','description':'Synthetic resource metadata.','mimeType':'text/plain','size':42}]})
             elif r['method'] == 'prompts/list':

@@ -92,6 +92,21 @@ final class NativeMCPConnectionsUITests: XCTestCase {
             XCTAssertTrue(app.staticTexts["Binary content: 3 bytes. Preview unavailable."].exists)
             let contentShot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
             contentShot.name = "Native MCP resource content"; contentShot.lifetime = .keepAlways; add(contentShot)
+            app.buttons["mcp.lifecycle.templates"].click()
+            XCTAssertTrue(app.buttons["Approve Template Discovery"].waitForExistence(timeout: 10))
+            XCTAssertFalse(app.staticTexts["mcp.template.title"].exists)
+            app.buttons["Approve Template Discovery"].click()
+            let template = app.staticTexts["mcp.template.title"]
+            XCTAssertTrue(template.waitForExistence(timeout: 10))
+            XCTAssertEqual(template.value as? String ?? template.label, "Synthetic resource template")
+            let templateURI = app.staticTexts["urn:synthetic:{item}"]
+            XCTAssertTrue(templateURI.exists)
+            for _ in 0..<16 where !details.frame.contains(templateURI.frame) {
+                details.scroll(byDeltaX: 0, deltaY: templateURI.frame.minY < details.frame.minY ? -150 : 150)
+            }
+            XCTAssertTrue(details.frame.contains(templateURI.frame))
+            let templateShot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+            templateShot.name = "Native MCP resource templates"; templateShot.lifetime = .keepAlways; add(templateShot)
             app.buttons["mcp.lifecycle.stop"].click()
             XCTAssertTrue(app.staticTexts["Stopped."].waitForExistence(timeout: 10))
         }

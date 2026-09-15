@@ -176,6 +176,38 @@ import AgentDeskPersistence
         try await Task.sleep(for: .milliseconds(30))
         XCTAssertNil(model.resourceCatalog); XCTAssertFalse(model.connected); XCTAssertNil(model.pending)
     }
+    func testTemplateReviewIsSeparateAndStopClearsDescriptions() async throws {
+        let fake = try LifecycleFake()
+        let model = NativeMCPLifecycleModel(needsCredentials: false) { fake }
+        model.prepare(); try await settle(model); model.approve(); try await settle(model)
+        model.discoverResourceTemplates(); try await settle(model)
+        XCTAssertTrue(model.reviewingTemplates); XCTAssertFalse(model.reviewingDiscovery)
+        XCTAssertEqual(model.pending?.id, fake.templateReview.id); XCTAssertEqual(fake.templateReads, 0)
+        model.approve(); try await settle(model)
+        XCTAssertNotNil(model.templateCatalog); XCTAssertEqual(fake.templateReads, 1)
+        XCTAssertEqual(model.message, "This server returned no resource templates.")
+        model.stop(); try await settle(model); XCTAssertNil(model.templateCatalog)
+    }
+    func testDeniedTemplateDiscoveryClosesWithoutRawError() async throws {
+        let fake = try LifecycleFake(); fake.denyTemplates = true
+        let model = NativeMCPLifecycleModel(needsCredentials: false) { fake }
+        model.prepare(); try await settle(model); model.approve(); try await settle(model)
+        model.discoverResourceTemplates(); try await settle(model)
+        XCTAssertEqual(fake.templateReads, 0); XCTAssertEqual(fake.closes, 1)
+        XCTAssertNil(model.templateCatalog); XCTAssertFalse(model.message.contains("private-value"))
+    }
+    func testLateTemplateDiscoveryCannotRestoreStoppedCatalog() async throws {
+        let fake = try LifecycleFake()
+        var release: CheckedContinuation<Void, Never>?
+        fake.beforeTemplates = { await withCheckedContinuation { release = $0 } }
+        let model = NativeMCPLifecycleModel(needsCredentials: false) { fake }
+        model.prepare(); try await settle(model); model.approve(); try await settle(model)
+        model.discoverResourceTemplates(); try await settle(model); model.approve()
+        for _ in 0..<100 where release == nil { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertNotNil(release); model.stop(); release?.resume(); try await settle(model)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertNil(model.templateCatalog); XCTAssertFalse(model.connected); XCTAssertNil(model.pending)
+    }
     func testResourceContentRequiresSeparateReviewAndClearsOnRefresh() async throws {
         let fake = try LifecycleFake(); fake.includeResource = true
         let model = NativeMCPLifecycleModel(needsCredentials: false) { fake }
@@ -222,6 +254,9 @@ import AgentDeskPersistence
     let credential: ApprovalRecord
     let discovery: ApprovalRecord
     let promptReview: ApprovalRecord
+    let templateReview: ApprovalRecord
+    var templateReads = 0, denyTemplates = false
+    var beforeTemplates: (() async -> Void)?
     let contentReview: ApprovalRecord
     let resource: MCPResourcePresentation
     let connectionID = UUID()
@@ -249,6 +284,7 @@ import AgentDeskPersistence
                 state: .pending, sequence: 1, createdAt: now, expiresAt: now.addingTimeInterval(600), updatedAt: now,
                 reviewerID: nil, reviewerRevision: nil)
         }
+        templateReview = try pending(.readEvidence)
         contentReview = try pending(.readEvidence)
         let context = RedactionContext(scope: scope, environmentID: environment, runID: RunID())
         let text = try ContentRedactor(context: context).redactText("urn:synthetic", in: context)
@@ -307,6 +343,18 @@ import AgentDeskPersistence
         XCTAssertEqual(approvalID, resourceReview.id); resourceReads += 1; await beforeResources?()
         return MCPResourceCatalogPresentation(scope: resourceReview.action.scope, environmentID: resourceReview.action.environmentID,
             connectionID: connectionID, resources: includeResource ? [resource] : [])
+    }
+    func prepareResourceTemplateDiscovery() async throws -> PolicyPreparation {
+        if denyTemplates { throw NSError(domain: "private-value", code: 1) }
+        return .approval(templateReview)
+    }
+    func reviewResourceTemplateDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        XCTAssertEqual(id, templateReview.id); XCTAssertTrue(approve); return templateReview
+    }
+    func discoverResourceTemplates(approvalID: UUID?) async throws -> MCPResourceTemplateCatalogPresentation {
+        XCTAssertEqual(approvalID, templateReview.id); templateReads += 1; await beforeTemplates?()
+        return MCPResourceTemplateCatalogPresentation(scope: templateReview.action.scope, environmentID: templateReview.action.environmentID,
+            connectionID: connectionID, resourceTemplates: [])
     }
     func prepareResourceRead(resourceID: UUID) async throws -> PolicyPreparation {
         XCTAssertEqual(resourceID, resource.id)

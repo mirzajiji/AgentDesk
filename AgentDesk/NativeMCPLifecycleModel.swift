@@ -22,6 +22,9 @@ protocol NativeMCPLifecycle: Sendable {
     func prepareResourceDiscovery() async throws -> PolicyPreparation
     func reviewResourceDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord
     func discoverResources(approvalID: UUID?) async throws -> MCPResourceCatalogPresentation
+    func prepareResourceTemplateDiscovery() async throws -> PolicyPreparation
+    func reviewResourceTemplateDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord
+    func discoverResourceTemplates(approvalID: UUID?) async throws -> MCPResourceTemplateCatalogPresentation
     func prepareResourceRead(resourceID: UUID) async throws -> PolicyPreparation
     func reviewResourceRead(_ id: UUID, resourceID: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord
     func readResource(resourceID: UUID, approvalID: UUID?) async throws -> MCPResourceReadPresentation
@@ -38,6 +41,8 @@ extension NativeMCPConnection: NativeMCPLifecycle {}
     @Published private(set) var reviewingDiscovery = false
     @Published private(set) var reviewingPrompts = false
     @Published private(set) var reviewingResources = false
+    @Published private(set) var reviewingTemplates = false
+    @Published private(set) var templateCatalog: MCPResourceTemplateCatalogPresentation?
     @Published private(set) var readingResourceID: UUID?
     @Published private(set) var resourceContent: MCPResourceReadPresentation?
     @Published private(set) var resourceCatalog: MCPResourceCatalogPresentation?
@@ -72,12 +77,15 @@ extension NativeMCPConnection: NativeMCPLifecycle {}
     }
     func approve() {
         guard !busy, let pending, let session else { return }
-        busy = true; let token = generation, credentials = reviewingCredentials, discovery = reviewingDiscovery, prompts = reviewingPrompts, resources = reviewingResources, resourceID = readingResourceID
+        busy = true; let token = generation, credentials = reviewingCredentials, discovery = reviewingDiscovery, prompts = reviewingPrompts, resources = reviewingResources, resourceID = readingResourceID, templates = reviewingTemplates
         task = Task {
             do {
                 if let resourceID {
                     _ = try await session.reviewResourceRead(pending.id, resourceID: resourceID, approve: true, expectedSequence: pending.sequence)
                     try await loadResourceContent(session, resourceID: resourceID, approvalID: pending.id, token: token)
+                } else if templates {
+                    _ = try await session.reviewResourceTemplateDiscovery(pending.id, approve: true, expectedSequence: pending.sequence)
+                    try await loadTemplates(session, approvalID: pending.id, token: token)
                 } else if resources {
                     _ = try await session.reviewResourceDiscovery(pending.id, approve: true, expectedSequence: pending.sequence)
                     try await loadResources(session, approvalID: pending.id, token: token)
@@ -184,6 +192,31 @@ extension NativeMCPConnection: NativeMCPLifecycle {}
         resourceCatalog = result; pending = nil; reviewingResources = false
         message = result.resources.isEmpty ? "This server returned no resources." : "Resource descriptions loaded."
     }
+    func discoverResourceTemplates() {
+        guard connected, !busy, pending == nil, let session else { return }
+        busy = true; templateCatalog = nil; let token = generation
+        task = Task {
+            do {
+                let preparation = try await session.prepareResourceTemplateDiscovery()
+                guard token == generation, !Task.isCancelled else { return }
+                switch preparation {
+                case .approval(let record):
+                    pending = record; reviewingTemplates = true
+                    message = "Approve listing resource template descriptions from this connection."
+                case .allowed: try await loadTemplates(session, approvalID: nil, token: token)
+                case .denied: throw AuthorizationError.denied
+                }
+            } catch { await failed(token) }
+            if token == generation { busy = false }
+        }
+    }
+    private func loadTemplates(_ session: any NativeMCPLifecycle, approvalID: UUID?, token: UUID) async throws {
+        guard token == generation, !Task.isCancelled else { throw CancellationError() }
+        let result = try await session.discoverResourceTemplates(approvalID: approvalID)
+        guard token == generation, !Task.isCancelled else { return }
+        templateCatalog = result; pending = nil; reviewingTemplates = false
+        message = result.resourceTemplates.isEmpty ? "This server returned no resource templates." : "Resource template descriptions loaded."
+    }
     func readResource(_ resourceID: UUID) {
         guard connected, !busy, pending == nil, let session,
               resourceCatalog?.resources.contains(where: { $0.id == resourceID }) == true else { return }
@@ -227,7 +260,7 @@ extension NativeMCPConnection: NativeMCPLifecycle {}
         guard !stopping else { return }; stopping = true
         generation = UUID(); task?.cancel(); task = nil
         let old = session; session = nil; pending = nil; launchApproval = nil
-        connected = false; reviewingCredentials = false; reviewingDiscovery = false; catalog = nil; reviewingPrompts = false; promptCatalog = nil; reviewingResources = false; resourceCatalog = nil; readingResourceID = nil; resourceContent = nil; busy = true; message = "Stopping…"
+        connected = false; reviewingCredentials = false; reviewingDiscovery = false; catalog = nil; reviewingPrompts = false; promptCatalog = nil; reviewingResources = false; resourceCatalog = nil; readingResourceID = nil; resourceContent = nil; reviewingTemplates = false; templateCatalog = nil; busy = true; message = "Stopping…"
         let token = generation, cleanup = enqueueCleanup(old)
         task = Task {
             await cleanup.value
@@ -243,7 +276,7 @@ extension NativeMCPConnection: NativeMCPLifecycle {}
     }
     private func failed(_ token: UUID) async {
         guard token == generation else { return }
-        let old = session; session = nil; pending = nil; launchApproval = nil; connected = false; reviewingCredentials = false; reviewingDiscovery = false; catalog = nil; reviewingPrompts = false; promptCatalog = nil; reviewingResources = false; resourceCatalog = nil; readingResourceID = nil; resourceContent = nil
+        let old = session; session = nil; pending = nil; launchApproval = nil; connected = false; reviewingCredentials = false; reviewingDiscovery = false; catalog = nil; reviewingPrompts = false; promptCatalog = nil; reviewingResources = false; resourceCatalog = nil; readingResourceID = nil; resourceContent = nil; reviewingTemplates = false; templateCatalog = nil
         let cleanup = enqueueCleanup(old)
         await cleanup.value
         if token == generation {

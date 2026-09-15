@@ -168,3 +168,17 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - Normal signed Mac build passed with the standard build command (`TestResults/p3-08-resource-content-build.log`). Exported UI screenshot `TestResults/p3-08-resource-content-images/19BEE1EE-A48A-49A3-BF77-536679094670.png` was visually inspected: resource content, binary limitation and persistent controls are readable and reachable. No new iPhone or physical multi-display coverage is claimed for this Mac-only surface.
 
 Binary previews/export, resource templates, prompt retrieval, tool invocation and remaining MCP lifecycle/manager requirements remain outstanding. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Native template browsing
+
+The implementation adds separate template discovery review, redacted template cards and a two-row control area. Model regressions cover separate approval, empty catalog, denial and late completion after stop. The live synthetic UI fixture/test now checks template discovery after resource reading in two connection lifetimes.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac -resultBundlePath TestResults/p3-08-template-ui.xcresult -only-testing:AgentDeskTests/NativeMCPLifecycleModelTests -only-testing:AgentDeskUITests/NativeMCPConnectionsUITests/testReviewedNativeProcessStartHealthStopAndRestart -parallel-testing-enabled NO test`: 21 native model tests passed; the UI test failed at application activation before feature interaction (`TestResults/p3-08-template-ui.log`). Xcode reported Running Background. The completed process exited 65.
+- Selecting the exact built app through computer use confirmed the Mac is locked and automatic unlock is unavailable. The user was asked to unlock it manually. Do not count this as UI feature coverage or restart tests until an unlocked desktop is available.
+- Normal signed Mac build passed (`TestResults/p3-08-template-ui-build.log`). Documentation/diff checks pass. No Simulator coverage is claimed for this Mac-only change.
+
+After the desktop became available, the exact built app was raised and only the UI test was rerun with the same test command, omitting the model-test selector and using `TestResults/p3-08-template-ui-retry.xcresult`. The native UI test passed both connection cycles (`TestResults/p3-08-template-ui-retry.log`). No source changes were made between the failed activation and passing retry. Exported screenshot `TestResults/p3-08-template-ui-images/9C16D5D2-6D0F-4789-B79A-B3644E2ED234.png` was visually inspected: template metadata and both control rows are visible and readable. The desktop lock no longer blocks this task.
+
+Template grammar/expansion, prompt retrieval, tool invocation and the remaining MCP manager/lifecycle requirements remain outstanding. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

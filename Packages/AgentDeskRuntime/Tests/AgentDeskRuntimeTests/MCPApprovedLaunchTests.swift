@@ -54,7 +54,10 @@ import XCTest
             if 'id' not in r: continue
             result = {'resultType':'complete'}
             if r['method'] == 'server/discover':
-                result.update({'supportedVersions':['2026-07-28'],'capabilities':{},'_meta':{'io.modelcontextprotocol/serverInfo':{'name':os.environ['SYNTHETIC_TOKEN'],'version':'1'}}})
+                result.update({'supportedVersions':['2026-07-28'],'capabilities':{'tools':{}},'_meta':{'io.modelcontextprotocol/serverInfo':{'name':os.environ['SYNTHETIC_TOKEN'],'version':'1'}}})
+            elif r['method'] == 'tools/list':
+                value = os.environ['SYNTHETIC_TOKEN']
+                result.update({'ttlMs':0,'cacheScope':'private','tools':[{'name':value,'title':value,'description':value,'inputSchema':{'type':'object'},'annotations':{'readOnlyHint':True}}]})
             print(json.dumps({'jsonrpc':'2.0','id':r['id'],'result':result}), flush=True)
         """
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -71,13 +74,13 @@ import XCTest
         let secrets = MCPFixtureSecrets(scope: secretScope)
         let config = try MCPStdioConfiguration(id: id, scope: scope, environmentID: environment, name: "Synthetic", executable: "/usr/bin/python3", arguments: ["-u", "-c", script], workingDirectory: path, secretEnvironment: ["SYNTHETIC_TOKEN": reference], enabled: true)
         _ = try await configurations.save(config, in: scope, expectedRevision: nil)
-        let rules = PolicyOperation.allCases.map { PolicyRule($0, $0 == .readSecret ? disposition : .allow) }
+        let rules = PolicyOperation.allCases.map { PolicyRule($0, $0 == .readSecret ? disposition : ($0 == .readEvidence && review ? .approval : .allow)) }
         let policy = try PolicySnapshot(
             workspace: PolicyDocument(level: .workspace, workspaceID: scope.workspaceID, rules: rules),
             project: PolicyDocument(level: .project, workspaceID: scope.workspaceID, projectID: scope.projectID, rules: rules),
             environment: PolicyDocument(level: .environment, workspaceID: scope.workspaceID, projectID: scope.projectID, environmentID: environment, rules: rules), environmentKind: .test)
         let user = try PolicyAuthority(id: UUID(), kind: .localUser, scopes: [scope], environments: [environment],
-            operations: [.runShell, .readSecret], canApprove: true, expiresAt: Date().addingTimeInterval(600))
+            operations: [.runShell, .readSecret, .readEvidence], canApprove: true, expiresAt: Date().addingTimeInterval(600))
         let approvals = try ApprovalStore(database: root.appendingPathComponent("operations.sqlite"), scope: scope, environmentID: environment)
         let directory = root.appendingPathComponent("project")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -106,6 +109,28 @@ import XCTest
             XCTAssertFalse(name.text.contains("fixture-value"))
             XCTAssertGreaterThan(name.redactionCount, 0)
             XCTAssertEqual(name.context.scope, scope)
+            var discoveryApproval: UUID?
+            if review {
+                do { _ = try await launch.discoverTools(); XCTFail("Discovery skipped approval") }
+                catch { XCTAssertEqual(error as? AuthorizationError, .approvalRequired) }
+                guard case .approval(let discovery) = try await launch.prepareDiscovery() else { return XCTFail("Missing discovery review") }
+                _ = try await launch.reviewDiscovery(discovery.id, approve: true, expectedSequence: discovery.sequence)
+                discoveryApproval = discovery.id
+            }
+            let tools = try await launch.discoverTools(approvalID: discoveryApproval)
+            XCTAssertEqual(tools.scope, scope)
+            XCTAssertEqual(tools.environmentID, environment)
+            XCTAssertEqual(tools.connectionID, id)
+            let tool = try XCTUnwrap(tools.tools.first)
+            XCTAssertEqual(tools.tools.count, 1)
+            for field in [tool.name, try XCTUnwrap(tool.title), try XCTUnwrap(tool.description)] {
+                XCTAssertFalse(field.text.contains("fixture-value"))
+                XCTAssertGreaterThan(field.redactionCount, 0)
+                XCTAssertEqual(field.context.scope, scope)
+                XCTAssertEqual(field.context.environmentID, environment)
+            }
+            XCTAssertEqual(tool.readOnlyHint, true)
+            XCTAssertNil(tool.destructiveHint)
             try await launch.ping()
         } catch {
             XCTAssertEqual(error as? AuthorizationError, disposition == .deny ? .denied : .approvalRequired)
@@ -113,6 +138,8 @@ import XCTest
         let reads = await secrets.reads
         XCTAssertEqual(reads, (disposition == .allow || review) ? 1 : 0)
         await launch.close()
+        do { _ = try await launch.discoverTools(); XCTFail("Closed discovery succeeded") }
+        catch { XCTAssertEqual(error as? MCPProcessError, .closed) }
         do { try await launch.ping(); XCTFail("Closed connection remained usable") }
         catch { XCTAssertEqual(error as? MCPProcessError, .closed) }
         }
@@ -159,6 +186,8 @@ import XCTest
         let server = try await launch.start(approvalID: pending.id)
         XCTAssertEqual(server.mode, .modern)
         try await launch.ping()
+        do { _ = try await launch.discoverTools(); XCTFail("Launch-only authority listed tools") }
+        catch { XCTAssertEqual(error as? AuthorizationError, .denied) }
         do { _ = try await launch.start(approvalID: pending.id); XCTFail("Repeated start succeeded") }
         catch { XCTAssertEqual(error as? AuthorizationError, .denied) }
         await launch.close()

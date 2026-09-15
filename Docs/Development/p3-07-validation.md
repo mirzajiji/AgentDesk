@@ -63,3 +63,15 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-discovery-policy-mac-build.log`). Documentation and diff checks pass. This Mac-only change adds no Simulator coverage.
 
 The public native connection still needs to combine this gate with live discovery and redaction. Tool invocation, capability UI, resources and prompts are not completed by this component. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Authorized native discovery presentation
+
+`NativeMCPConnection` now exposes discovery preparation, review and execution through the independent policy gate. The approved launch combines that gate with the live negotiated traversal and returns only scoped display descriptions. Tool names, titles and descriptions pass through the launch's retained `ContentRedactor`, including the actual child-process secret values. Discovery does not reread Keychain; the retained redaction policy is released when the connection closes. Raw protocol pages, schemas and cursors do not escape through this presentation API. Redacted tool names are display labels, not executable identifiers; annotation hints remain untrusted claims and grant no authority.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- `swift test --package-path Packages/AgentDeskRuntime --filter MCPApprovedLaunchTests`: all 3 process integration tests passed (`TestResults/p3-07-native-discovery.log`).
+- `swift test --package-path Packages/AgentDeskRuntime`: all 202 tests passed after extending missing-authority coverage (`TestResults/p3-07-native-discovery-final.log`). Synthetic servers echo a known child credential in all three display fields. Tests verify redaction and scope, allowed and separately approved discovery, approval-required denial, no extra secret reads, launch-only authority denial and closed-connection rejection.
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-native-discovery-mac-build.log`). Documentation and diff checks pass. This Mac-only API adds no Simulator coverage.
+
+Native discovery UI and its host authority wiring remain next; schema browsing and tool invocation are not implemented by the display API. P3-07/P3-08 remain in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

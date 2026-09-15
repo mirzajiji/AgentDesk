@@ -38,6 +38,13 @@ public actor NativeMCPConnection {
     public func start(approvalID: UUID, credentialApprovalID: UUID? = nil) async throws -> MCPServerPresentation {
         try await launch.start(approvalID: approvalID, credentialApprovalID: credentialApprovalID)
     }
+    public func prepareDiscovery() async throws -> PolicyPreparation { try await launch.prepareDiscovery() }
+    public func reviewDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        try await launch.reviewDiscovery(id, approve: approve, expectedSequence: expectedSequence)
+    }
+    public func discoverTools(approvalID: UUID? = nil) async throws -> MCPToolCatalogPresentation {
+        try await launch.discoverTools(approvalID: approvalID)
+    }
     public func ping() async throws { try await launch.ping() }
     /// Await before releasing the owner or switching projects.
     public func close() async { await launch.close() }

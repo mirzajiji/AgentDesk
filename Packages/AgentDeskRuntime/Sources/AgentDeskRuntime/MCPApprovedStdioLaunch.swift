@@ -15,12 +15,28 @@ public struct MCPServerPresentation: Sendable {
     public let prompts: Bool
 }
 
+/// Display-only server claims. Names are redacted labels, never executable tool identifiers.
+public struct MCPToolPresentation: Sendable {
+    public let name: RedactedText
+    public let title: RedactedText?
+    public let description: RedactedText?
+    public let readOnlyHint: Bool?
+    public let destructiveHint: Bool?
+}
+public struct MCPToolCatalogPresentation: Sendable {
+    public let scope: ProjectScope
+    public let environmentID: EnvironmentID
+    public let connectionID: UUID
+    public let tools: [MCPToolPresentation]
+}
+
 /// Internal Mac integration. The host retains registered filesystem access for this lifetime.
 /// Credential reads require independent readSecret policy permission.
 actor MCPApprovedStdioLaunch {
     private struct Opened: Sendable {
         let connection: MCPNegotiatedStdioConnection
         let presentation: MCPServerPresentation
+        let redactor: ContentRedactor
     }
     private let secrets: (any SecretStore)?
     private let gate: MCPLaunchPolicySession
@@ -29,6 +45,7 @@ actor MCPApprovedStdioLaunch {
     private let projectRoot: URL
     private let resource: ActionFingerprint
     private var connection: MCPNegotiatedStdioConnection?
+    private var redactor: ContentRedactor?
     private var repositoryAccess: RepositoryAccess?
     private var closed = false
     private var starting = false
@@ -108,7 +125,7 @@ actor MCPApprovedStdioLaunch {
                     name: server.name.map { try redactor.redactText($0, in: context) },
                     version: server.version.map { try redactor.redactText($0, in: context) },
                     tools: server.tools, resources: server.resources, prompts: server.prompts)
-                return Opened(connection: opened, presentation: presentation)
+                return Opened(connection: opened, presentation: presentation, redactor: redactor)
             } catch { await opened.close(); throw error }
         }
         }
@@ -117,7 +134,35 @@ actor MCPApprovedStdioLaunch {
         guard case .executed(let opened) = result else { throw AuthorizationError.denied }
         if closed || Task.isCancelled { await opened.connection.close(); throw CancellationError() }
         connection = opened.connection
+        redactor = opened.redactor
         return opened.presentation
+    }
+    func prepareDiscovery() async throws -> PolicyPreparation {
+        guard !closed, connection != nil else { throw MCPProcessError.closed }
+        return try await gate.prepareDiscovery()
+    }
+    func reviewDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        guard !closed, connection != nil else { throw MCPProcessError.closed }
+        return try await gate.reviewDiscovery(id, approve: approve, expectedSequence: expectedSequence)
+    }
+    func discoverTools(approvalID: UUID? = nil) async throws -> MCPToolCatalogPresentation {
+        guard !closed, let connection, let redactor else { throw MCPProcessError.closed }
+        let environment = configuration.environmentID
+        let result = try await gate.discover(approvalID: approvalID) {
+            let catalog = try await connection.discoverTools(environmentID: environment)
+            let tools = try catalog.tools.map { tool in
+                try Task.checkCancellation()
+                return try MCPToolPresentation(name: redactor.redactText(tool.name, in: redactor.context),
+                    title: tool.title.map { try redactor.redactText($0, in: redactor.context) },
+                    description: tool.description.map { try redactor.redactText($0, in: redactor.context) },
+                    readOnlyHint: tool.readOnlyHint, destructiveHint: tool.destructiveHint)
+            }
+            return MCPToolCatalogPresentation(scope: catalog.scope, environmentID: catalog.environmentID,
+                connectionID: catalog.connectionID, tools: tools)
+        }
+        try Task.checkCancellation()
+        guard !closed, case .executed(let catalog) = result else { throw AuthorizationError.denied }
+        return catalog
     }
     func ping() async throws {
         guard !closed, let connection else { throw MCPProcessError.closed }
@@ -131,6 +176,7 @@ actor MCPApprovedStdioLaunch {
         if let pending, case .executed(let opened) = try? await pending.value { await opened.connection.close() }
         await connection?.close()
         connection = nil
+        redactor = nil
         repositoryAccess = nil
     }
 }

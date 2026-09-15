@@ -50,6 +50,22 @@ public struct MCPPromptCatalogPresentation: Sendable {
     public let prompts: [MCPPromptPresentation]
 }
 
+/// Redacted metadata only. URI labels are not executable URLs or filesystem grants.
+public struct MCPResourcePresentation: Sendable {
+    public let uri: RedactedText
+    public let name: RedactedText
+    public let title: RedactedText?
+    public let description: RedactedText?
+    public let mimeType: RedactedText?
+    public let sizeBytes: RedactedText?
+}
+public struct MCPResourceCatalogPresentation: Sendable {
+    public let scope: ProjectScope
+    public let environmentID: EnvironmentID
+    public let connectionID: UUID
+    public let resources: [MCPResourcePresentation]
+}
+
 /// Internal Mac integration. The host retains registered filesystem access for this lifetime.
 /// Credential reads require independent readSecret policy permission.
 actor MCPApprovedStdioLaunch {
@@ -214,6 +230,35 @@ actor MCPApprovedStdioLaunch {
             }
             return MCPPromptCatalogPresentation(scope: catalog.scope, environmentID: catalog.environmentID,
                 connectionID: catalog.connectionID, prompts: prompts)
+        }
+        try Task.checkCancellation()
+        guard !closed, case .executed(let catalog) = result else { throw AuthorizationError.denied }
+        return catalog
+    }
+    func prepareResourceDiscovery() async throws -> PolicyPreparation {
+        guard !closed, connection != nil else { throw MCPProcessError.closed }
+        return try await gate.prepareDiscovery(kind: .resources)
+    }
+    func reviewResourceDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        guard !closed, connection != nil else { throw MCPProcessError.closed }
+        return try await gate.reviewDiscovery(id, approve: approve, expectedSequence: expectedSequence, kind: .resources)
+    }
+    func discoverResources(approvalID: UUID? = nil) async throws -> MCPResourceCatalogPresentation {
+        guard !closed, let connection, let redactor else { throw MCPProcessError.closed }
+        let environment = configuration.environmentID
+        let result = try await gate.discover(approvalID: approvalID, kind: .resources) {
+            let catalog = try await connection.discoverResources(environmentID: environment)
+            let resources = try catalog.resources.map { resource in
+                try Task.checkCancellation()
+                return try MCPResourcePresentation(uri: redactor.redactText(resource.uri, in: redactor.context),
+                    name: redactor.redactText(resource.name, in: redactor.context),
+                    title: resource.title.map { try redactor.redactText($0, in: redactor.context) },
+                    description: resource.description.map { try redactor.redactText($0, in: redactor.context) },
+                    mimeType: resource.mimeType.map { try redactor.redactText($0, in: redactor.context) },
+                    sizeBytes: resource.size.map { try redactor.redactText(String($0), in: redactor.context) })
+            }
+            return MCPResourceCatalogPresentation(scope: catalog.scope, environmentID: catalog.environmentID,
+                connectionID: catalog.connectionID, resources: resources)
         }
         try Task.checkCancellation()
         guard !closed, case .executed(let catalog) = result else { throw AuthorizationError.denied }

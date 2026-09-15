@@ -138,3 +138,14 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-live-resources-build.log`). Documentation/diff checks pass. This Mac-only integration adds no Simulator coverage.
 
 Resource-specific authorization, redacted native presentation and resource reading/templates remain outstanding. P3-07 remains in progress: 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Authorized resource presentation
+
+The native connection now exposes resource discovery preparation, review and execution. resources/list has its own immutable read-evidence action, separate from tools/list and prompts/list. The gate checks the selected action's scope/configuration/resource/policy before dispatch and before returning claims. Every display field, including URI, MIME type and formatted byte count, passes through the retained scoped redactor. Returned URI text is display metadata, not an executable URL or filesystem grant; no resource is opened or read.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- `swift test --package-path Packages/AgentDeskRuntime`: all 208 tests passed (`TestResults/p3-07-resource-authorization.log`). Live synthetic process tests now exercise allowed and independently approved resource discovery, rejection of both tool and prompt approval substitution while retaining those approvals for their proper operations, redacted URI/name/title/description/MIME fields, scoped byte count, unchanged credential-read count, missing authority and closed-connection rejection.
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-resource-authorization-build.log`). Documentation/diff checks pass. This Mac-only integration adds no Simulator coverage.
+
+Resource browsing UI is next; reading, templates, tool invocation and remaining lifecycle/manager requirements remain outstanding. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

@@ -51,3 +51,15 @@ Validation on macOS 26.5.2 / Xcode 26.0:
 - This implementation and its tests are macOS-only; no new Simulator coverage is claimed. Documentation and diff checks pass.
 
 P3-07 remains in progress. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.
+
+## Independent discovery policy
+
+The internal MCP policy session prepares, reviews and executes a separate `readEvidence` action for `tools/list`. Its payload binds the method and immutable configuration revision fingerprint; resource, workspace/project and environment remain bound by the action. Launch approval does not authorize discovery. The policy/configuration/resource checks run before dispatch and again before returning claims, so a configuration changed during traversal cannot publish a stale catalog. Closed sessions and missing operation authority fail closed.
+
+Validation on macOS 26.5.2 / Xcode 26.0:
+
+- `swift test --package-path Packages/AgentDeskRuntime --filter MCPLaunchPolicyTests`: both policy tests passed (`TestResults/p3-07-discovery-policy.log`).
+- After extending successful-read and missing-authority coverage, `swift test --package-path Packages/AgentDeskRuntime`: all 202 tests passed (`TestResults/p3-07-discovery-policy-final.log`). The discovery regression exercises deny/allow/approval policies, launch-approval substitution, independently approved execution, stale configuration during execution and closed-session rejection with synthetic storage.
+- `xcodebuild -project AgentDesk.xcodeproj -scheme AgentDesk -destination 'platform=macOS' -derivedDataPath TestResults/p1-01/NativeMac build`: signed Mac build passed (`TestResults/p3-07-discovery-policy-mac-build.log`). Documentation and diff checks pass. This Mac-only change adds no Simulator coverage.
+
+The public native connection still needs to combine this gate with live discovery and redaction. Tool invocation, capability UI, resources and prompts are not completed by this component. Counts remain 52 complete, 11 Phase 3 tasks plus Phases 4–6 remaining.

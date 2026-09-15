@@ -12,11 +12,16 @@ actor MCPLaunchPolicySession {
     private let gate: PolicyGate
     private let action: PolicyAction
     private let credentialAction: PolicyAction
+    private let discoveryAction: PolicyAction
     private let requesterID: UUID
     private let policyFingerprint: ActionFingerprint
     private let validate: @Sendable () async throws -> (PolicyAction, PolicySnapshot)
     private var closed = false
 
+    private struct DiscoveryPayload: Encodable {
+        let configuration: ActionFingerprint
+        let method: String
+    }
     private init(configuration: MCPStdioConfiguration, action: PolicyAction, policy: PolicySnapshot, authorities: [PolicyAuthority], requesterID: UUID,
                  approvals: ApprovalStore, validate: @escaping @Sendable () async throws -> (PolicyAction, PolicySnapshot)) throws {
         guard let requester = authorities.first(where: { $0.id == requesterID }), case .localUser = requester.kind else {
@@ -24,6 +29,9 @@ actor MCPLaunchPolicySession {
         }
         credentialAction = try PolicyAction(scope: action.scope, environmentID: action.environmentID, operation: .readSecret,
             resource: action.resource, payload: action.payload)
+        // Bind this review to listing tools, not arbitrary MCP requests or the launch itself.
+        discoveryAction = try PolicyAction(scope: action.scope, environmentID: action.environmentID, operation: .readEvidence,
+            resource: action.resource, payload: ActionFingerprint.canonical(DiscoveryPayload(configuration: action.payload, method: "tools/list")))
         self.configuration = configuration
         self.action = action; self.requesterID = requesterID; self.validate = validate
         policyFingerprint = try policy.fingerprint
@@ -80,6 +88,26 @@ actor MCPLaunchPolicySession {
         return try await gate.execute(action, requesterID: requesterID, approvalID: approvalID) { _ in
             try await self.check()
             return try await launch()
+        }
+    }
+    func prepareDiscovery() async throws -> PolicyPreparation {
+        try await check()
+        return try await gate.prepare(discoveryAction, requesterID: requesterID)
+    }
+    func reviewDiscovery(_ id: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        try await check()
+        return try await gate.review(id, expectedAction: discoveryAction, requesterID: requesterID, reviewerID: requesterID,
+            approve: approve, expectedSequence: expectedSequence)
+    }
+    func discover<Value: Sendable>(approvalID: UUID? = nil,
+                                  read: @Sendable () async throws -> Value) async throws -> PolicyExecutionResult<Value> {
+        try await check()
+        return try await gate.execute(discoveryAction, requesterID: requesterID, approvalID: approvalID) { _ in
+            try await self.check()
+            let value = try await read()
+            // A configuration/policy change during the traversal invalidates the returned claims.
+            try await self.check()
+            return value
         }
     }
     func prepareCredentials() async throws -> PolicyPreparation {

@@ -74,6 +74,24 @@ final class NativeMCPConnectionsUITests: XCTestCase {
             XCTAssertTrue(details.frame.contains(size.frame))
             let resourceShot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
             resourceShot.name = "Native MCP resource descriptions"; resourceShot.lifetime = .keepAlways; add(resourceShot)
+            let read = app.buttons["mcp.resource.read.0"]
+            for _ in 0..<16 where !details.frame.contains(read.frame) {
+                details.scroll(byDeltaX: 0, deltaY: read.frame.minY < details.frame.minY ? -150 : 150)
+            }
+            read.click()
+            XCTAssertTrue(app.buttons["Approve Resource Read"].waitForExistence(timeout: 10))
+            XCTAssertFalse(app.staticTexts["mcp.resource.content.0"].exists)
+            app.buttons["Approve Resource Read"].click()
+            let body = app.staticTexts["mcp.resource.content.0"]
+            XCTAssertTrue(body.waitForExistence(timeout: 10))
+            XCTAssertEqual(body.value as? String ?? body.label, "Synthetic evidence body.")
+            for _ in 0..<16 where !details.frame.contains(body.frame) {
+                details.scroll(byDeltaX: 0, deltaY: body.frame.minY < details.frame.minY ? -150 : 150)
+            }
+            XCTAssertTrue(details.frame.contains(body.frame))
+            XCTAssertTrue(app.staticTexts["Binary content: 3 bytes. Preview unavailable."].exists)
+            let contentShot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+            contentShot.name = "Native MCP resource content"; contentShot.lifetime = .keepAlways; add(contentShot)
             app.buttons["mcp.lifecycle.stop"].click()
             XCTAssertTrue(app.staticTexts["Stopped."].waitForExistence(timeout: 10))
         }

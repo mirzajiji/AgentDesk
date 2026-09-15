@@ -176,6 +176,42 @@ import AgentDeskPersistence
         try await Task.sleep(for: .milliseconds(30))
         XCTAssertNil(model.resourceCatalog); XCTAssertFalse(model.connected); XCTAssertNil(model.pending)
     }
+    func testResourceContentRequiresSeparateReviewAndClearsOnRefresh() async throws {
+        let fake = try LifecycleFake(); fake.includeResource = true
+        let model = NativeMCPLifecycleModel(needsCredentials: false) { fake }
+        model.prepare(); try await settle(model); model.approve(); try await settle(model)
+        model.discoverResources(); try await settle(model); model.approve(); try await settle(model)
+        model.readResource(UUID()); XCTAssertNil(model.readingResourceID)
+        model.readResource(fake.resource.id); try await settle(model)
+        XCTAssertEqual(model.pending?.id, fake.contentReview.id); XCTAssertEqual(fake.contentReads, 0)
+        model.approve(); try await settle(model)
+        XCTAssertEqual(fake.contentReads, 1); XCTAssertNotNil(model.resourceContent)
+        XCTAssertEqual(model.message, "This resource returned no content.")
+        model.discoverResources(); try await settle(model); XCTAssertNil(model.resourceContent)
+        model.stop(); try await settle(model); XCTAssertNil(model.readingResourceID)
+    }
+    func testDeniedResourceContentClosesWithoutRawError() async throws {
+        let fake = try LifecycleFake(); fake.includeResource = true; fake.denyContent = true
+        let model = NativeMCPLifecycleModel(needsCredentials: false) { fake }
+        model.prepare(); try await settle(model); model.approve(); try await settle(model)
+        model.discoverResources(); try await settle(model); model.approve(); try await settle(model)
+        model.readResource(fake.resource.id); try await settle(model)
+        XCTAssertEqual(fake.contentReads, 0); XCTAssertEqual(fake.closes, 1)
+        XCTAssertNil(model.resourceContent); XCTAssertFalse(model.message.contains("private-value"))
+    }
+    func testLateResourceContentCannotRestoreStoppedConnection() async throws {
+        let fake = try LifecycleFake(); fake.includeResource = true
+        var release: CheckedContinuation<Void, Never>?
+        fake.beforeContent = { await withCheckedContinuation { release = $0 } }
+        let model = NativeMCPLifecycleModel(needsCredentials: false) { fake }
+        model.prepare(); try await settle(model); model.approve(); try await settle(model)
+        model.discoverResources(); try await settle(model); model.approve(); try await settle(model)
+        model.readResource(fake.resource.id); try await settle(model); model.approve()
+        for _ in 0..<100 where release == nil { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertNotNil(release); model.stop(); release?.resume(); try await settle(model)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertNil(model.resourceContent); XCTAssertFalse(model.connected); XCTAssertNil(model.pending)
+    }
     private func settle(_ model: NativeMCPLifecycleModel) async throws {
         for _ in 0..<100 where model.busy { try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertFalse(model.busy)
@@ -186,6 +222,11 @@ import AgentDeskPersistence
     let credential: ApprovalRecord
     let discovery: ApprovalRecord
     let promptReview: ApprovalRecord
+    let contentReview: ApprovalRecord
+    let resource: MCPResourcePresentation
+    let connectionID = UUID()
+    var includeResource = false, denyContent = false, contentReads = 0
+    var beforeContent: (() async -> Void)?
     let resourceReview: ApprovalRecord
     var resourceReads = 0, denyResources = false
     var beforeResources: (() async -> Void)?
@@ -208,6 +249,10 @@ import AgentDeskPersistence
                 state: .pending, sequence: 1, createdAt: now, expiresAt: now.addingTimeInterval(600), updatedAt: now,
                 reviewerID: nil, reviewerRevision: nil)
         }
+        contentReview = try pending(.readEvidence)
+        let context = RedactionContext(scope: scope, environmentID: environment, runID: RunID())
+        let text = try ContentRedactor(context: context).redactText("urn:synthetic", in: context)
+        resource = MCPResourcePresentation(uri: text, name: text, title: nil, description: nil, mimeType: nil, sizeBytes: nil)
         launch = try pending(.runShell); credential = try pending(.readSecret); discovery = try pending(.readEvidence); promptReview = try pending(.readEvidence); resourceReview = try pending(.readEvidence)
     }
     func prepare() async throws -> PolicyPreparation { .approval(launch) }
@@ -261,7 +306,22 @@ import AgentDeskPersistence
     func discoverResources(approvalID: UUID?) async throws -> MCPResourceCatalogPresentation {
         XCTAssertEqual(approvalID, resourceReview.id); resourceReads += 1; await beforeResources?()
         return MCPResourceCatalogPresentation(scope: resourceReview.action.scope, environmentID: resourceReview.action.environmentID,
-            connectionID: UUID(), resources: [])
+            connectionID: connectionID, resources: includeResource ? [resource] : [])
+    }
+    func prepareResourceRead(resourceID: UUID) async throws -> PolicyPreparation {
+        XCTAssertEqual(resourceID, resource.id)
+        if denyContent { throw NSError(domain: "private-value", code: 1) }
+        return .approval(contentReview)
+    }
+    func reviewResourceRead(_ id: UUID, resourceID: UUID, approve: Bool, expectedSequence: Int64) async throws -> ApprovalRecord {
+        XCTAssertEqual(id, contentReview.id); XCTAssertEqual(resourceID, resource.id); XCTAssertTrue(approve)
+        return contentReview
+    }
+    func readResource(resourceID: UUID, approvalID: UUID?) async throws -> MCPResourceReadPresentation {
+        XCTAssertEqual(resourceID, resource.id); XCTAssertEqual(approvalID, contentReview.id)
+        contentReads += 1; await beforeContent?()
+        return MCPResourceReadPresentation(scope: contentReview.action.scope, environmentID: contentReview.action.environmentID,
+            connectionID: connectionID, resourceID: resourceID, contents: [])
     }
     func ping() async throws { pings += 1 }
     func close() async { closes += 1; await beforeClose?() }

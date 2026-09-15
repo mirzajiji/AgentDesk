@@ -44,6 +44,9 @@ enum NativeMCPUITestSupport {
             result = {'resultType':'complete'}
             if r['method'] == 'server/discover':
                 result.update({'supportedVersions':['2026-07-28'],'capabilities':{'tools':{},'prompts':{},'resources':{}},'_meta':{'io.modelcontextprotocol/serverInfo':{'name':'Synthetic native server','version':'1'}}})
+            elif r['method'] == 'resources/read':
+                assert r['params']['uri'] == 'urn:synthetic:evidence'
+                result.update({'ttlMs':0,'cacheScope':'private','contents':[{'uri':'urn:synthetic:evidence','mimeType':'text/plain','text':'Synthetic evidence body.'},{'uri':'urn:synthetic:binary','blob':'AP9B'}]})
             elif r['method'] == 'resources/list':
                 result.update({'ttlMs':0,'cacheScope':'private','resources':[{'uri':'urn:synthetic:evidence','name':'evidence','title':'Synthetic evidence resource','description':'Synthetic resource metadata.','mimeType':'text/plain','size':42}]})
             elif r['method'] == 'prompts/list':

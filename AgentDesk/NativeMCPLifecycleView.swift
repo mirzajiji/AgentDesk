@@ -88,10 +88,28 @@ struct NativeMCPLifecycleView: View {
                                 if let description = resource.description { Text(verbatim: description.text).textSelection(.enabled) }
                                 if let mime = resource.mimeType { Text("Type: \(mime.text)").font(.caption) }
                                 if let size = resource.sizeBytes { Text("Size: \(size.text) bytes").font(.caption) }
+                                Button("Read Content") { model.readResource(resource.id) }
+                                    .disabled(model.busy || model.pending != nil).accessibilityIdentifier("mcp.resource.read.\(index)")
+                                if model.readingResourceID == resource.id { Text("Selected for reading").font(.caption).bold() }
+                                if let content = model.resourceContent, content.resourceID == resource.id {
+                                    ForEach(Array(content.contents.enumerated()), id: \.offset) { part, item in
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Text(verbatim: item.uri.text).font(.caption)
+                                            if let mime = item.mimeType { Text(verbatim: mime.text).font(.caption) }
+                                            switch item.body {
+                                            case .text(let text):
+                                                Text(verbatim: text.text).textSelection(.enabled)
+                                                    .accessibilityIdentifier("mcp.resource.content.\(part)")
+                                            case .binary(let size):
+                                                Text("Binary content: \(size.text) bytes. Preview unavailable.")
+                                            }
+                                        }.padding(.top, 8)
+                                    }
+                                }
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
                                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
                         }
-                        Text("Resource descriptions only. Contents have not been read.").font(.caption).foregroundStyle(.secondary)
+                        Text("Read a resource to view its contents. Server content is untrusted.").font(.caption).foregroundStyle(.secondary)
                     }
                     Text("Closing this window stops this connection. Server capabilities do not grant permission to use tools.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -100,7 +118,7 @@ struct NativeMCPLifecycleView: View {
             Text(model.message).accessibilityIdentifier("mcp.lifecycle.message")
             if model.busy { ProgressView() }
             if model.pending != nil {
-                Button(model.reviewingResources ? "Approve Resource Discovery" : model.reviewingPrompts ? "Approve Prompt Discovery" : model.reviewingDiscovery ? "Approve Tool Discovery" : model.reviewingCredentials ? "Approve Credential Access" : "Approve and Start") { model.approve() }
+                Button(model.readingResourceID != nil ? "Approve Resource Read" : model.reviewingResources ? "Approve Resource Discovery" : model.reviewingPrompts ? "Approve Prompt Discovery" : model.reviewingDiscovery ? "Approve Tool Discovery" : model.reviewingCredentials ? "Approve Credential Access" : "Approve and Start") { model.approve() }
                     .disabled(model.busy).accessibilityIdentifier("mcp.lifecycle.approve")
             } else if model.connected {
                 HStack {
